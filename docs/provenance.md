@@ -197,6 +197,16 @@ The first monthly drift check ([issue 26](https://github.com/yungSNAT/GhostSoap/
   checked contact fields and current page state, not an unchanged policy.
   No email was sent and no form was submitted.
 
+### People-search leads rechecked (8 November 2026)
+
+The Optery Australian list named PERSONLOOKUP AUSTRALIA, Radaris Australia and ReverseAustralia; only the names were used. Each site's own pages were read on 8 November 2026 by an AI agent working for the maintainer: no name was searched, no form submitted and no account created. None was added.
+
+| Candidate | Pages read | Reason |
+|---|---|---|
+| PERSONLOOKUP AUSTRALIA | personlookup.com.au home, `/about`, `/search-tips`, `/privacy` | Still as at M1. No page names an operator; there is no privacy policy (`/privacy` returns 500). The about page gives `contact@personlookup.com.au` and a removal form for listed numbers, and says it takes no removal requests by email. The auDA registry lists the domain's registrant as a sole trader, an individual the register would have to name, and marks it 'Not Currently Eligible For Renewal'. A .com.au registrant with an ABN is not an overseas entry either |
+| Radaris Australia | radaris.com, au.radaris.com, radaris.com/au/ | Gone. Every path serves one notice: the New Jersey Superior Court (docket MID-L-000847-24) entered a default judgment against Radaris.com on 27 August 2026 and transferred the domain to Atlas Data Privacy Corporation. radaris.com.au, radaris.au and radaris.net.au do not exist in DNS |
+| ReverseAustralia | www.reverseaustralia.com home, `/about.php`, `/contact.php`, `/privacy.php`, `/acceptableuse.php`, `/developer/`, `/llms.txt` | Still as at M1. The privacy page returns an error page, and no page names a legal entity or ABN. The site is a community spam-report lookup for phone numbers, like NumberCheck and PhoneLookup (rejected at M1), though its about page says it may show names linked to a number; its contact page gives `residential@reverseaustralia.com` for residential listing removal. ABN Lookup lists the business names 'Reverse Australia' (from 2 November 2026) and 'Reverse Phone Lookup Australia' (from 1 November 2026) under ABN 21 663 563 611 (WWW ENTERPRISES PTY. LTD., WA), but no page of the site names that company, so the link is unconfirmed. Recheck once the privacy policy loads |
+
 ### Rejected candidates (M1)
 
 | Candidate | Reason |
