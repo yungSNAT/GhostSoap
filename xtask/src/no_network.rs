@@ -98,6 +98,16 @@ fn rust_files(root: &Path, dir: &Path, out: &mut Vec<(String, String)>) -> io::R
     Ok(())
 }
 
+/// The file's text, or `None` if it does not exist. Any other read error is returned, so a
+/// file the check cannot read fails it instead of passing unread.
+fn read_if_present(path: &Path) -> io::Result<Option<String>> {
+    match fs::read_to_string(path) {
+        Ok(text) => Ok(Some(text)),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e),
+    }
+}
+
 /// Run the check from the repository root. Exits 1 on a finding, 2 if it cannot run.
 pub fn run() -> ExitCode {
     let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
@@ -128,8 +138,13 @@ pub fn run() -> ExitCode {
         eprintln!("error: cannot read src: {e}");
         return ExitCode::from(2);
     }
-    if let Ok(text) = fs::read_to_string(root.join("build.rs")) {
-        files.push(("build.rs".to_owned(), text));
+    match read_if_present(&root.join("build.rs")) {
+        Ok(Some(text)) => files.push(("build.rs".to_owned(), text)),
+        Ok(None) => {}
+        Err(e) => {
+            eprintln!("error: cannot read build.rs: {e}");
+            return ExitCode::from(2);
+        }
     }
     let crates = network_crates(&tree);
     let uses = socket_uses(&files);
@@ -185,5 +200,18 @@ mod tests {
             ),
         ];
         assert_eq!(socket_uses(&files), ["src/a.rs:2", "src/b.rs:1"]);
+    }
+
+    #[test]
+    fn a_missing_file_is_absent_but_an_unreadable_one_is_an_error() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+        assert!(
+            read_if_present(&dir.join("no-such-build.rs"))
+                .unwrap()
+                .is_none()
+        );
+        // Reading a directory fails on every platform (access denied on Windows, 'is a
+        // directory' elsewhere), standing in for an unreadable file.
+        assert!(read_if_present(dir).is_err());
     }
 }
