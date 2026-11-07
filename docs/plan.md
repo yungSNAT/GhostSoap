@@ -212,12 +212,7 @@ Every command is planned to support `--json`; output honours `NO_COLOR`, and no 
 
 ## 6a. Threat model and abuse
 
-| Actor | Threat | Response |
-|---|---|---|
-| The user | Loses the passphrase or device | Export; clear warning that a lost passphrase cannot be recovered |
-| Someone with access to the device (for example an abusive partner) | Reads the profile, requests or checklist progress, which reveal what the user is hiding | Encryption at rest, keyring cache off by default, drafts cleaned, no plaintext logs; the README's safety section links to eSafety and DV support guidance on device safety |
-| An impersonator | Uses GhostSoap to send APP 12 requests in a victim's name from a fresh webmail address and collect the victim's details from many brokers at once | APP 12 is opt-in per entity with a warning, never in a pack or bulk command; every APP 12 letter invites the entity to verify identity as APP 12 requires (para 12.15); APP 7 and 13 letters, which return no data, stay the default; the README states misuse may be an offence |
-| A hostile broker | Uses the request to confirm or enrich its record of the user | Minimum fields per entry; letters ask the entity not to use request details for any other purpose |
+The threat model is kept in [SECURITY.md](../SECURITY.md#threat-model), which states what GhostSoap does today (moved there on 8 November 2026). Planned responses not yet built: `ghostsoap export`, so a profile survives a lost device, and a passphrase cache in the system keyring, off by default.
 
 ## 7. Hygiene checklist
 
