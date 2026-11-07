@@ -48,6 +48,9 @@ jobs:
           fallback: none
       - run: cargo fmt --all --check
       - run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      # The README promises no network connections: fail if a network crate or socket use
+      # reaches the ghostsoap package (see SECURITY.md's threat model).
+      - run: cargo run --locked -p xtask -- no-network
       - if: matrix.os != 'ubuntu-latest'
         run: cargo test --locked --workspace
       # GhostSoap makes no network connections (README), so the tests run in a network

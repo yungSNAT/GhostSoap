@@ -12,8 +12,10 @@
 //!                                                     the law table, optionally saving
 //!                                                     each page's text
 //! cargo run -p xtask -- email-changes <base> <head>   warn of email addresses a change added
+//! cargo run -p xtask -- no-network                    fail if ghostsoap could open a connection
 //! ```
 
+mod no_network;
 mod text;
 
 use std::collections::BTreeMap;
@@ -681,11 +683,13 @@ fn main() -> ExitCode {
         Some((command, [base, head])) if command == "email-changes" => {
             emails_changed(Path::new(base), Path::new(head))
         }
+        Some((command, [])) if command == "no-network" => no_network::run(),
         _ => {
             eprintln!(
                 "usage: xtask evidence-hash <url>... \
                  | xtask evidence-drift [registry dir [page text dir]] \
-                 | xtask email-changes <base registry dir> <head registry dir>"
+                 | xtask email-changes <base registry dir> <head registry dir> \
+                 | xtask no-network"
             );
             ExitCode::from(2)
         }
