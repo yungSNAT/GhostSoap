@@ -84,7 +84,7 @@ The skill is guidance, not a lock. It does not stop an agent that can read your 
 
 ## What leaves your machine
 
-Nothing from GhostSoap itself: it makes no network connections, and you send each letter yourself. CI holds it to that: it fails if a network crate or socket use reaches GhostSoap, and runs the tests with no network. An AI agent you use is separate: what it reads may reach its provider. [SECURITY.md](SECURITY.md#threat-model) has the threat model.
+Nothing from GhostSoap itself: it makes no network connections, and you send each letter yourself. CI holds it to that: it fails if a known network crate or socket use reaches GhostSoap, and runs the Linux tests with no network. An AI agent you use is separate: what it reads may reach its provider. [SECURITY.md](SECURITY.md#threat-model) has the threat model.
 
 ## What it will do
 

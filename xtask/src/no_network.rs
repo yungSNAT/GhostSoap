@@ -14,8 +14,10 @@ use std::path::Path;
 use std::process::{Command, ExitCode};
 
 /// Crates whose purpose is network I/O: HTTP, mail, sockets, DNS and TLS.
+// shortcut: a list catches only the crates it names; add any new network crate here.
 const NETWORK_CRATES: &[&str] = &[
     "async-imap",
+    "async-net",
     "attohttpc",
     "curl",
     "curl-sys",
@@ -28,6 +30,7 @@ const NETWORK_CRATES: &[&str] = &[
     "isahc",
     "lettre",
     "minreq",
+    "mio",
     "native-tls",
     "quinn",
     "reqwest",
@@ -100,6 +103,9 @@ pub fn run() -> ExitCode {
     let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
     let output = Command::new(cargo)
         .args(["tree", "--locked", "-e", "normal", "-p", "ghostsoap"])
+        // Every feature and target, so a dependency for another platform or an optional
+        // feature cannot slip past a run on this one.
+        .args(["--all-features", "--target", "all"])
         .args(["--prefix", "none", "--format", "{p}"])
         .output();
     let tree = match output {
