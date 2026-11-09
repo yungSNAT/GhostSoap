@@ -21,7 +21,7 @@ _GhostSoap at no Price._
 
 GhostSoap is a free, local-first tool that helps people in Australia reclaim their privacy. It prepares Privacy Act requests to data brokers, recruiters and other businesses for you to send from your own mailbox. Planned milestones add tracking of every deadline and reply, an escalation file when a business does not respond, and a guide to the data hygiene steps email cannot fix.
 
-**Status: milestone M2.** GhostSoap has a sourced [register](registry/README.md) of Australian entities and prepares request letters for you to send yourself. It does not yet track what you sent or the replies (milestone M3). The [plan](docs/plan.md) sets out what comes next.
+**Status: milestone M2.** GhostSoap has a sourced [register](registry/README.md) of Australian entities and prepares request letters for you to send yourself. It does not yet track what you sent or the replies (milestone M3a). The [plan](docs/plan.md) sets out what comes next.
 
 ## Install
 
