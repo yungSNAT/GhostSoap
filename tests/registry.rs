@@ -104,6 +104,66 @@ fn entry_with_no_source_is_rejected() {
 }
 
 #[test]
+fn malformed_entry_and_pack_fields_are_reported_together() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path();
+    let fixture = include_str!("fixtures/registry/no-source/no-source-au.toml");
+    let (entry, _) = fixture.split_once("[[channels]]").unwrap();
+    let entry = entry.replace("kinds = [\"marketing-list\"]", "kinds = []");
+    std::fs::write(
+        root.join("no-source-au.toml"),
+        format!("{entry}\n[manual_check]\nurl = \"http://example.invalid/manual\"\n"),
+    )
+    .unwrap();
+    let retired = fixture.replace("no-source-au", "retired-au");
+    std::fs::write(
+        root.join("retired-au.toml"),
+        format!("{retired}\n[obsolete]\nreason = \"out-of-scope\"\n"),
+    )
+    .unwrap();
+    std::fs::create_dir(root.join("packs")).unwrap();
+    for (id, entries) in [
+        ("empty", "[]"),
+        ("retired", "[\"retired-au\", \"retired-au\"]"),
+    ] {
+        std::fs::write(
+            root.join("packs").join(format!("{id}.toml")),
+            format!("id = \"{id}\"\nname = \"Fixture\"\ndescription = \"Fixture\"\nentries = {entries}\n"),
+        )
+        .unwrap();
+    }
+    let out = registry_check(root.to_str().unwrap());
+    assert_eq!(out.status.code(), Some(1));
+    let stderr = text(&out.stderr);
+    for finding in [
+        "kinds must not be empty",
+        "channels must list at least one way to send a request",
+        "manual_check.url `http://example.invalid/manual` is not an https URL",
+        "pack lists no entries",
+        "pack lists obsolete entry `retired-au`",
+        "pack lists `retired-au` twice",
+    ] {
+        assert!(stderr.contains(finding), "missing {finding:?}: {stderr}");
+    }
+}
+
+#[test]
+fn stale_verification_is_printed_as_a_warning_without_failing() {
+    let tmp = tempfile::tempdir().unwrap();
+    let fixture = include_str!("fixtures/registry/no-source/no-source-au.toml");
+    let fixture = fixture.replace(
+        "verified_at = 2026-10-24",
+        "verified_at = 2000-01-01\nsources = [\"https://example.invalid/privacy\"]",
+    );
+    std::fs::write(tmp.path().join("no-source-au.toml"), fixture).unwrap();
+    let out = registry_check(tmp.path().to_str().unwrap());
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    assert!(text(&out.stderr).starts_with("warning: "));
+    assert!(text(&out.stderr).contains("verified_at"));
+    assert!(text(&out.stdout).contains("errors: 0, warnings: 1"));
+}
+
+#[test]
 fn missing_register_directory_is_an_error() {
     let out = registry_check("tests/fixtures/registry/does-not-exist");
     assert_eq!(out.status.code(), Some(1));
