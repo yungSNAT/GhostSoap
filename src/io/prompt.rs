@@ -38,10 +38,18 @@ impl Input {
     }
 
     pub fn passphrase(&mut self, prompt: &str) -> io::Result<SecretString> {
+        self.passphrase_with(prompt, rpassword::prompt_password)
+    }
+
+    fn passphrase_with<'a>(
+        &mut self,
+        prompt: &'a str,
+        read_terminal: impl FnOnce(&'a str) -> io::Result<String>,
+    ) -> io::Result<SecretString> {
         let text = if self.passphrase_from_stdin {
             self.line(prompt)?
         } else {
-            rpassword::prompt_password(prompt)?
+            read_terminal(prompt)?
         };
         Ok(SecretString::from(text))
     }
@@ -88,4 +96,17 @@ impl Input {
             postcode: optional(self.line("Postcode: ")?),
         })
     }
+}
+
+#[test]
+fn terminal_prompt_errors_are_returned_to_the_caller() {
+    let mut input = Input::new(false);
+    let prompt = "Passphrase: ";
+    let err = input
+        .passphrase_with(prompt, |printed| {
+            assert_eq!(printed, prompt);
+            Err(io::Error::other("terminal unavailable"))
+        })
+        .unwrap_err();
+    assert_eq!(err.to_string(), "terminal unavailable");
 }

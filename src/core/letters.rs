@@ -232,6 +232,11 @@ fn tidy(text: &str) -> String {
     out.join("\n")
 }
 
+#[test]
+fn tidy_trims_blank_ends_and_keeps_one_paragraph_break() {
+    assert_eq!(tidy("\n \nFirst  \n\n \nSecond\n\n \n"), "First\n\nSecond");
+}
+
 /// Wrap each line at `width` columns on spaces; a longer word stays whole.
 pub fn wrap(text: &str, width: usize) -> String {
     let mut out = Vec::new();

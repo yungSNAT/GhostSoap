@@ -29,6 +29,8 @@ use sha2::{Digest, Sha256};
 /// Pages with less main text than this are bot checks or script-only shells.
 const MIN_TEXT: usize = 500;
 const USER_AGENT: &str = "GhostSoap-evidence-check/0.1 (+https://github.com/yungSNAT/GhostSoap)";
+const LEGISLATION_VERSIONS: &str = "https://api.prod.legislation.gov.au/v1/Versions";
+const DNS_RESOLVER: &str = "https://dns.google/resolve";
 /// Whole-request limit, so one slow or silent site fails instead of stalling the check.
 const TIMEOUT: Duration = Duration::from_secs(30);
 /// Each law the plan pins: its name, Federal Register title and the version read.
@@ -175,7 +177,14 @@ fn hash(urls: &[String]) -> ExitCode {
 /// Prints a Markdown report of changed and failing evidence pages, or nothing if every
 /// page still matches, and saves each HTML page's text under `text_dir` if given. Exits 0
 /// either way; a register that cannot be read exits 1.
-fn drift(dir: &Path, text_dir: Option<&Path>) -> ExitCode {
+fn drift(
+    dir: &Path,
+    text_dir: Option<&Path>,
+    agent: &ureq::Agent,
+    dns_resolver: &str,
+    versions_url: &str,
+    legal_pages: &[LegalPage],
+) -> ExitCode {
     let files = match ghostsoap::io::register::load(dir) {
         Ok(files) => files,
         Err(e) => {
@@ -183,13 +192,32 @@ fn drift(dir: &Path, text_dir: Option<&Path>) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let agent = agent(TIMEOUT);
+    let report = drift_report(
+        agent,
+        &files.entries,
+        text_dir,
+        &|name, record| dns_query(agent, dns_resolver, name, record),
+        &|title| latest_version(agent, versions_url, title),
+        legal_pages,
+    );
+    print!("{report}");
+    ExitCode::SUCCESS
+}
+
+fn drift_report(
+    agent: &ureq::Agent,
+    entries: &[SourceFile],
+    text_dir: Option<&Path>,
+    lookup: &dyn Fn(&str, &str) -> Result<Dns, String>,
+    latest: &dyn Fn(&str) -> Result<String, String>,
+    legal_pages: &[LegalPage],
+) -> String {
     let mut changed = Vec::new();
     let mut failing = Vec::new();
     let mut mail_domains = BTreeMap::new();
     let mut forms = BTreeMap::new();
     let mut emails = Vec::new();
-    for file in &files.entries {
+    for file in entries {
         let entry: Entry = match toml::from_str(&file.text) {
             Ok(entry) => entry,
             Err(e) => {
@@ -200,7 +228,7 @@ fn drift(dir: &Path, text_dir: Option<&Path>) -> ExitCode {
         let ids = std::slice::from_ref(&entry.id);
         let mut pages = Vec::new();
         for evidence in &entry.evidence {
-            match evidence_page(&agent, &evidence.url) {
+            match evidence_page(agent, &evidence.url) {
                 Ok(page) => {
                     if page.sha256 != evidence.sha256 {
                         changed.push(format!(
@@ -225,25 +253,22 @@ fn drift(dir: &Path, text_dir: Option<&Path>) -> ExitCode {
         }
         if entry.obsolete.is_none() {
             collect_channels(&entry, &mut mail_domains, &mut forms);
-            for (address, check) in email_checks(&agent, &entry, pages) {
+            for (address, check) in email_checks(agent, &entry, pages) {
                 record(&mut emails, &format!("email {address}"), ids, check);
             }
         }
     }
-    let mut channels = channel_problems(&agent, &mail_domains, &forms);
+    let mut channels = channel_problems(agent, lookup, &mail_domains, &forms);
     channels.append(&mut emails);
-    let mut laws = law_changes(&|title| latest_version(&agent, title));
-    laws.append(&mut legal_page_changes(&agent, &LEGAL_PAGES, text_dir));
-    if !changed.is_empty() || !failing.is_empty() || !channels.is_empty() || !laws.is_empty() {
-        print!("{}", report(&changed, &failing, &channels, &laws));
-    }
-    ExitCode::SUCCESS
+    let mut laws = law_changes(latest);
+    laws.append(&mut legal_page_changes(agent, legal_pages, text_dir));
+    report(&changed, &failing, &channels, &laws)
 }
 
 /// The Federal Register's latest version of a title.
-fn latest_version(agent: &ureq::Agent, title: &str) -> Result<String, String> {
+fn latest_version(agent: &ureq::Agent, endpoint: &str, title: &str) -> Result<String, String> {
     let body = agent
-        .get("https://api.prod.legislation.gov.au/v1/Versions")
+        .get(endpoint)
         .query(
             "$filter",
             format!("titleId eq '{title}' and isLatest eq true"),
@@ -343,18 +368,18 @@ fn collect_channels(
 
 fn channel_problems(
     agent: &ureq::Agent,
+    lookup: &dyn Fn(&str, &str) -> Result<Dns, String>,
     mail_domains: &BTreeMap<String, Vec<String>>,
     forms: &BTreeMap<String, Vec<String>>,
 ) -> Vec<String> {
-    let lookup = |name: &str, record: &str| dns_query(agent, name, record);
     let mut lines = Vec::new();
     for (domain, ids) in mail_domains {
         let what = format!("email domain {domain}");
-        record(&mut lines, &what, ids, check_mail(&lookup, domain));
+        record(&mut lines, &what, ids, check_mail(lookup, domain));
     }
     for (url, ids) in forms {
         let what = format!("web form or manual-check page {url}");
-        record(&mut lines, &what, ids, check_form(agent, &lookup, url));
+        record(&mut lines, &what, ids, check_form(agent, lookup, url));
     }
     lines
 }
@@ -548,9 +573,9 @@ enum Dns {
 }
 
 /// Ask Google Public DNS, which reports MX records that the standard library cannot look up.
-fn dns_query(agent: &ureq::Agent, name: &str, record: &str) -> Result<Dns, String> {
+fn dns_query(agent: &ureq::Agent, endpoint: &str, name: &str, record: &str) -> Result<Dns, String> {
     let body = agent
-        .get("https://dns.google/resolve")
+        .get(endpoint)
         .query("name", name)
         .query("type", record)
         .header("User-Agent", USER_AGENT)
@@ -679,6 +704,10 @@ fn main() -> ExitCode {
         Some((command, rest)) if command == "evidence-drift" && rest.len() <= 2 => drift(
             Path::new(rest.first().map_or("registry/au", String::as_str)),
             rest.get(1).map(Path::new),
+            &agent(TIMEOUT),
+            DNS_RESOLVER,
+            LEGISLATION_VERSIONS,
+            &LEGAL_PAGES,
         ),
         Some((command, [base, head])) if command == "email-changes" => {
             emails_changed(Path::new(base), Path::new(head))
@@ -730,8 +759,9 @@ address = "PO Box 1, Sydney NSW 2000"
 levers = []
 "#;
     use super::*;
-    use std::io::{Read, Write};
+    use std::io::{BufRead, BufReader, Write};
     use std::net::TcpListener;
+    use std::sync::mpsc::{self, Receiver};
     use std::time::Instant;
 
     fn fake_dns(mx: Dns, a: Dns) -> impl Fn(&str, &str) -> Result<Dns, String> {
@@ -760,6 +790,10 @@ levers = []
 
     #[test]
     fn reports_a_domain_that_cannot_take_mail() {
+        assert_eq!(
+            check_mail(&|_, _| panic!("empty domain must not be looked up"), ""),
+            Check::Dead("no domain in the address".to_owned())
+        );
         let gone = fake_dns(Dns::NoSuchName, records(&[]));
         assert_eq!(
             check_mail(&gone, "x.example"),
@@ -907,20 +941,269 @@ levers = []
         assert_eq!(parse_dns(r#"{"Status":3}"#, "A"), Ok(Dns::NoSuchName));
         assert!(parse_dns(r#"{"Status":2}"#, "A").is_err());
         assert!(parse_dns("not json", "A").is_err());
+        let ipv6 = r#"{"Status":0,"Answer":[{"type":28,"data":"2001:db8::1"}]}"#;
+        assert_eq!(parse_dns(ipv6, "AAAA"), Ok(records(&["2001:db8::1"])));
+        assert_eq!(
+            parse_dns(ipv6, "TXT"),
+            Err("unknown record type TXT".to_owned())
+        );
     }
 
-    fn serve_once(status: &'static str) -> String {
+    fn serve_body(status: &str, media: &str, body: &str) -> String {
+        serve_replies(status, media, body, 1).0
+    }
+
+    fn serve_replies(
+        status: &str,
+        media: &str,
+        body: &str,
+        count: usize,
+    ) -> (String, Receiver<String>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let url = format!("http://{}/", listener.local_addr().unwrap());
+        let (sender, requests) = mpsc::channel();
+        let reply = format!(
+            "HTTP/1.1 {status}\r\nContent-Type: {media}\r\nContent-Length: {}\r\n\
+             Connection: close\r\n\r\n{body}",
+            body.len()
+        );
         std::thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
-            let mut request = [0; 1024];
-            let _ = stream.read(&mut request);
-            let reply =
-                format!("HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
-            let _ = stream.write_all(reply.as_bytes());
+            for mut stream in listener.incoming().take(count).map(Result::unwrap) {
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(5)))
+                    .unwrap();
+                stream
+                    .set_write_timeout(Some(Duration::from_secs(5)))
+                    .unwrap();
+                let mut lines = BufReader::new(&mut stream).lines();
+                let request = lines.next().unwrap().unwrap();
+                let _ = sender.send(request);
+                for line in lines {
+                    if line.unwrap().is_empty() {
+                        break;
+                    }
+                }
+                let _ = stream.write_all(reply.as_bytes());
+            }
         });
-        url
+        (url, requests)
+    }
+
+    fn version_request(title: &str) -> String {
+        format!(
+            "GET /?$filter=titleId eq '{title}' and isLatest eq true&$select=registerId HTTP/1.1"
+        )
+    }
+
+    fn decode_request(request: String) -> String {
+        request
+            .replace("%24", "$")
+            .replace("%27", "'")
+            .replace("%20", " ")
+            .replace('+', " ")
+    }
+
+    fn serve_once(status: &str) -> String {
+        serve_body(status, "text/plain", "")
+    }
+
+    fn loopback_agent() -> ureq::Agent {
+        ureq::Agent::config_builder()
+            .proxy(None)
+            .timeout_global(Some(Duration::from_secs(5)))
+            .build()
+            .into()
+    }
+
+    #[test]
+    fn evidence_clients_parse_responses_and_propagate_http_errors() {
+        let agent = loopback_agent();
+        let (latest, latest_requests) = serve_replies(
+            "200 OK",
+            "application/json",
+            r#"{"value":[{"registerId":"TEST-VERSION"}]}"#,
+            1,
+        );
+        assert_eq!(
+            latest_version(&agent, &latest, "TEST-TITLE"),
+            Ok("TEST-VERSION".to_owned())
+        );
+        assert_eq!(
+            latest_requests
+                .try_iter()
+                .map(decode_request)
+                .collect::<Vec<_>>(),
+            [version_request("TEST-TITLE")]
+        );
+        let latest_unavailable = serve_once("503 Service Unavailable");
+        assert!(
+            latest_version(&agent, &latest_unavailable, "TEST-TITLE")
+                .unwrap_err()
+                .contains("503")
+        );
+        let (dns, dns_requests) = serve_replies(
+            "200 OK",
+            "application/json",
+            r#"{"Status":0,"Answer":[{"type":15,"data":"10 mx.example."}]}"#,
+            1,
+        );
+        assert_eq!(
+            dns_query(&agent, &dns, "example", "MX"),
+            Ok(records(&["10 mx.example."]))
+        );
+        assert_eq!(
+            dns_requests.try_iter().collect::<Vec<_>>(),
+            ["GET /?name=example&type=MX HTTP/1.1"]
+        );
+        let dns_unavailable = serve_once("503 Service Unavailable");
+        assert!(
+            dns_query(&agent, &dns_unavailable, "example", "MX")
+                .unwrap_err()
+                .contains("503")
+        );
+    }
+
+    #[test]
+    fn drift_loads_a_register_and_reports_success_using_local_evidence() {
+        let fixture =
+            std::env::temp_dir().join(format!("ghostsoap-drift-local-{}", std::process::id()));
+        std::fs::create_dir(&fixture).unwrap();
+        let (form, form_requests) = serve_replies("200 OK", "text/plain", "", 1);
+        let entry = ENTRY.replace("https://example.com.au/form", &form);
+        let entry_path = fixture.join("example-au.toml");
+        std::fs::write(&entry_path, &entry).unwrap();
+        let (dns, dns_requests) = serve_replies(
+            "200 OK",
+            "application/json",
+            r#"{"Status":0,"Answer":[{"type":15,"data":"10 mx.example."}]}"#,
+            1,
+        );
+        let (versions, version_requests) = serve_replies(
+            "200 OK",
+            "application/json",
+            r#"{"value":[{"registerId":"TEST-VERSION"}]}"#,
+            LAWS.len(),
+        );
+        let status = drift(&fixture, None, &loopback_agent(), &dns, &versions, &[]);
+        std::fs::remove_file(&entry_path).unwrap();
+        std::fs::remove_dir(&fixture).unwrap();
+        assert_eq!(status, ExitCode::SUCCESS);
+        assert_eq!(
+            form_requests.try_iter().collect::<Vec<_>>(),
+            ["GET / HTTP/1.1"]
+        );
+        assert_eq!(
+            dns_requests.try_iter().collect::<Vec<_>>(),
+            ["GET /?name=example.com.au&type=MX HTTP/1.1"]
+        );
+        assert_eq!(
+            version_requests
+                .try_iter()
+                .map(decode_request)
+                .collect::<Vec<_>>(),
+            LAWS.map(|(_, title, _)| version_request(title))
+        );
+    }
+
+    #[test]
+    fn drift_report_separates_changed_evidence_failed_checks_and_laws() {
+        let changed = serve_html("Email privacy@example.com.au.");
+        let refused = serve_once("403 Forbidden");
+        let dead = serve_once("404 Not Found");
+        let form = serve_once("404 Not Found");
+        let legal = serve_html("New fixture policy.");
+        let mut entry = ENTRY
+            .replace("https://example.com.au/privacy", &changed)
+            .replace("https://example.com.au/form", &form);
+        for url in [&changed, &refused, &dead] {
+            entry.push_str(&format!(
+                "\n[[evidence]]\nurl = \"{url}\"\nchecked_at = 2026-10-30\nsha256 = \"{}\"\n",
+                "0".repeat(64)
+            ));
+        }
+        let malformed = SourceFile {
+            name: "malformed.toml".to_owned(),
+            text: "not = ".to_owned(),
+        };
+        let retired = source(&format!(
+            "{}\n[obsolete]\nreason = \"closed\"\n",
+            ENTRY
+                .replace("example-au", "retired-au")
+                .replace("example.com.au", "retired.invalid")
+        ));
+        let lookup = |domain: &str, record: &str| {
+            assert_eq!((domain, record), ("example.com.au", "MX"));
+            Ok(Dns::NoSuchName)
+        };
+        let latest = |_: &str| Ok("TEST-VERSION".to_owned());
+        let text_dir = std::env::temp_dir().join(format!("ghostsoap-drift-{}", std::process::id()));
+        std::fs::create_dir(&text_dir).unwrap();
+        let report = drift_report(
+            &loopback_agent(),
+            &[source(&entry), retired, malformed],
+            Some(&text_dir),
+            &lookup,
+            &latest,
+            &[stale_page(&legal)],
+        );
+        let saved: Vec<_> = std::fs::read_dir(&text_dir)
+            .unwrap()
+            .map(|item| {
+                let path = item.unwrap().path();
+                let text = std::fs::read_to_string(&path);
+                std::fs::remove_file(path).unwrap();
+                text.unwrap()
+            })
+            .collect();
+        std::fs::remove_dir(&text_dir).unwrap();
+        assert_eq!(saved.len(), 2);
+        for (url, excerpt) in [
+            (&changed, "Email privacy@example.com.au."),
+            (&legal, "New fixture policy."),
+        ] {
+            assert!(
+                saved.iter().any(|text| {
+                    text.starts_with(&format!("{url}\n\n")) && text.contains(excerpt)
+                })
+            );
+        }
+        let sections: BTreeMap<_, _> = report
+            .split("\n## ")
+            .skip(1)
+            .map(|section| section.split_once('\n').unwrap())
+            .collect();
+        assert!(sections["Changed"].contains(&format!("- `example-au`: {changed}")));
+        assert!(sections["Failing"].contains(&format!("- `example-au`: {dead}: ")));
+        assert!(sections["Failing"].contains("- `malformed.toml`: does not parse:"));
+        assert!(!report.contains(&refused));
+        assert!(!report.contains("retired-au"));
+        assert!(
+            sections["Channels"].contains("email domain example.com.au: domain does not exist")
+        );
+        assert!(sections["Channels"].contains(&format!("web form or manual-check page {form}: ")));
+        assert!(sections["Laws"].contains("TEST-VERSION is now the latest version"));
+        assert!(sections["Laws"].contains(&format!("{legal} has changed")));
+    }
+
+    #[test]
+    fn saving_text_leaves_an_existing_non_directory_alone() {
+        let path = std::env::temp_dir().join(format!("ghostsoap-save-text-{}", std::process::id()));
+        std::fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .write_all(b"keep")
+            .unwrap();
+        save_text(
+            &path,
+            "example-au",
+            "https://example.invalid/",
+            "Test page.",
+        );
+        let original = std::fs::read(&path).unwrap();
+        std::fs::remove_file(path).unwrap();
+        assert_eq!(original, b"keep");
     }
 
     #[test]
@@ -960,22 +1243,20 @@ levers = []
 
     #[test]
     fn a_bot_block_does_not_count_as_a_dead_form() {
-        let agent = agent(Duration::from_secs(5));
-        for status in [
-            "401 Unauthorized",
-            "405 Method Not Allowed",
-            "403 Forbidden",
-            "429 Too Many Requests",
-            "500 Internal Server Error",
-            "502 Bad Gateway",
-            "503 Service Unavailable",
+        let agent = loopback_agent();
+        for (code, status) in [
+            (401, "401 Unauthorized"),
+            (405, "405 Method Not Allowed"),
+            (403, "403 Forbidden"),
+            (429, "429 Too Many Requests"),
+            (500, "500 Internal Server Error"),
+            (502, "502 Bad Gateway"),
+            (503, "503 Service Unavailable"),
         ] {
             let lookup = |_: &str, _: &str| Ok(records(&["192.0.2.1"]));
-            assert!(
-                matches!(
-                    check_form(&agent, &lookup, &serve_once(status)),
-                    Check::Inconclusive(_)
-                ),
+            assert_eq!(
+                check_form(&agent, &lookup, &serve_once(status)),
+                Check::Inconclusive(ureq::Error::StatusCode(code).to_string()),
                 "{status}"
             );
         }
@@ -1040,19 +1321,7 @@ levers = []
     fn serve_html(main: &str) -> String {
         let filler = "Privacy policy text. ".repeat(30);
         let html = format!("<html><body><main>{filler} {main}</main></body></html>");
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let url = format!("http://{}/", listener.local_addr().unwrap());
-        std::thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
-            let _ = stream.read(&mut [0; 1024]);
-            let reply = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\n\
-                 Connection: close\r\n\r\n{html}",
-                html.len()
-            );
-            let _ = stream.write_all(reply.as_bytes());
-        });
-        url
+        serve_body("200 OK", "text/html", &html)
     }
 
     #[test]
