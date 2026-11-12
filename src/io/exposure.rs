@@ -50,6 +50,10 @@ pub struct SyncRoot {
 /// The sync folders listed in the module documentation, read through `var` (normally
 /// `std::env::var_os`) so tests can supply their own. Empty variables are ignored.
 pub fn sync_roots(var: impl Fn(&str) -> Option<OsString>) -> Vec<SyncRoot> {
+    sync_roots_for(std::env::consts::OS, var)
+}
+
+fn sync_roots_for(os: &str, var: impl Fn(&str) -> Option<OsString>) -> Vec<SyncRoot> {
     let var = |name: &str| var(name).filter(|v| !v.is_empty()).map(PathBuf::from);
     let mut roots: Vec<SyncRoot> = ["OneDrive", "OneDriveCommercial", "OneDriveConsumer"]
         .into_iter()
@@ -59,7 +63,7 @@ pub fn sync_roots(var: impl Fn(&str) -> Option<OsString>) -> Vec<SyncRoot> {
             path,
         })
         .collect();
-    let home = if cfg!(windows) {
+    let home = if os == "windows" {
         var("USERPROFILE")
     } else {
         var("HOME")
@@ -72,12 +76,13 @@ pub fn sync_roots(var: impl Fn(&str) -> Option<OsString>) -> Vec<SyncRoot> {
             });
         };
         add("Dropbox", "Dropbox");
-        if cfg!(windows) {
-            add("iCloud Drive", "iCloudDrive");
-        }
-        if cfg!(target_os = "macos") {
-            add("iCloud Drive", "Library/Mobile Documents");
-            add("macOS cloud storage", "Library/CloudStorage");
+        match os {
+            "windows" => add("iCloud Drive", "iCloudDrive"),
+            "macos" => {
+                add("iCloud Drive", "Library/Mobile Documents");
+                add("macOS cloud storage", "Library/CloudStorage");
+            }
+            _ => {}
         }
     }
     roots
@@ -151,9 +156,13 @@ fn real(path: &Path) -> PathBuf {
 /// `path` for people to read: without the `\\?\` prefix Windows gives canonical paths on a
 /// drive.
 pub fn display(path: &Path) -> String {
+    display_for(path, cfg!(windows))
+}
+
+fn display_for(path: &Path, windows: bool) -> String {
     let text = path.display().to_string();
     match text.strip_prefix(r"\\?\") {
-        Some(rest) if cfg!(windows) && !rest.starts_with(r"UNC\") => rest.to_owned(),
+        Some(rest) if windows && !rest.starts_with(r"UNC\") => rest.to_owned(),
         _ => text,
     }
 }
@@ -226,6 +235,12 @@ mod tests {
     }
 
     #[test]
+    fn an_unresolvable_path_keeps_its_original_form() {
+        let empty = Path::new("");
+        assert_eq!(resolve(empty), empty);
+    }
+
+    #[test]
     fn sync_folders_are_matched_and_reported_once() {
         let tmp = tempfile::tempdir().unwrap();
         let onedrive = tmp.path().join("OneDrive");
@@ -256,30 +271,33 @@ mod tests {
         let vars = |name: &str| match name {
             "OneDrive" => Some(OsString::from("od")),
             "OneDriveCommercial" => Some(OsString::new()),
-            "USERPROFILE" | "HOME" => Some(OsString::from("home")),
+            "USERPROFILE" => Some(OsString::from("userprofile")),
+            "HOME" => Some(OsString::from("home")),
             _ => None,
         };
-        let found = sync_roots(vars);
+        let onedrive = ("OneDrive", Path::new("od"));
+        let dropbox = ("Dropbox", Path::new("home/Dropbox"));
+        assert_eq!(sync_roots_for("linux", vars), roots(&[onedrive, dropbox]));
         assert_eq!(
-            found[..2],
-            [
-                SyncRoot {
-                    service: "OneDrive",
-                    path: PathBuf::from("od")
-                },
-                SyncRoot {
-                    service: "Dropbox",
-                    path: Path::new("home").join("Dropbox")
-                },
-            ],
-            "an empty variable is ignored"
+            sync_roots_for("windows", vars),
+            roots(&[
+                onedrive,
+                ("Dropbox", Path::new("userprofile/Dropbox")),
+                ("iCloud Drive", Path::new("userprofile/iCloudDrive")),
+            ])
         );
-        let expected_extra = if cfg!(windows) || cfg!(target_os = "macos") {
-            1 + usize::from(cfg!(target_os = "macos"))
-        } else {
-            0
-        };
-        assert_eq!(found.len(), 2 + expected_extra);
+        assert_eq!(
+            sync_roots_for("macos", vars),
+            roots(&[
+                onedrive,
+                dropbox,
+                ("iCloud Drive", Path::new("home/Library/Mobile Documents")),
+                (
+                    "macOS cloud storage",
+                    Path::new("home/Library/CloudStorage")
+                ),
+            ])
+        );
         assert!(sync_roots(|_| None).is_empty());
     }
 
@@ -296,12 +314,14 @@ mod tests {
         let into_repo = tmp.path().join("into-repo");
         let out_of_repo = repo.join("out");
         #[cfg(unix)]
-        let made = std::os::unix::fs::symlink(&inside, &into_repo)
-            .and_then(|()| std::os::unix::fs::symlink(&plain, &out_of_repo));
+        {
+            std::os::unix::fs::symlink(&inside, &into_repo).unwrap();
+            std::os::unix::fs::symlink(&plain, &out_of_repo).unwrap();
+        }
         #[cfg(windows)]
-        let made = std::os::windows::fs::symlink_dir(&inside, &into_repo)
-            .and_then(|()| std::os::windows::fs::symlink_dir(&plain, &out_of_repo));
-        if let Err(e) = made {
+        if let Err(e) = std::os::windows::fs::symlink_dir(&inside, &into_repo)
+            .and_then(|()| std::os::windows::fs::symlink_dir(&plain, &out_of_repo))
+        {
             // Windows needs Developer Mode or an administrator to make links.
             eprintln!("skipped: cannot create a directory link here: {e}");
             return;
@@ -322,12 +342,10 @@ mod tests {
     #[test]
     fn display_drops_only_the_drive_verbatim_prefix() {
         assert_eq!(display(Path::new("plain")), "plain");
-        if cfg!(windows) {
-            assert_eq!(display(Path::new(r"\\?\C:\x")), r"C:\x");
-            assert_eq!(
-                display(Path::new(r"\\?\UNC\server\share")),
-                r"\\?\UNC\server\share"
-            );
-        }
+        let drive = Path::new(r"\\?\C:\x");
+        let unc = Path::new(r"\\?\UNC\server\share");
+        assert_eq!(display_for(drive, true), r"C:\x");
+        assert_eq!(display_for(unc, true), r"\\?\UNC\server\share");
+        assert_eq!(display_for(drive, false), r"\\?\C:\x");
     }
 }

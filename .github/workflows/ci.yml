@@ -42,12 +42,15 @@ jobs:
         run: rustup component add llvm-tools
       - name: Install the pinned cargo-llvm-cov
         if: matrix.os == 'ubuntu-latest'
-        uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+        uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2.88.1
         with:
           tool: cargo-llvm-cov@0.9.1
           fallback: none
       - run: cargo fmt --all --check
       - run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      # The README promises no network connections: fail if a network crate or socket use
+      # reaches the ghostsoap package (see SECURITY.md's threat model).
+      - run: cargo run --locked -p xtask -- no-network
       - if: matrix.os != 'ubuntu-latest'
         run: cargo test --locked --workspace
       # GhostSoap makes no network connections (README), so the tests run in a network
@@ -124,7 +127,7 @@ jobs:
         with:
           persist-credentials: false
       - run: rustup toolchain install
-      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+      - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2.88.1
         with:
           tool: cargo-audit@0.22.2
           fallback: none

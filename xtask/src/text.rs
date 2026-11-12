@@ -336,6 +336,14 @@ mod tests {
     }
 
     #[test]
+    fn a_tag_can_have_an_unquoted_attribute() {
+        assert_eq!(
+            main_text("<main id=policy>Policy text</main>"),
+            "Policy text"
+        );
+    }
+
+    #[test]
     fn falls_back_to_body_and_skips_scripts_and_comments() {
         let html = "<BODY><script>var a = '<p>';</script><!-- note -->Hello\n\n  <STYLE>p{}</STYLE>world</BODY>";
         assert_eq!(main_text(html), "Hello world");
@@ -380,6 +388,16 @@ mod tests {
             "<body>Text<script>x</script",
         ] {
             assert_eq!(main_text(html), "Text");
+        }
+    }
+
+    #[test]
+    fn unclosed_skipped_elements_hide_their_remaining_text() {
+        for tail in [
+            "<template><!-- </template> --> unclosed < 3 <main>Hidden</main>",
+            "<script>unclosed <main>Hidden</main>",
+        ] {
+            assert_eq!(main_text(&format!("<body>Visible {tail}")), "Visible");
         }
     }
 

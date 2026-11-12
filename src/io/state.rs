@@ -39,22 +39,20 @@ impl State {
 /// Where the state lives: `GHOSTSOAP_HOME` if set, else the platform data directory, never
 /// a folder a sync service such as OneDrive is likely to copy.
 pub fn data_dir() -> io::Result<PathBuf> {
-    let var = |name: &str| {
-        env::var_os(name)
-            .filter(|v| !v.is_empty())
-            .map(PathBuf::from)
-    };
+    data_dir_for(env::consts::OS, |name| env::var_os(name))
+}
+
+fn data_dir_for(os: &str, var: impl Fn(&str) -> Option<std::ffi::OsString>) -> io::Result<PathBuf> {
+    let var = |name: &str| var(name).filter(|v| !v.is_empty()).map(PathBuf::from);
     if let Some(home) = var("GHOSTSOAP_HOME") {
         return Ok(home);
     }
-    let dir = if cfg!(windows) {
-        var("LOCALAPPDATA").map(|d| d.join("GhostSoap"))
-    } else if cfg!(target_os = "macos") {
-        var("HOME").map(|d| d.join("Library/Application Support/GhostSoap"))
-    } else {
-        var("XDG_DATA_HOME")
+    let dir = match os {
+        "windows" => var("LOCALAPPDATA").map(|d| d.join("GhostSoap")),
+        "macos" => var("HOME").map(|d| d.join("Library/Application Support/GhostSoap")),
+        _ => var("XDG_DATA_HOME")
             .or_else(|| var("HOME").map(|h| h.join(".local/share")))
-            .map(|d| d.join("ghostsoap"))
+            .map(|d| d.join("ghostsoap")),
     };
     dir.ok_or_else(|| io::Error::other("cannot find a data directory; set GHOSTSOAP_HOME"))
 }
@@ -79,7 +77,7 @@ pub fn create(dir: &Path, state: &State, passphrase: SecretString) -> io::Result
             format!("{} already exists", path.display()),
         ));
     }
-    write_atomic(&path, &bytes)
+    write_atomic(dir, &bytes)
 }
 
 /// Read and decrypt the state file.
@@ -167,27 +165,30 @@ impl Drop for Lock {
 /// survives a power cut. A temporary file left by an interrupted write is overwritten, so
 /// GhostSoap keeps only what it reported as saved: after an interrupted update `path` still
 /// holds the last complete state, and after an interrupted `init` the user runs it again.
-fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
+fn write_atomic(dir: &Path, bytes: &[u8]) -> io::Result<()> {
+    let path = state_path(dir);
     let tmp = path.with_extension("age.tmp");
     let mut file = File::create(&tmp)?;
     file.write_all(bytes)?;
     file.sync_all()?;
     drop(file);
+    rename_with_retry(|| fs::rename(&tmp, &path))?;
+    #[cfg(unix)]
+    File::open(dir)?.sync_all()?;
+    Ok(())
+}
+
+fn rename_with_retry(mut rename: impl FnMut() -> io::Result<()>) -> io::Result<()> {
     let mut attempt = 0;
     loop {
-        match fs::rename(&tmp, path) {
+        match rename() {
             Err(e) if e.kind() == io::ErrorKind::PermissionDenied && attempt < 10 => {
                 attempt += 1;
                 thread::sleep(Duration::from_millis(200));
             }
-            other => break other?,
+            other => return other,
         }
     }
-    #[cfg(unix)]
-    if let Some(dir) = path.parent() {
-        File::open(dir)?.sync_all()?;
-    }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -234,5 +235,93 @@ mod tests {
         let err = create(dir.path(), &State::new(profile()), secret("pass phrase")).unwrap_err();
         assert!(err.to_string().contains("another GhostSoap is writing"));
         assert!(!state_path(dir.path()).exists());
+    }
+
+    #[test]
+    fn data_directory_uses_the_platform_and_explicit_override() {
+        let env = std::collections::BTreeMap::from([
+            ("LOCALAPPDATA", "appdata"),
+            ("HOME", "home"),
+            ("XDG_DATA_HOME", "xdg"),
+            ("GHOSTSOAP_HOME", ""),
+        ]);
+        let vars = |name: &str| env.get(name).map(std::ffi::OsString::from);
+        for (os, parent, rest) in [
+            ("windows", "appdata", "GhostSoap"),
+            ("macos", "home", "Library/Application Support/GhostSoap"),
+            ("linux", "xdg", "ghostsoap"),
+        ] {
+            assert_eq!(
+                data_dir_for(os, vars).unwrap(),
+                Path::new(parent).join(rest)
+            );
+            assert_eq!(
+                data_dir_for(os, |name| (name == "GHOSTSOAP_HOME")
+                    .then(|| "override".into()))
+                .unwrap(),
+                Path::new("override")
+            );
+        }
+    }
+
+    #[test]
+    fn state_reports_non_missing_read_errors_and_rejects_unreadable_contents() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = state_path(dir.path());
+        fs::create_dir(&path).unwrap();
+        let err = load(dir.path(), secret("test passphrase")).unwrap_err();
+        assert_ne!(err.kind(), io::ErrorKind::NotFound);
+        fs::remove_dir(&path).unwrap();
+        fs::write(&path, b"not an age file").unwrap();
+        let err = load(dir.path(), secret("test passphrase")).unwrap_err();
+        assert!(err.to_string().contains("cannot decrypt"));
+
+        fs::remove_file(&path).unwrap();
+        let state = State {
+            format: FORMAT + 1,
+            ..State::new(profile())
+        };
+        create(dir.path(), &state, secret("test passphrase")).unwrap();
+        let err = load(dir.path(), secret("test passphrase")).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            format!(
+                "state format {} is not supported by this version",
+                FORMAT + 1
+            )
+        );
+    }
+
+    #[test]
+    fn a_lock_in_a_missing_parent_preserves_the_os_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let err = Lock::acquire(&dir.path().join("missing"), LOCK_FILE)
+            .err()
+            .unwrap();
+        assert_eq!(err.kind(), io::ErrorKind::NotFound);
+        assert!(err.raw_os_error().is_some());
+    }
+
+    #[test]
+    fn state_rename_retries_a_temporarily_locked_file_only() {
+        let mut calls = 0;
+        rename_with_retry(|| {
+            calls += 1;
+            if calls == 1 {
+                Err(io::ErrorKind::PermissionDenied.into())
+            } else {
+                Ok(())
+            }
+        })
+        .unwrap();
+        assert_eq!(calls, 2);
+
+        let err = rename_with_retry(|| {
+            calls += 1;
+            Err(io::ErrorKind::NotFound.into())
+        })
+        .unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::NotFound);
+        assert_eq!(calls, 3);
     }
 }

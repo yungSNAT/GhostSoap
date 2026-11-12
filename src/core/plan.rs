@@ -289,6 +289,30 @@ entries = ["pollos-au", "fsociety-au"]
         .unwrap()
     }
 
+    #[test]
+    fn retired_entries_and_levers_without_written_channels_are_skipped() {
+        use crate::core::register::{Obsolete, ObsoleteReason};
+
+        let mut register = register();
+        let selection = select(&[], &["pollos-au"], &[Lever::App7NoMarketing], None);
+        let entry = register.entries.get_mut("pollos-au").unwrap();
+        entry
+            .channels
+            .retain(|channel| channel.kind == ChannelKind::Phone);
+        entry.channels[0].levers = vec![Lever::App7NoMarketing];
+        let steps = plan(&register, &selection).unwrap();
+        assert!(matches!(&steps[..], [Step::Skip { reason, .. }]
+            if reason == "no written channel for app7-no-marketing"));
+
+        register.entries.get_mut("pollos-au").unwrap().obsolete = Some(Obsolete {
+            reason: ObsoleteReason::OutOfScope,
+            replaced_by: None,
+        });
+        let steps = plan(&register, &selection).unwrap();
+        assert!(matches!(&steps[..], [Step::Skip { reason, .. }]
+            if reason == "obsolete (out-of-scope)"));
+    }
+
     fn select(
         packs: &[&str],
         entries: &[&str],

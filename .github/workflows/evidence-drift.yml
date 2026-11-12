@@ -6,7 +6,7 @@ name: Evidence drift
 # changed or failed. It never commits, sends an email or submits a form.
 on:
   schedule:
-    - cron: "17 3 1 * *"
+    - cron: "18 3 1 * *"
   workflow_dispatch:
 
 permissions:

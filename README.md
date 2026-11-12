@@ -21,7 +21,7 @@ _GhostSoap at no Price._
 
 GhostSoap is a free, local-first tool that helps people in Australia reclaim their privacy. It prepares Privacy Act requests to data brokers, recruiters and other businesses for you to send from your own mailbox. Planned milestones add tracking of every deadline and reply, an escalation file when a business does not respond, and a guide to the data hygiene steps email cannot fix.
 
-**Status: milestone M2.** GhostSoap has a sourced [register](registry/README.md) of Australian entities and prepares request letters for you to send yourself. It does not yet track what you sent or the replies (milestone M3). The [plan](docs/plan.md) sets out what comes next.
+**Status: milestone M2.** GhostSoap has a sourced [register](registry/README.md) of Australian entities and prepares request letters for you to send yourself. It does not yet track what you sent or the replies (milestone M3a). The [plan](docs/plan.md) sets out what comes next.
 
 ## Install
 
@@ -84,7 +84,7 @@ The skill is guidance, not a lock. It does not stop an agent that can read your 
 
 ## What leaves your machine
 
-Nothing from GhostSoap itself: it makes no network connections, and you send each letter yourself. An AI agent you use is separate: what it reads may reach its provider.
+Nothing from GhostSoap itself: it makes no network connections, and you send each letter yourself. CI holds it to that: it fails if a known network crate or socket use reaches GhostSoap, and runs the Linux tests with no network. An AI agent you use is separate: what it reads may reach its provider. [SECURITY.md](SECURITY.md#threat-model) has the threat model.
 
 ## What it will do
 

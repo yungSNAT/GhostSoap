@@ -55,11 +55,7 @@ pub fn write(dir: &Path, name: &str, text: &str) -> io::Result<PathBuf> {
             format!("`{name}` is not a draft name"),
         ));
     }
-    let _lock = lock_new(dir).or_else(|e| match e.kind() {
-        // A `clean` removed the emptied folder between creating it and locking it.
-        io::ErrorKind::NotFound => lock_new(dir),
-        _ => Err(e),
-    })?;
+    let _lock = lock_for_write(dir, lock_new)?;
     let path = dir.join(name);
     if fs::symlink_metadata(&path).is_ok() {
         return Err(io::Error::new(
@@ -87,6 +83,14 @@ fn lock_new(dir: &Path) -> io::Result<Lock> {
     create_private_dir(dir)?;
     check_private(dir)?;
     Lock::acquire(dir, LOCK)
+}
+
+fn lock_for_write(dir: &Path, acquire: impl Fn(&Path) -> io::Result<Lock>) -> io::Result<Lock> {
+    acquire(dir).or_else(|e| match e.kind() {
+        // A `clean` removed the emptied folder between creating it and locking it.
+        io::ErrorKind::NotFound => acquire(dir),
+        _ => Err(e),
+    })
 }
 
 /// One manifest line: `pending` or a SHA-256, then a draft name.
@@ -252,11 +256,21 @@ fn is_draft(name: &str) -> bool {
 /// pass it only for GhostSoap's own drafts folder.
 // Bravo Six, going dark.
 pub fn clean(dir: &Path, remove_dir: bool) -> io::Result<Cleaned> {
+    clean_with_lock(dir, remove_dir, || {
+        check_private(dir).and_then(|()| Lock::acquire(dir, LOCK))
+    })
+}
+
+fn clean_with_lock(
+    dir: &Path,
+    remove_dir: bool,
+    acquire: impl FnOnce() -> io::Result<Lock>,
+) -> io::Result<Cleaned> {
     if !dir.exists() {
         return Ok(Cleaned::default());
     }
-    let lock = match check_private(dir).and_then(|()| Lock::acquire(dir, LOCK)) {
-        // Another clean removed the folder since the check above.
+    let lock = match acquire() {
+        // Another clean removed the folder since the existence check.
         Err(e) if e.kind() == io::ErrorKind::NotFound && !dir.exists() => {
             return Ok(Cleaned::default());
         }
@@ -296,12 +310,12 @@ pub fn clean(dir: &Path, remove_dir: bool) -> io::Result<Cleaned> {
     }
     drop(lock);
     if remove_dir {
-        remove_if_empty(dir)?;
+        remove_if_empty(dir, |dir| fs::remove_dir(dir))?;
     }
     Ok(cleaned)
 }
 
-fn remove_if_empty(dir: &Path) -> io::Result<()> {
+fn remove_if_empty(dir: &Path, remove: impl FnOnce(&Path) -> io::Result<()>) -> io::Result<()> {
     let empty = match fs::read_dir(dir) {
         Ok(mut items) => items.next().is_none(),
         // Another clean removed it after this one released the lock.
@@ -311,7 +325,7 @@ fn remove_if_empty(dir: &Path) -> io::Result<()> {
     if !empty {
         return Ok(());
     }
-    match fs::remove_dir(dir) {
+    match remove(dir) {
         // A `write` started in the folder after the lock was released; it stays.
         Err(e)
             if !matches!(
@@ -328,6 +342,104 @@ fn remove_if_empty(dir: &Path) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn drafts_ignore_other_extensions_and_report_filesystem_errors() {
+        let dir = tempfile::tempdir().unwrap();
+        let drafts = dir.path().join("drafts");
+        let err = write(&drafts, "example-au-GS-ABCDE.pdf", "text").unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+        assert!(!drafts.exists());
+
+        #[cfg(unix)]
+        {
+            fs::write(&drafts, "").unwrap();
+            let err = read_manifest(&drafts).unwrap_err();
+            assert_eq!(err.kind(), io::ErrorKind::NotADirectory);
+            let err = remove_if_empty(&drafts, |_| panic!("a file is never removed")).unwrap_err();
+            assert_eq!(err.kind(), io::ErrorKind::NotADirectory);
+        }
+    }
+
+    #[test]
+    fn a_failed_manifest_replacement_removes_only_its_own_copy() {
+        let dir = tempfile::tempdir().unwrap();
+        let manifest = dir.path().join(MANIFEST);
+        fs::create_dir(&manifest).unwrap();
+        let prior = dir.path().join(".ghostsoap-drafts.1-1.tmp");
+        fs::write(&prior, "prior copy").unwrap();
+        let record = (PENDING.to_owned(), "example-au-GS-ABCDE.eml".to_owned());
+        assert!(save_manifest(dir.path(), &[record]).is_err());
+        assert!(manifest.is_dir());
+        assert_eq!(fs::read_to_string(prior).unwrap(), "prior copy");
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 2);
+    }
+
+    #[test]
+    fn cleanup_forgives_an_absent_committed_draft_but_reports_other_read_errors() {
+        let dir = tempfile::tempdir().unwrap();
+        let drafts = dir.path().join("drafts");
+        let name = "example-au-GS-ABCDE.eml";
+        let path = write(&drafts, name, "letter").unwrap();
+        fs::remove_file(&path).unwrap();
+        assert_eq!(clean(&drafts, false).unwrap(), Cleaned::default());
+        assert!(!drafts.join(MANIFEST).exists());
+
+        let path = write(&drafts, name, "letter").unwrap();
+        fs::remove_file(&path).unwrap();
+        fs::create_dir(&path).unwrap();
+        assert!(clean(&drafts, false).is_err());
+        assert!(path.is_dir());
+        assert_eq!(
+            read_manifest(&drafts).unwrap(),
+            [(sha256(b"letter"), name.to_owned())]
+        );
+    }
+
+    #[test]
+    fn a_removed_folder_is_retried_by_write_and_ignored_by_clean() {
+        let dir = tempfile::tempdir().unwrap();
+        let drafts = dir.path().join("drafts");
+        let called = std::cell::Cell::new(false);
+        let lock = lock_for_write(&drafts, |dir| {
+            if !called.replace(true) {
+                create_private_dir(dir).unwrap();
+                fs::remove_dir(dir).unwrap();
+                Lock::acquire(dir, LOCK)
+            } else {
+                lock_new(dir)
+            }
+        })
+        .unwrap();
+        assert!(drafts.join(LOCK).exists());
+        drop(lock);
+        assert_eq!(
+            clean_with_lock(&drafts, true, || {
+                fs::remove_dir(&drafts).unwrap();
+                Lock::acquire(&drafts, LOCK)
+            })
+            .unwrap(),
+            Cleaned::default()
+        );
+        remove_if_empty(&drafts, |_| panic!("a missing folder is never removed")).unwrap();
+    }
+
+    #[test]
+    fn cleanup_leaves_new_arrivals_and_reports_other_removal_errors() {
+        let dir = tempfile::tempdir().unwrap();
+        let note = dir.path().join("keep.txt");
+        remove_if_empty(dir.path(), |dir| {
+            fs::write(&note, "keep").unwrap();
+            fs::remove_dir(dir)
+        })
+        .unwrap();
+        assert_eq!(fs::read_to_string(&note).unwrap(), "keep");
+        fs::remove_file(note).unwrap();
+        let err = remove_if_empty(dir.path(), |_| Err(io::ErrorKind::PermissionDenied.into()))
+            .unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::PermissionDenied);
+        assert!(dir.path().is_dir());
+    }
 
     #[test]
     fn clean_deletes_only_drafts_it_wrote() {
