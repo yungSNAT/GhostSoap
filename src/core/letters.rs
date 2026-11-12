@@ -129,6 +129,12 @@ pub fn compose(entry: &Entry, profile: &Profile, request: &Request) -> Result<Le
         });
     let postal =
         (request.channel.kind == ChannelKind::Post).then(|| request.channel.address.clone());
+    // Empty, which keeps its line, when the letter also asks to stop direct marketing.
+    let with_opt_out = request
+        .levers
+        .iter()
+        .any(|l| matches!(l, Lever::App7NoMarketing | Lever::App7NoFacilitation))
+        .then(String::new);
     values.extend([
         ("date", Some(request.date.format("%-d %B %Y").to_string())),
         ("legal_entity", Some(entry.legal_entity.clone())),
@@ -138,6 +144,7 @@ pub fn compose(entry: &Entry, profile: &Profile, request: &Request) -> Result<Le
         ("escalation", escalation(entry, spam_only, has_spam)),
         ("tag", Some(format!("[{}]", request.tag))),
         ("detail", request.detail.map(str::to_owned)),
+        ("with_opt_out", with_opt_out),
     ]);
     let mut sections = vec![render(parts(OPENING).1, &values)?];
     for &lever in request.levers {
