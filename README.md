@@ -110,6 +110,7 @@ GhostSoap suits you if you want to keep your details on your own computer and se
 
 - **Someone else does the work:** [ClearTrace AU](https://cleartrace.au/) and [Optery's paid plans](https://www.optery.com/pricing-australia/) handle removals for you, which means giving them your details.
 - **A guide rather than a tool:** [Serus's Australian guide](https://www.serus.ai/privacy-laws/remove-your-data-australia/) is free and covers opt-outs site by site. Serus also sells removal tools.
+- **You live outside Australia:** [Stealth](https://github.com/Anish25012/stealth) (MIT) also runs on your own computer and is built for the UK, with letters for the EU, Switzerland, California, Canada and Australia. Its Australian letter, which it marks untested, has the APP 7 opt-out and APP 11.2 destruction requests but no access, correction, credit reporting or spam requests.
 - **A result gone from Google:** [Results about you](https://support.google.com/websearch/answer/12719076) asks Google to drop a result from Search. The information stays on the source page, so it complements a request to the site.
 
 ## Development
