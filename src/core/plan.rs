@@ -143,7 +143,14 @@ fn steps<'a>(entry: &'a Entry, selection: &Selection) -> Vec<Step<'a>> {
             .filter(|l| entry.levers.contains(l))
             .collect()
     } else {
-        selection.levers.iter().copied().filter(listed).collect()
+        // A lever named twice is asked for once, where it was first named.
+        let mut chosen = Vec::new();
+        for lever in selection.levers.iter().copied().filter(listed) {
+            if !chosen.contains(&lever) {
+                chosen.push(lever);
+            }
+        }
+        chosen
     };
     if levers.is_empty() {
         let available: Vec<&str> = entry
@@ -360,6 +367,17 @@ entries = ["pollos-au", "fsociety-au"]
         let register = register();
         let selection = select(&["start-here"], &[], &[Lever::App11Destroy], None);
         let steps = plan(&register, &selection).unwrap();
+        assert_eq!(
+            letters(&steps),
+            [("privacy@example.com.au", vec![Lever::App11Destroy])]
+        );
+    }
+
+    #[test]
+    fn a_lever_named_twice_is_asked_for_once() {
+        let register = register();
+        let levers = [Lever::App11Destroy, Lever::App11Destroy];
+        let steps = plan(&register, &select(&[], &["pollos-au"], &levers, None)).unwrap();
         assert_eq!(
             letters(&steps),
             [("privacy@example.com.au", vec![Lever::App11Destroy])]
