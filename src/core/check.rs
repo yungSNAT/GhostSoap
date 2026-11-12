@@ -313,7 +313,11 @@ fn erasure_claims(words: &[Word], covered: &[bool]) -> BTreeMap<usize, String> {
         let cited = (0..sentence.len()).find(|&i| is_source_or_duty(sentence, i));
         if let (Some(erasing), Some(cited)) = (erasing, cited) {
             let (first, second) = (erasing.min(cited), erasing.max(cited));
-            let found = format!("{} ... {}", shown(&sentence[first]), shown(&sentence[second]));
+            let found = format!(
+                "{} ... {}",
+                shown(&sentence[first]),
+                shown(&sentence[second])
+            );
             claims.insert(offset + first, found);
         }
         offset += sentence.len();
