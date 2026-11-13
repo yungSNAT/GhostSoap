@@ -46,8 +46,14 @@ pub enum Step<'a> {
 pub fn plan<'a>(register: &'a Register, selection: &Selection) -> Result<Vec<Step<'a>>, String> {
     let entries = resolve(register, selection)?;
     let single = selection.packs.is_empty() && entries.len() == 1;
-    let guarded: Vec<&str> = selection
-        .levers
+    // A lever named twice is asked for once, where it was first named.
+    let mut levers: Vec<Lever> = Vec::new();
+    for &lever in &selection.levers {
+        if !levers.contains(&lever) {
+            levers.push(lever);
+        }
+    }
+    let guarded: Vec<&str> = levers
         .iter()
         .filter(|&&l| is_guarded(l))
         .map(|l| l.name())
@@ -61,7 +67,7 @@ pub fn plan<'a>(register: &'a Register, selection: &Selection) -> Result<Vec<Ste
     check_detail(selection)?;
     Ok(entries
         .into_iter()
-        .flat_map(|entry| steps(entry, selection))
+        .flat_map(|entry| steps(entry, &levers))
         .collect())
 }
 
@@ -128,7 +134,7 @@ fn resolve<'a>(register: &'a Register, selection: &Selection) -> Result<Vec<&'a 
     Ok(entries)
 }
 
-fn steps<'a>(entry: &'a Entry, selection: &Selection) -> Vec<Step<'a>> {
+fn steps<'a>(entry: &'a Entry, chosen: &[Lever]) -> Vec<Step<'a>> {
     if let Some(obsolete) = &entry.obsolete {
         let reason = obsolete.skip_reason();
         return vec![Step::Skip { entry, reason }];
@@ -137,20 +143,13 @@ fn steps<'a>(entry: &'a Entry, selection: &Selection) -> Vec<Step<'a>> {
         return vec![Step::Overseas { entry }];
     }
     let listed = |l: &Lever| entry.levers.contains(l) || entry.opt_in_levers.contains(l);
-    let levers: Vec<Lever> = if selection.levers.is_empty() {
+    let levers: Vec<Lever> = if chosen.is_empty() {
         DEFAULT_LEVERS
             .into_iter()
             .filter(|l| entry.levers.contains(l))
             .collect()
     } else {
-        // A lever named twice is asked for once, where it was first named.
-        let mut chosen = Vec::new();
-        for lever in selection.levers.iter().copied().filter(listed) {
-            if !chosen.contains(&lever) {
-                chosen.push(lever);
-            }
-        }
-        chosen
+        chosen.iter().copied().filter(listed).collect()
     };
     if levers.is_empty() {
         let available: Vec<&str> = entry
@@ -382,6 +381,9 @@ entries = ["pollos-au", "fsociety-au"]
             letters(&steps),
             [("privacy@example.com.au", vec![Lever::App11Destroy])]
         );
+        let twice = [Lever::App12, Lever::App12];
+        let err = plan(&register, &select(&["start-here"], &[], &twice, None)).unwrap_err();
+        assert!(err.starts_with("app12 must be chosen"), "{err}");
     }
 
     #[test]
