@@ -195,13 +195,20 @@ fn number_and_unit(word: &str) -> [&str; 2] {
     }
 }
 
-fn is_number(word: &Word) -> bool {
-    word.text.chars().all(|c| c.is_ascii_digit()) || NUMBER_WORDS.contains(&word.text.as_str())
+fn is_digits(word: &str) -> bool {
+    word.chars().all(|c| c.is_ascii_digit())
 }
 
-/// The index after the period of time that starts at `start`, if one does.
+fn is_number(word: &Word) -> bool {
+    is_digits(&word.text) || NUMBER_WORDS.contains(&word.text.as_str())
+}
+
+/// The index after the period of time that starts at `start`, if one does. A number in
+/// digits ends the period's number, so a phone number before '30 days' is left out of it.
 fn period_end(words: &[Word], start: usize) -> Option<usize> {
-    let numbers = words[start..].iter().take_while(|w| is_number(w)).count();
+    let numbers = (start..words.len())
+        .take_while(|&i| is_number(&words[i]) && (i == start || !is_digits(&words[i - 1].text)))
+        .count();
     let article = ["a", "an"].contains(&words[start].text.as_str());
     if numbers == 0 && !article {
         return None;
@@ -299,7 +306,7 @@ fn is_short_section(word: &str) -> bool {
 fn shown(word: &str) -> &str {
     if is_short_section(word) {
         "section"
-    } else if word.len() > 3 && word.chars().all(|c| c.is_ascii_digit()) {
+    } else if word.len() > 3 && is_digits(word) {
         "number"
     } else {
         word
@@ -817,15 +824,21 @@ mod tests {
             ("Regards,\nArt\n0412345678", "article number", "0412345678"),
             ("under art.0412345678", "article number", "0412345678"),
             ("see 1798.0412345678", "1798.number", "0412345678"),
-            (
-                "My customer number is 4471923. 30 days have passed.",
-                "number 30 days",
-                "4471923",
-            ),
         ] {
             let found = found(text);
             assert_eq!(found, [shown], "{text:?}");
             assert!(found.iter().all(|f| !f.contains(number)), "{text:?}");
+        }
+    }
+
+    #[test]
+    fn a_period_holds_only_the_number_next_to_its_unit() {
+        for text in [
+            "My customer number is 4471923. 30 days have passed.",
+            "Call me on +61 412 345 678. 30 days have passed.",
+            "Call me on 0412 345 678. 30 days have passed.",
+        ] {
+            assert_eq!(found(text), ["30 days"], "{text:?}");
         }
     }
 
