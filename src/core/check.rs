@@ -199,16 +199,24 @@ fn is_digits(word: &str) -> bool {
     word.chars().all(|c| c.is_ascii_digit())
 }
 
-fn is_number(word: &Word) -> bool {
-    is_digits(&word.text) || NUMBER_WORDS.contains(&word.text.as_str())
+/// How many words the number at `start` spans: a number in digits or one number word, or a
+/// tens word and a units word such as 'twenty one'. A phone number before '30 days', in
+/// digits or in words, is therefore left out of the period.
+fn number_len(words: &[Word], start: usize) -> usize {
+    let text = |i: usize| words.get(i).map_or("", |w| w.text.as_str());
+    let (units, tens) = (&NUMBER_WORDS[..9], &NUMBER_WORDS[19..]);
+    if tens.contains(&text(start)) && units.contains(&text(start + 1)) {
+        2
+    } else if is_digits(text(start)) || NUMBER_WORDS.contains(&text(start)) {
+        1
+    } else {
+        0
+    }
 }
 
-/// The index after the period of time that starts at `start`, if one does. A number in
-/// digits ends the period's number, so a phone number before '30 days' is left out of it.
+/// The index after the period of time that starts at `start`, if one does.
 fn period_end(words: &[Word], start: usize) -> Option<usize> {
-    let numbers = (start..words.len())
-        .take_while(|&i| is_number(&words[i]) && (i == start || !is_digits(&words[i - 1].text)))
-        .count();
+    let numbers = number_len(words, start);
     let article = ["a", "an"].contains(&words[start].text.as_str());
     if numbers == 0 && !article {
         return None;
@@ -837,9 +845,15 @@ mod tests {
             "My customer number is 4471923. 30 days have passed.",
             "Call me on +61 412 345 678. 30 days have passed.",
             "Call me on 0412 345 678. 30 days have passed.",
+            "Call me on four one two three four five six seven eight, 30 days on.",
         ] {
             assert_eq!(found(text), ["30 days"], "{text:?}");
         }
+        assert_eq!(
+            found("Call four one two three nine days on."),
+            ["nine days"]
+        );
+        assert_eq!(found("within twenty one days"), ["twenty one days"]);
     }
 
     #[test]
