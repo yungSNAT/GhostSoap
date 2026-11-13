@@ -16,6 +16,8 @@
 //! ```
 
 mod no_network;
+#[cfg(test)]
+mod registry_table;
 mod text;
 
 use std::collections::BTreeMap;
@@ -1069,7 +1071,18 @@ levers = []
             std::env::temp_dir().join(format!("ghostsoap-drift-local-{}", std::process::id()));
         std::fs::create_dir(&fixture).unwrap();
         let (form, form_requests) = serve_replies("200 OK", "text/plain", "", 1);
-        let entry = ENTRY.replace("https://example.com.au/form", &form);
+        // The entry's source page is searched for its email address, so it is served here
+        // too: the test must not reach the internet.
+        let filler = "Privacy policy text. ".repeat(30);
+        let (source, source_requests) = serve_replies(
+            "200 OK",
+            "text/html",
+            &format!("<html><body><main>{filler} privacy@example.com.au</main></body></html>"),
+            1,
+        );
+        let entry = ENTRY
+            .replace("https://example.com.au/form", &form)
+            .replace("https://example.com.au/privacy", &source);
         let entry_path = fixture.join("example-au.toml");
         std::fs::write(&entry_path, &entry).unwrap();
         let (dns, dns_requests) = serve_replies(
@@ -1090,6 +1103,10 @@ levers = []
         assert_eq!(status, ExitCode::SUCCESS);
         assert_eq!(
             form_requests.try_iter().collect::<Vec<_>>(),
+            ["GET / HTTP/1.1"]
+        );
+        assert_eq!(
+            source_requests.try_iter().collect::<Vec<_>>(),
             ["GET / HTTP/1.1"]
         );
         assert_eq!(

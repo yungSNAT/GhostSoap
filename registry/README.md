@@ -49,6 +49,95 @@ A listed business that asks to be taken out of the register stays in it unless e
 
 A pack has `id` (equal to the file name), `name`, `description` and `entries`, a list of entry ids at `tested` or `verified` quality. Packs choose entities, not levers. When the user plans a round from a pack, the planner offers each entry's `levers` and checks each lever's prerequisites: a correction (`app13`, `s20t-correction`) needs the user to say what is wrong, `app13-notify-recipients` follows a correction and `app13-statement` follows a refusal to correct. Pack membership never selects an `opt_in_levers` lever; the user chooses those per entity.
 
+## Entries
+
+Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI fails when this table is out of date. A route of `letter` means GhostSoap drafts requests; `its own web form` marks an overseas entry, which gets no letter: the user goes to the web form in its channels. `obsolete (<reason>)`, followed by `use <id> instead` when another entry handles its requests, marks a retired entry, which gets no letter.
+
+<!-- entries:start -->
+| Entry | Name | Kinds | Packs | Route |
+|---|---|---|---|---|
+| `acceleon-au` | Acceleon | property-data, people-search, directory | `people-search`, `start-here` | letter |
+| `adecco-au` | Adecco | recruitment | `recruitment` | letter |
+| `afterpay-au` | Afterpay | financial-services | `banks-and-lenders` | letter |
+| `allianz-au` | Allianz Australia | insurance | `insurers` | letter |
+| `amazon-au` | Amazon Australia | retail | `retail` | letter |
+| `anz-au` | ANZ | financial-services | `banks-and-lenders` | letter |
+| `aussie-broadband-au` | Aussie Broadband | telecommunications | `telecommunications` | letter |
+| `australia-post-au` | Australia Post (data services, National Change of Address) | marketing-list | `marketing` | letter |
+| `bunnings-au` | Bunnings | retail | `retail` | letter |
+| `bupa-au` | Bupa Health Insurance | insurance | `insurers` | letter |
+| `canva-au` | Canva | online-service | `data-breaches`, `retail` | letter |
+| `careerone-au` | CareerOne | recruitment | `recruitment` | letter |
+| `cba-au` | Commonwealth Bank of Australia | financial-services | `banks-and-lenders` | letter |
+| `chandler-macleod-au` | Chandler Macleod | recruitment | `recruitment` | letter |
+| `charterhouse-au` | Charterhouse Partnership | recruitment | `recruitment` | letter |
+| `coles-au` | Coles | retail | `retail` | letter |
+| `conexum-au` | Conexum | marketing-list | `marketing`, `start-here` | letter |
+| `cotality-au` | Cotality (formerly CoreLogic Australia; brands include RP Data, Cordell, onthehouse.com.au) | property-data, marketing-list | `property`, `start-here` | letter |
+| `domain-au` | Domain (Allhomes) | property-data | `property` | letter |
+| `dymocks-au` | Dymocks | retail | `data-breaches`, `retail` | letter |
+| `ebay-au` | eBay Australia | retail | `retail` | letter |
+| `equifax-au` | Equifax | credit-reporting-body | `credit` | letter |
+| `equifax-marketing-au` | Equifax Data-driven Marketing | marketing-list | `marketing`, `start-here` | letter |
+| `everyday-rewards-au` | Everyday Rewards (Woolworths) | loyalty | `loyalty` | letter |
+| `experian-au` | Experian | credit-reporting-body | `credit` | letter |
+| `experian-marketing-au` | Experian Data and Marketing | marketing-list, ad-tech | `marketing`, `start-here` | letter |
+| `flybuys-au` | Flybuys | loyalty | `loyalty` | letter |
+| `globalx-au` | GlobalX | property-data | `property` | letter |
+| `harvey-norman-au` | Harvey Norman Online | retail | `retail` | letter |
+| `hays-au` | Hays | recruitment | `recruitment` | letter |
+| `hcf-au` | HCF | insurance | `insurers` | letter |
+| `hudson-au` | Hudson | recruitment | `recruitment` | letter |
+| `iag-au` | NRMA Insurance (IAG) | insurance | `insurers` | letter |
+| `id4me-au` | iD4me | people-search, marketing-list | `people-search`, `start-here` | letter |
+| `indeed-au` | Indeed | recruitment | `recruitment` | its own web form |
+| `infotracer-au` | InfoTracer Australia | people-search | `people-search` | its own web form |
+| `infotrack-au` | InfoTrack | property-data | `property` | letter |
+| `jb-hi-fi-au` | JB Hi-Fi | retail, loyalty | `retail` | letter |
+| `kmart-au` | Kmart | retail | `retail` | letter |
+| `landchecker-au` | Landchecker | property-data | `property` | letter |
+| `latitude-au` | Latitude Financial Services | financial-services | `banks-and-lenders`, `data-breaches` | letter |
+| `lead-lists-au` | Lead Lists | marketing-list | `marketing` | letter |
+| `linkedin-au` | LinkedIn | recruitment | `recruitment` | its own web form |
+| `list-factory-au` | List Factory | marketing-list | `marketing` | letter |
+| `liveramp-au` | LiveRamp Australia | ad-tech | `marketing`, `start-here` | letter |
+| `locate-family-au` | Locate Family | people-search | `people-search` | its own web form |
+| `macquarie-au` | Macquarie Bank | financial-services | `banks-and-lenders` | letter |
+| `manpowergroup-au` | ManpowerGroup | recruitment | `recruitment` | letter |
+| `medibank-au` | Medibank | insurance | `data-breaches`, `insurers` | letter |
+| `michael-page-au` | Michael Page | recruitment | `recruitment` | letter |
+| `myer-one-au` | MYER one | loyalty | `loyalty` | letter |
+| `nab-au` | NAB | financial-services | `banks-and-lenders` | letter |
+| `nib-au` | nib | insurance | `insurers` | letter |
+| `nielsen-au` | Nielsen (Australia) | ad-tech |  | letter |
+| `optus-au` | Optus | telecommunications | `data-breaches`, `telecommunications` | letter |
+| `peoplebank-au` | Peoplebank | recruitment | `recruitment` | letter |
+| `priceline-pulse-rewards-au` | Priceline Pulse Rewards | loyalty | `loyalty` | letter |
+| `programmed-au` | Programmed | recruitment | `recruitment` | letter |
+| `qantas-frequent-flyer-au` | Qantas Frequent Flyer | loyalty | `data-breaches`, `loyalty` | letter |
+| `qbe-au` | QBE Insurance (Australia) | insurance | `insurers` | letter |
+| `quantium-au` | Quantium | ad-tech |  | letter |
+| `randstad-au` | Randstad | recruitment | `recruitment` | letter |
+| `rea-group-au` | realestate.com.au (REA Group) | property-data | `property` | letter |
+| `records-finder-au` | Records Finder Australia | people-search | `people-search` | its own web form |
+| `robert-half-au` | Robert Half | recruitment | `recruitment` | letter |
+| `robert-walters-au` | Robert Walters | recruitment | `recruitment` | letter |
+| `seek-au` | SEEK | recruitment |  | letter |
+| `smrtr-au` | smrtr | marketing-list, ad-tech | `marketing` | letter |
+| `suncorp-au` | Suncorp Insurance (AAMI, GIO, Apia) | insurance | `insurers` | letter |
+| `talefin-au` | TaleFin | credit-reporting-body | `credit` | letter |
+| `talent-international-au` | Talent International | recruitment | `recruitment` | letter |
+| `telstra-au` | Telstra | telecommunications | `telecommunications` | letter |
+| `the-iconic-au` | THE ICONIC | retail, loyalty | `retail` | letter |
+| `thryv-au` | Thryv Australia (White Pages, Yellow Pages) | directory, marketing-list | `marketing`, `start-here` | letter |
+| `ticketek-au` | Ticketek | retail | `data-breaches`, `retail` | letter |
+| `tpg-telecom-au` | TPG Telecom | telecommunications | `data-breaches`, `telecommunications` | letter |
+| `velocity-frequent-flyer-au` | Velocity Frequent Flyer | loyalty | `loyalty` | letter |
+| `westpac-au` | Westpac | financial-services | `banks-and-lenders` | letter |
+| `winr-alchemist-au` | WINR Data | ad-tech | `marketing` | letter |
+| `zip-au` | Zip | financial-services | `banks-and-lenders` | letter |
+<!-- entries:end -->
+
 ## Evidence hashes and drift
 
 Each `[[evidence]]` table records a source page's state when the entry was verified. A scheduled workflow (`.github/workflows/evidence-drift.yml`) re-fetches every evidence page on the first of each month and opens or updates one issue, 'Register evidence drift', listing pages that changed or could not be read within 30 seconds, and closes that issue once every page matches again. A page that answers 401, 403 or 429 goes to the workflow log instead, because sites answer scripts that way when the page is up: its hash is not confirmed that month. It never commits. Each run keeps every HTML page's main text, one sentence per line, as the `evidence-text` artifact for 90 days, and the issue links to it. When a page changes, diff its file against an earlier run's copy, recheck the entry against the page and update the hash and `checked_at`.
