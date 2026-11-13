@@ -62,26 +62,88 @@ fn with_table(readme: &str, table: &str) -> Option<String> {
 mod tests {
     use super::*;
     use ghostsoap::core::embedded;
-    use ghostsoap::core::register::parse_register;
+    use ghostsoap::core::register::{RegisterFiles, SourceFile, parse_register};
+    use std::io::Write;
     use std::path::Path;
 
-    #[test]
-    fn the_register_readme_lists_every_entry() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../registry/README.md");
-        let readme = std::fs::read_to_string(&path)
-            .unwrap()
-            .replace("\r\n", "\n");
+    fn check_readme(path: &Path, update: bool) {
+        let readme = std::fs::read_to_string(path).unwrap().replace("\r\n", "\n");
         let register = parse_register(&embedded::register()).unwrap();
         let current = with_table(&readme, &table(&register))
             .expect("registry/README.md has the entries table markers");
-        if std::env::var_os("UPDATE_REGISTRY_TABLE").is_some() {
-            std::fs::write(&path, &current).unwrap();
+        if update {
+            std::fs::write(path, &current).unwrap();
             return;
         }
         assert!(
             readme == current,
             "the entries table in registry/README.md is out of date; \
              run UPDATE_REGISTRY_TABLE=1 cargo test -p xtask"
+        );
+    }
+
+    #[test]
+    fn the_register_readme_lists_every_entry() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../registry/README.md");
+        check_readme(&path, std::env::var_os("UPDATE_REGISTRY_TABLE").is_some());
+    }
+
+    #[test]
+    fn updating_the_table_preserves_surrounding_text() {
+        let path =
+            std::env::temp_dir().join(format!("ghostsoap-update-table-{}", std::process::id()));
+        let readme = format!("# PUBLIC register\n{START}\nstale table\n{END}\nPUBLIC footer\n");
+        std::fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .write_all(readme.as_bytes())
+            .unwrap();
+        check_readme(&path, true);
+        let updated = std::fs::read_to_string(&path).unwrap();
+        std::fs::remove_file(path).unwrap();
+        let register = parse_register(&embedded::register()).unwrap();
+        assert_eq!(
+            updated,
+            format!(
+                "# PUBLIC register\n{START}\n{}{END}\nPUBLIC footer\n",
+                table(&register)
+            )
+        );
+    }
+
+    #[test]
+    fn an_obsolete_entry_names_its_closed_route_without_a_pack() {
+        let register = parse_register(&RegisterFiles {
+            entries: vec![SourceFile {
+                name: "closed-au.toml".to_owned(),
+                text: r#"
+id = "closed-au"
+name = "PUBLIC Closed"
+legal_entity = "PUBLIC Closed Pty Ltd"
+abn = "88 000 014 675"
+kinds = ["marketing-list"]
+priority = "high"
+quality = "verified"
+verified_at = 2026-10-24
+sources = ["https://example.invalid/privacy"]
+identity_fields = ["full_name", "email"]
+exemption_risk = "none"
+escalation = ["oaic"]
+effort = "easy"
+[obsolete]
+reason = "closed"
+"#
+                .to_owned(),
+            }],
+            packs: vec![],
+        })
+        .unwrap();
+        assert_eq!(
+            table(&register),
+            "| Entry | Name | Kinds | Packs | Route |\n|---|---|---|---|---|\n\
+             | `closed-au` | PUBLIC Closed | marketing-list |  | obsolete (closed) |\n"
         );
     }
 
