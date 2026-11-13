@@ -280,8 +280,26 @@ fn is_source_or_duty(sentence: &[Word], index: usize) -> bool {
     LEGAL_SOURCES.contains(&word)
         || DUTY_WORDS.contains(&word)
         || (CITING_WORDS.contains(&word) && number(next))
-        || (word.starts_with('s') && number(word.trim_start_matches(['s', '.'])))
+        || is_short_section(word)
         || (["have", "has"].contains(&word) && next == "to")
+}
+
+/// A section cited as 's' and a number, such as 's41' or 's.20t'.
+fn is_short_section(word: &str) -> bool {
+    word.starts_with('s')
+        && word
+            .trim_start_matches(['s', '.'])
+            .starts_with(|c: char| c.is_ascii_digit())
+}
+
+/// How a matched word appears in a flag. A short section citation has the shape of an
+/// account or reference number, such as 'S4471923', so it is shown as 'section'.
+fn shown(word: &Word) -> &str {
+    if is_short_section(&word.text) {
+        "section"
+    } else {
+        &word.text
+    }
 }
 
 /// The sentences that may claim a right or duty to erase, keyed by the index of the first
@@ -295,7 +313,11 @@ fn erasure_claims(words: &[Word], covered: &[bool]) -> BTreeMap<usize, String> {
         let cited = (0..sentence.len()).find(|&i| is_source_or_duty(sentence, i));
         if let (Some(erasing), Some(cited)) = (erasing, cited) {
             let (first, second) = (erasing.min(cited), erasing.max(cited));
-            let found = format!("{} ... {}", sentence[first].text, sentence[second].text);
+            let found = format!(
+                "{} ... {}",
+                shown(&sentence[first]),
+                shown(&sentence[second])
+            );
             claims.insert(offset + first, found);
         }
         offset += sentence.len();
@@ -774,5 +796,14 @@ mod tests {
     fn a_flag_repeats_only_its_pattern() {
         let flags = check("Jane Citizen of 1 Test Street claims the GDPR");
         assert_eq!(flags[0].found, "gdpr");
+    }
+
+    #[test]
+    fn a_short_section_citation_is_shown_without_its_number() {
+        assert_eq!(
+            found("Please delete my account S4471923."),
+            ["delete ... section"]
+        );
+        assert_eq!(found("See s20T and remove it."), ["section ... remove"]);
     }
 }
