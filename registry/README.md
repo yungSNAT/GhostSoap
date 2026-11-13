@@ -51,7 +51,7 @@ A pack has `id` (equal to the file name), `name`, `description` and `entries`, a
 
 ## Entries
 
-Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI fails when this table is out of date. A route of `letter` means GhostSoap drafts requests; `its own opt-out form` marks an overseas entry, which gets no letter.
+Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI fails when this table is out of date. A route of `letter` means GhostSoap drafts requests; `its own web form` marks an overseas entry, which gets no letter: the user goes to the web form in its channels. `obsolete (<reason>)`, followed by `use <id> instead` when another entry handles its requests, marks a retired entry, which gets no letter.
 
 <!-- entries:start -->
 | Entry | Name | Kinds | Packs | Route |
@@ -90,18 +90,18 @@ Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI
 | `hudson-au` | Hudson | recruitment | `recruitment` | letter |
 | `iag-au` | NRMA Insurance (IAG) | insurance | `insurers` | letter |
 | `id4me-au` | iD4me | people-search, marketing-list | `people-search`, `start-here` | letter |
-| `indeed-au` | Indeed | recruitment | `recruitment` | its own opt-out form |
-| `infotracer-au` | InfoTracer Australia | people-search | `people-search` | its own opt-out form |
+| `indeed-au` | Indeed | recruitment | `recruitment` | its own web form |
+| `infotracer-au` | InfoTracer Australia | people-search | `people-search` | its own web form |
 | `infotrack-au` | InfoTrack | property-data | `property` | letter |
 | `jb-hi-fi-au` | JB Hi-Fi | retail, loyalty | `retail` | letter |
 | `kmart-au` | Kmart | retail | `retail` | letter |
 | `landchecker-au` | Landchecker | property-data | `property` | letter |
 | `latitude-au` | Latitude Financial Services | financial-services | `banks-and-lenders`, `data-breaches` | letter |
 | `lead-lists-au` | Lead Lists | marketing-list | `marketing` | letter |
-| `linkedin-au` | LinkedIn | recruitment | `recruitment` | its own opt-out form |
+| `linkedin-au` | LinkedIn | recruitment | `recruitment` | its own web form |
 | `list-factory-au` | List Factory | marketing-list | `marketing` | letter |
 | `liveramp-au` | LiveRamp Australia | ad-tech | `marketing`, `start-here` | letter |
-| `locate-family-au` | Locate Family | people-search | `people-search` | its own opt-out form |
+| `locate-family-au` | Locate Family | people-search | `people-search` | its own web form |
 | `macquarie-au` | Macquarie Bank | financial-services | `banks-and-lenders` | letter |
 | `manpowergroup-au` | ManpowerGroup | recruitment | `recruitment` | letter |
 | `medibank-au` | Medibank | insurance | `data-breaches`, `insurers` | letter |
@@ -119,7 +119,7 @@ Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI
 | `quantium-au` | Quantium | ad-tech |  | letter |
 | `randstad-au` | Randstad | recruitment | `recruitment` | letter |
 | `rea-group-au` | realestate.com.au (REA Group) | property-data | `property` | letter |
-| `records-finder-au` | Records Finder Australia | people-search | `people-search` | its own opt-out form |
+| `records-finder-au` | Records Finder Australia | people-search | `people-search` | its own web form |
 | `robert-half-au` | Robert Half | recruitment | `recruitment` | letter |
 | `robert-walters-au` | Robert Walters | recruitment | `recruitment` | letter |
 | `seek-au` | SEEK | recruitment |  | letter |

@@ -32,7 +32,7 @@ fn table(register: &Register) -> String {
             .collect();
         let route = match &entry.obsolete {
             Some(obsolete) => obsolete.skip_reason(),
-            None if entry.is_overseas() => "its own opt-out form".to_owned(),
+            None if entry.is_overseas() => "its own web form".to_owned(),
             None => "letter".to_owned(),
         };
         out.push_str(&format!(
@@ -59,7 +59,6 @@ fn with_table(readme: &str, table: &str) -> Option<String> {
     Some(format!("{before}{START}\n{table}{END}{after}"))
 }
 
-#[cfg(test)]
 mod tests {
     use super::*;
     use ghostsoap::core::embedded;
