@@ -116,11 +116,6 @@ pub fn compose(entry: &Entry, profile: &Profile, request: &Request) -> Result<Le
     let mut values = identity_values(entry, profile);
     let spam_only = request.levers.iter().all(|&l| l == Lever::SpamUnsubscribe);
     let has_spam = request.levers.contains(&Lever::SpamUnsubscribe);
-    let laws = match (spam_only, has_spam) {
-        (true, _) => "the Spam Act 2003 (Cth)",
-        (false, true) => "the Privacy Act 1988 (Cth) and the Spam Act 2003 (Cth)",
-        (false, false) => "the Privacy Act 1988 (Cth)",
-    };
     let exemption_note =
         (entry.exemption_risk == ExemptionRisk::SmallBusinessPossible).then(|| {
             "If you consider that the Privacy Act does not apply to you, for example because you \
@@ -133,11 +128,12 @@ pub fn compose(entry: &Entry, profile: &Profile, request: &Request) -> Result<Le
         ("date", Some(request.date.format("%-d %B %Y").to_string())),
         ("legal_entity", Some(entry.legal_entity.clone())),
         ("postal_address", postal),
-        ("laws", Some(laws.to_owned())),
+        ("laws", Some(laws(spam_only, has_spam).to_owned())),
         ("exemption_note", exemption_note),
         ("escalation", escalation(entry, spam_only, has_spam)),
         ("tag", Some(format!("[{}]", request.tag))),
         ("detail", request.detail.map(str::to_owned)),
+        ("with_opt_out", with_opt_out(request.levers)),
     ]);
     let mut sections = vec![render(parts(OPENING).1, &values)?];
     for &lever in request.levers {
@@ -185,6 +181,23 @@ fn identity_values(entry: &Entry, profile: &Profile) -> BTreeMap<&'static str, O
             (name, profile.value(field).filter(|_| allowed))
         })
         .collect()
+}
+
+/// The laws the letter is made under.
+fn laws(spam_only: bool, has_spam: bool) -> &'static str {
+    match (spam_only, has_spam) {
+        (true, _) => "the Spam Act 2003 (Cth)",
+        (false, true) => "the Privacy Act 1988 (Cth) and the Spam Act 2003 (Cth)",
+        (false, false) => "the Privacy Act 1988 (Cth)",
+    }
+}
+
+/// Empty, which keeps its line, when the letter also asks to stop direct marketing.
+fn with_opt_out(levers: &[Lever]) -> Option<String> {
+    levers
+        .iter()
+        .any(|l| matches!(l, Lever::App7NoMarketing | Lever::App7NoFacilitation))
+        .then(String::new)
 }
 
 /// Where the user can complain: the entry's Privacy Act targets about the Privacy Act
@@ -333,7 +346,9 @@ mod tests {
     #[test]
     fn every_template_has_a_version() {
         for lever in Lever::ALL {
-            assert_eq!(letter_version(lever), 1, "{}", lever.name());
+            // Version 2 asks a destroy request beside an opt-out to keep what the opt-out needs.
+            let expected = if lever == Lever::App11Destroy { 2 } else { 1 };
+            assert_eq!(letter_version(lever), expected, "{}", lever.name());
         }
         assert!(takes_detail(Lever::App13) && takes_detail(Lever::S20kBan));
         assert!(!takes_detail(Lever::App7Source));
