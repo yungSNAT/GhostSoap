@@ -63,7 +63,6 @@ mod tests {
     use super::*;
     use ghostsoap::core::embedded;
     use ghostsoap::core::register::{RegisterFiles, SourceFile, parse_register};
-    use std::io::Write;
     use std::path::Path;
 
     fn check_readme(path: &Path, update: bool) {
@@ -90,19 +89,12 @@ mod tests {
 
     #[test]
     fn updating_the_table_preserves_surrounding_text() {
-        let path =
-            std::env::temp_dir().join(format!("ghostsoap-update-table-{}", std::process::id()));
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("README.md");
         let readme = format!("# PUBLIC register\n{START}\nstale table\n{END}\nPUBLIC footer\n");
-        std::fs::OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(&path)
-            .unwrap()
-            .write_all(readme.as_bytes())
-            .unwrap();
+        std::fs::write(&path, readme).unwrap();
         check_readme(&path, true);
         let updated = std::fs::read_to_string(&path).unwrap();
-        std::fs::remove_file(path).unwrap();
         let register = parse_register(&embedded::register()).unwrap();
         assert_eq!(
             updated,
