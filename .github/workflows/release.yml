@@ -1,0 +1,41 @@
+name: Release
+
+# A v* tag on main's head publishes ghostsoap through release-policy's binary
+# family: Linux (x86_64 and arm64, static), macOS (arm64) and Windows (x86_64)
+# executables, source archives, SBOMs, SHA256SUMS and signed provenance in one
+# immutable release. VERSION, Cargo.toml and the first line of RELEASE_NOTES.md
+# must agree (tests/cli.rs); release-policy refuses a tag that names another
+# version.
+# Its audit of the built executables has no ignore list, so RUSTSEC-2026-0387,
+# which .cargo/audit.toml accepts for crypto-bigint through age, must be
+# cleared before a tag can publish.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # A job that calls a reusable workflow accepts no timeout-minutes; every
+    # job in release-binary.yml sets its own.
+    permissions:
+      actions: read # Read this repository's own runs to require the mandatory checks.
+      attestations: write # Record provenance and SBOM attestations for release assets.
+      contents: write # Create the draft release, upload assets and publish it.
+      id-token: write # Obtain the OIDC identity required to sign attestations.
+    uses: ryanduguid/release-policy/.github/workflows/release-binary.yml@efac799b4380171e9f392e392a20e80f285bfa25 # canaries.json binary family pin
+    with:
+      artifact-stem: ghostsoap
+      # The ci.yml jobs the main ruleset requires, which must have passed on main for the tagged commit.
+      required-checks: |
+        .github/workflows/ci.yml: rust (ubuntu-latest)
+        .github/workflows/ci.yml: rust (windows-latest)
+        .github/workflows/ci.yml: audit
