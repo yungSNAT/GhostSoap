@@ -18,3 +18,13 @@ levers = []
 
 [manual_check]
 url = "https://www.zoominfo.com/trust-center/your-privacy"
+
+[[evidence]]
+url = "https://www.zoominfo.com/legal/privacy-policy"
+checked_at = 2026-11-15
+sha256 = "1ba38e15744f11a0c428b9f8e7ff6ff00df2bd2a21c160ee7751e98d93bff886"
+
+[[evidence]]
+url = "https://www.zoominfo.com/trust-center/your-privacy"
+checked_at = 2026-11-15
+sha256 = "45baa4a727744494dd4cd571c6837c14694e7644a3737c20f5dd0c8ee1ae51d4"

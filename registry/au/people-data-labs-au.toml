@@ -18,3 +18,8 @@ levers = []
 
 [manual_check]
 url = "https://www.peopledatalabs.com/do-not-sell-or-share"
+
+[[evidence]]
+url = "https://www.peopledatalabs.com/do-not-sell-or-share"
+checked_at = 2026-11-15
+sha256 = "acee2726165b98065803d7c3fbe42f3d9769ce7db8ed7ed339565455548ab7e5"

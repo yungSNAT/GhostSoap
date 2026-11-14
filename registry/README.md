@@ -62,6 +62,7 @@ Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI
 | `allianz-au` | Allianz Australia | insurance | `insurers` | letter |
 | `amazon-au` | Amazon Australia | retail | `retail` | letter |
 | `anz-au` | ANZ | financial-services | `banks-and-lenders` | letter |
+| `apollo-au` | Apollo.io | marketing-list | `marketing` | its own web form |
 | `aussie-broadband-au` | Aussie Broadband | telecommunications | `telecommunications` | letter |
 | `australia-post-au` | Australia Post (data services, National Change of Address) | marketing-list | `marketing` | letter |
 | `bunnings-au` | Bunnings | retail | `retail` | letter |
@@ -73,6 +74,7 @@ Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI
 | `charterhouse-au` | Charterhouse Partnership | recruitment | `recruitment` | letter |
 | `coles-au` | Coles | retail | `retail` | letter |
 | `conexum-au` | Conexum | marketing-list | `marketing`, `start-here` | letter |
+| `contactout-au` | ContactOut | marketing-list | `marketing` | its own web form |
 | `cotality-au` | Cotality (formerly CoreLogic Australia; brands include RP Data, Cordell, onthehouse.com.au) | property-data, marketing-list | `property`, `start-here` | letter |
 | `domain-au` | Domain (Allhomes) | property-data | `property` | letter |
 | `dymocks-au` | Dymocks | retail | `data-breaches`, `retail` | letter |
@@ -102,6 +104,7 @@ Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI
 | `list-factory-au` | List Factory | marketing-list | `marketing` | letter |
 | `liveramp-au` | LiveRamp Australia | ad-tech | `marketing`, `start-here` | letter |
 | `locate-family-au` | Locate Family | people-search | `people-search` | its own web form |
+| `lusha-au` | Lusha | marketing-list | `marketing` | its own web form |
 | `macquarie-au` | Macquarie Bank | financial-services | `banks-and-lenders` | letter |
 | `manpowergroup-au` | ManpowerGroup | recruitment | `recruitment` | letter |
 | `medibank-au` | Medibank | insurance | `data-breaches`, `insurers` | letter |
@@ -111,6 +114,7 @@ Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI
 | `nib-au` | nib | insurance | `insurers` | letter |
 | `nielsen-au` | Nielsen (Australia) | ad-tech |  | letter |
 | `optus-au` | Optus | telecommunications | `data-breaches`, `telecommunications` | letter |
+| `people-data-labs-au` | People Data Labs | marketing-list | `marketing` | its own web form |
 | `peoplebank-au` | Peoplebank | recruitment | `recruitment` | letter |
 | `priceline-pulse-rewards-au` | Priceline Pulse Rewards | loyalty | `loyalty` | letter |
 | `programmed-au` | Programmed | recruitment | `recruitment` | letter |
@@ -122,6 +126,7 @@ Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI
 | `records-finder-au` | Records Finder Australia | people-search | `people-search` | its own web form |
 | `robert-half-au` | Robert Half | recruitment | `recruitment` | letter |
 | `robert-walters-au` | Robert Walters | recruitment | `recruitment` | letter |
+| `rocketreach-au` | RocketReach | marketing-list | `marketing` | its own web form |
 | `seek-au` | SEEK | recruitment |  | letter |
 | `smrtr-au` | smrtr | marketing-list, ad-tech | `marketing` | letter |
 | `suncorp-au` | Suncorp Insurance (AAMI, GIO, Apia) | insurance | `insurers` | letter |
@@ -136,6 +141,7 @@ Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI
 | `westpac-au` | Westpac | financial-services | `banks-and-lenders` | letter |
 | `winr-alchemist-au` | WINR Data | ad-tech | `marketing` | letter |
 | `zip-au` | Zip | financial-services | `banks-and-lenders` | letter |
+| `zoominfo-au` | ZoomInfo | marketing-list | `marketing` | its own web form |
 <!-- entries:end -->
 
 ## Evidence hashes and drift

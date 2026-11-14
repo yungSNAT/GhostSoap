@@ -18,3 +18,18 @@ levers = []
 
 [manual_check]
 url = "https://www.lusha.com/privacy-center/"
+
+[[evidence]]
+url = "https://www.lusha.com/legal/privacy-notice/"
+checked_at = 2026-11-15
+sha256 = "2d3e73820c317b00bb925a26d14f7f7349923f0e3f313f184bd93349650204fd"
+
+[[evidence]]
+url = "https://www.lusha.com/privacy-center/"
+checked_at = 2026-11-15
+sha256 = "c2da438a2d1e4cae2fce8e3669caddcc4926c63bed36ee0c5eb33a5367b07403"
+
+[[evidence]]
+url = "https://www.lusha.com/privacy-center/request-removal/"
+checked_at = 2026-11-15
+sha256 = "d72d062f73a38be0940b2194d5e5b6aea05bb2b9321835166aa0647463c13926"

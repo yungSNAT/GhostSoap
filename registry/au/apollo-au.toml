@@ -18,3 +18,18 @@ levers = []
 
 [manual_check]
 url = "https://www.apollo.io/company/privacy-center"
+
+[[evidence]]
+url = "https://www.apollo.io/privacy-policy"
+checked_at = 2026-11-15
+sha256 = "b773075dd9ca901d3d2de099e2c48af76b43eb1639001003fb1e2b1ff3a86306"
+
+[[evidence]]
+url = "https://www.apollo.io/company/privacy-center"
+checked_at = 2026-11-15
+sha256 = "104ea1008ee47c3af633b9476e5966bc7d0d6e4dc0648c3ceb1aaa996065a2a0"
+
+[[evidence]]
+url = "https://www.apollo.io/privacy-policy/remove"
+checked_at = 2026-11-15
+sha256 = "f146bf5fb7f1712df979350e3b290af782194cac6f28cfe0b67d37fadc2ebc21"
