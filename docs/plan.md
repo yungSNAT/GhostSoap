@@ -97,7 +97,7 @@ This panel records what the primary sources said on that date, or on the date a 
 
 **Later (M5 to M7):** SMTP sending, read-only IMAP reply queue, an interface for non-technical users.
 
-**Out of scope:** non-Australian brokers (the user can use other tools; GhostSoap may link to them), except overseas people-search sites that list Australians, which get manual opt-out entries only (section 6), account creation on brokers, automated web forms, people-search scanning, any hosted service.
+**Out of scope:** non-Australian brokers (the user can use other tools; GhostSoap may link to them), except overseas people-search sites that list Australians and, since 13 November 2026, overseas business contact-data brokers, which get manual opt-out entries only (section 6), account creation on brokers, automated web forms, people-search scanning, any hosted service.
 
 ## 5. Architecture
 
