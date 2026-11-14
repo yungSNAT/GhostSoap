@@ -1,10 +1,11 @@
 name: Release
 
 # A v* tag on main's head publishes ghostsoap through release-policy's binary
-# family: Linux (x86_64, static) and Windows (x86_64) executables, source
-# archives, SBOMs, SHA256SUMS and signed provenance in one immutable release.
-# The family builds no macOS target yet. VERSION and Cargo.toml must agree
-# (tests/cli.rs); release-policy refuses a tag that names another version.
+# family: Linux (x86_64 and arm64, static), macOS (arm64) and Windows (x86_64)
+# executables, source archives, SBOMs, SHA256SUMS and signed provenance in one
+# immutable release. VERSION, Cargo.toml and the first line of RELEASE_NOTES.md
+# must agree (tests/cli.rs); release-policy refuses a tag that names another
+# version.
 # Its audit of the built executables has no ignore list, so RUSTSEC-2026-0387,
 # which .cargo/audit.toml accepts for crypto-bigint through age, must be
 # cleared before a tag can publish.
@@ -30,7 +31,7 @@ jobs:
       attestations: write # Record provenance and SBOM attestations for release assets.
       contents: write # Create the draft release, upload assets and publish it.
       id-token: write # Obtain the OIDC identity required to sign attestations.
-    uses: ryanduguid/release-policy/.github/workflows/release-binary.yml@ca5492bd09693be9e1fd47d980e2740ef8daf023 # canaries.json current pin
+    uses: ryanduguid/release-policy/.github/workflows/release-binary.yml@efac799b4380171e9f392e392a20e80f285bfa25 # canaries.json binary family pin
     with:
       artifact-stem: ghostsoap
       # The ci.yml jobs the main ruleset requires, which must have passed on main for the tagged commit.

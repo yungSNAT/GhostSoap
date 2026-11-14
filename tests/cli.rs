@@ -41,6 +41,17 @@ fn version_file_matches_the_package_version() {
     assert_eq!(file.trim_end(), env!("CARGO_PKG_VERSION"));
 }
 
+// The release gates refuse a tag unless RELEASE_NOTES.md opens with its version.
+#[test]
+fn release_notes_open_with_the_package_version() {
+    let notes = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/RELEASE_NOTES.md"))
+        .expect("read RELEASE_NOTES.md");
+    assert_eq!(
+        notes.lines().next(),
+        Some(format!("# v{}", env!("CARGO_PKG_VERSION")).as_str())
+    );
+}
+
 #[test]
 fn no_arguments_prints_help() {
     let out = ghostsoap(&[]);
