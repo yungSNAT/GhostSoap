@@ -1,0 +1,86 @@
+name: Pages
+
+# Builds the one-page site in site/ with the README banner and, on main, publishes it to
+# GitHub Pages. Until Pages is enabled with GitHub Actions as its source, the deploy job
+# is skipped with a notice, so main's runs stay green.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/assets/banner.svg"
+      - ".github/assets/banner-phone.svg"
+      - ".github/workflows/pages.yml"
+  pull_request:
+    paths:
+      - "site/**"
+      - ".github/assets/banner.svg"
+      - ".github/assets/banner-phone.svg"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy finishes before the next starts; a newer push replaces a run still waiting.
+concurrency:
+  group: pages-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Assemble the site
+        run: |
+          mkdir _site
+          cp site/index.html site/style.css .github/assets/banner.svg .github/assets/banner-phone.svg _site/
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+  enabled:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pages: read # Read whether Pages is enabled; nothing else.
+    outputs:
+      pages: ${{ steps.pages.outputs.enabled }}
+    steps:
+      - id: pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          status="$(curl -sS -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pages")"
+          case "$status" in
+            200) echo "enabled=true" >> "$GITHUB_OUTPUT" ;;
+            404)
+              echo "::notice::GitHub Pages is not enabled, so the site was built but not published."
+              echo "enabled=false" >> "$GITHUB_OUTPUT"
+              ;;
+            *) echo "::error::Reading the Pages settings returned HTTP $status"; exit 1 ;;
+          esac
+
+  deploy:
+    needs: [build, enabled]
+    if: needs.enabled.outputs.pages == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write # Publish the site.
+      id-token: write # Prove the deployment came from this workflow.
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
