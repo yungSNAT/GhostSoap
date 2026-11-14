@@ -114,7 +114,6 @@ Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI
 | `nib-au` | nib | insurance | `insurers` | letter |
 | `nielsen-au` | Nielsen (Australia) | ad-tech |  | letter |
 | `optus-au` | Optus | telecommunications | `data-breaches`, `telecommunications` | letter |
-| `people-data-labs-au` | People Data Labs | marketing-list | `marketing` | its own web form |
 | `peoplebank-au` | Peoplebank | recruitment | `recruitment` | letter |
 | `priceline-pulse-rewards-au` | Priceline Pulse Rewards | loyalty | `loyalty` | letter |
 | `programmed-au` | Programmed | recruitment | `recruitment` | letter |

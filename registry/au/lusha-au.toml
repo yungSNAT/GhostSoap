@@ -1,6 +1,6 @@
 id = "lusha-au"
 name = "Lusha"
-legal_entity = "Lusha Systems Inc."
+legal_entity = "Lusha Systems Inc. and Lusha Systems Ltd."
 kinds = ["marketing-list"]
 priority = "standard"
 quality = "verified"
