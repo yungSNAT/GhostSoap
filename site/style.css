@@ -1,0 +1,107 @@
+/* House palette: black, ivory, platinum, bright gold, crimson. */
+:root {
+  --black: #000000;
+  --ivory: #fffff0;
+  --platinum: #e5e4e2;
+  --gold: #ffd32a;
+  --crimson: #990024;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--black);
+  color: var(--ivory);
+  font: 1.0625rem/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+header,
+main,
+footer {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
+
+header img {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 1.5rem;
+}
+
+.tagline {
+  color: var(--platinum);
+  text-align: center;
+}
+
+h1,
+h2 {
+  line-height: 1.25;
+}
+
+h1 {
+  font-size: 1.75rem;
+}
+
+h2 {
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--gold);
+  font-size: 1.3rem;
+}
+
+a {
+  color: var(--gold);
+}
+
+a:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 1.5rem;
+}
+
+.button {
+  display: inline-block;
+  padding: 0.6rem 1.2rem;
+  border: 1px solid var(--ivory);
+  border-radius: 0.25rem;
+  background: var(--crimson);
+  color: var(--ivory);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+li + li {
+  margin-top: 0.5rem;
+}
+
+pre {
+  overflow-x: auto;
+  padding: 1rem;
+  border: 1px solid var(--platinum);
+  border-radius: 0.25rem;
+}
+
+code {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.95em;
+}
+
+footer {
+  margin-top: 3rem;
+  padding-bottom: 2rem;
+  border-top: 1px solid var(--gold);
+  color: var(--platinum);
+  font-size: 0.9rem;
+  text-align: center;
+}
