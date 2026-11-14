@@ -32,6 +32,15 @@ fn version_prints_name_and_version() {
     );
 }
 
+// The release workflow names the release from VERSION and refuses one that
+// Cargo.toml does not match.
+#[test]
+fn version_file_matches_the_package_version() {
+    let file = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/VERSION"))
+        .expect("read VERSION");
+    assert_eq!(file.trim_end(), env!("CARGO_PKG_VERSION"));
+}
+
 #[test]
 fn no_arguments_prints_help() {
     let out = ghostsoap(&[]);
