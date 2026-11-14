@@ -44,8 +44,10 @@ jobs:
         with:
           path: _site
 
+  # Also runs on this repository's own pull requests, which only read the setting, so the
+  # check is exercised before it decides a deployment on main.
   enabled:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -71,7 +73,7 @@ jobs:
 
   deploy:
     needs: [build, enabled]
-    if: needs.enabled.outputs.pages == 'true'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.enabled.outputs.pages == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
