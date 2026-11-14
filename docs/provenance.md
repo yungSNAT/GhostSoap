@@ -220,15 +220,15 @@ Leads: ZoomInfo and Apollo from the maintainer's ruling; Lusha from the peer com
 | `contactout-au` | Optery Australian list (name only) | Privacy policy for the people it holds data on, website privacy policy and opt-out form on contactout.com | No ABN for 'ContactOut'. The policies and terms name ContactOut Limited without a country and send complaints to the UK Information Commissioner's Office |
 | `lusha-au` | Peer comparison | Privacy notice, Privacy Center and removal form on www.lusha.com | No ABN for 'Lusha' or 'Lusha Systems'. The notice names Lusha Systems Inc., incorporated in Delaware, of Boston |
 | `rocketreach-au` | Optery Australian list (name only) | Privacy policy and removal form on rocketreach.co | No ABN for 'RocketReach'. The policy's postal contact and the terms name RocketReach LLC of Brooklyn, New York |
-| `people-data-labs-au` | Optery Australian list (name only) | Privacy policy on privacy.peopledatalabs.com and opt-out form on www.peopledatalabs.com | No ABN for 'People Data Labs'. The policy names People Data Labs, Inc. |
+| `people-data-labs-au` | Optery Australian list (name only) | Privacy policy and Privacy Center on privacy.peopledatalabs.com and opt-out form on www.peopledatalabs.com | No ABN for 'People Data Labs'. The policy names People Data Labs, Inc. |
 
 - `zoominfo-au`: the removal form asks for an email address; the Trust Center page says removal also opts the profile out of sale or sharing where that applies, and that ZoomInfo keeps limited information to honour the request.
 - `apollo-au`: the opt-out form takes a work email address; the policy also gives privacy@apollo.io, which the entry does not list because overseas entries get no letter.
 - `contactout-au`: the opt-out page sends a verification link to the email address given; the policy for the people ContactOut holds data on links to it.
 - `lusha-au`: the removal form asks why you reached the page, your country and your email; Lusha keeps the details in a suppression list so they are not added again.
-- `people-data-labs-au`: the form is headed 'Do Not Sell or Share My Personal Information' and asks for your name, US state or 'I do not live in the United States', and email; the policy describes rights only for some US states and Europe.
+- `people-data-labs-au`: the form is headed 'Do Not Sell or Share My Personal Information' and asks for your name, US state or 'I do not live in the United States', and email; the policy describes rights only for some US states and Europe. The form says requests for rights outside the United States go to a 'Privacy Request Center', but the Privacy Center, which the entry shows first, links only this form and privacy@peopledatalabs.com.
 
-Evidence: 12 `[[evidence]]` hashes across 5 of these entries, taken on 15 November 2026 with the xtask's `evidence-hash` command; 2 fetches about 30 seconds apart gave the same 12 hashes, none shared. Not tracked: ZoomInfo's removal form and both RocketReach pages (403 to a plain fetch), and People Data Labs' policy, which shows no text without a browser, so `rocketreach-au` has no evidence.
+Evidence: 12 `[[evidence]]` hashes across 5 of these entries, taken on 15 November 2026 with the xtask's `evidence-hash` command; 2 fetches about 30 seconds apart gave the same 12 hashes, none shared. Not tracked: ZoomInfo's removal form and both RocketReach pages (403 to a plain fetch), People Data Labs' policy, which shows no text without a browser, and its Privacy Center, read later through Firecrawl, so `rocketreach-au` has no evidence.
 
 ### Rejected candidates (M1)
 

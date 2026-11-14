@@ -5,7 +5,7 @@ kinds = ["marketing-list"]
 priority = "standard"
 quality = "verified"
 verified_at = 2026-11-15
-sources = ["https://privacy.peopledatalabs.com/policies?name=privacy-policy", "https://www.peopledatalabs.com/do-not-sell-or-share"]
+sources = ["https://privacy.peopledatalabs.com/policies?name=privacy-policy", "https://privacy.peopledatalabs.com/", "https://www.peopledatalabs.com/do-not-sell-or-share"]
 identity_fields = ["full_name", "email"]
 exemption_risk = "overseas"
 escalation = []
@@ -17,7 +17,7 @@ address = "https://www.peopledatalabs.com/do-not-sell-or-share"
 levers = []
 
 [manual_check]
-url = "https://www.peopledatalabs.com/do-not-sell-or-share"
+url = "https://privacy.peopledatalabs.com/"
 
 [[evidence]]
 url = "https://www.peopledatalabs.com/do-not-sell-or-share"
