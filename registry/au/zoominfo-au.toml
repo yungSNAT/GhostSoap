@@ -1,0 +1,20 @@
+id = "zoominfo-au"
+name = "ZoomInfo"
+legal_entity = "ZoomInfo Technologies LLC"
+kinds = ["marketing-list"]
+priority = "standard"
+quality = "verified"
+verified_at = 2026-11-15
+sources = ["https://www.zoominfo.com/legal/privacy-policy", "https://www.zoominfo.com/trust-center/your-privacy", "https://privacyrequest.zoominfo.com/remove/verify"]
+identity_fields = ["email"]
+exemption_risk = "overseas"
+escalation = []
+effort = "easy"
+
+[[channels]]
+kind = "web-form"
+address = "https://privacyrequest.zoominfo.com/remove/verify"
+levers = []
+
+[manual_check]
+url = "https://www.zoominfo.com/trust-center/your-privacy"

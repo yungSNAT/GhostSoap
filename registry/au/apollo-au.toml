@@ -1,0 +1,20 @@
+id = "apollo-au"
+name = "Apollo.io"
+legal_entity = "ZenLeads, Inc."
+kinds = ["marketing-list"]
+priority = "standard"
+quality = "verified"
+verified_at = 2026-11-15
+sources = ["https://www.apollo.io/privacy-policy", "https://www.apollo.io/company/privacy-center", "https://www.apollo.io/privacy-policy/remove"]
+identity_fields = ["email"]
+exemption_risk = "overseas"
+escalation = []
+effort = "easy"
+
+[[channels]]
+kind = "web-form"
+address = "https://www.apollo.io/privacy-policy/remove"
+levers = []
+
+[manual_check]
+url = "https://www.apollo.io/company/privacy-center"

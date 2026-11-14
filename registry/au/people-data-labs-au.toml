@@ -1,0 +1,20 @@
+id = "people-data-labs-au"
+name = "People Data Labs"
+legal_entity = "People Data Labs, Inc."
+kinds = ["marketing-list"]
+priority = "standard"
+quality = "verified"
+verified_at = 2026-11-15
+sources = ["https://privacy.peopledatalabs.com/policies?name=privacy-policy", "https://www.peopledatalabs.com/do-not-sell-or-share"]
+identity_fields = ["full_name", "email"]
+exemption_risk = "overseas"
+escalation = []
+effort = "easy"
+
+[[channels]]
+kind = "web-form"
+address = "https://www.peopledatalabs.com/do-not-sell-or-share"
+levers = []
+
+[manual_check]
+url = "https://www.peopledatalabs.com/do-not-sell-or-share"

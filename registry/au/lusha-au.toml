@@ -1,0 +1,20 @@
+id = "lusha-au"
+name = "Lusha"
+legal_entity = "Lusha Systems Inc."
+kinds = ["marketing-list"]
+priority = "standard"
+quality = "verified"
+verified_at = 2026-11-15
+sources = ["https://www.lusha.com/legal/privacy-notice/", "https://www.lusha.com/privacy-center/", "https://www.lusha.com/privacy-center/request-removal/"]
+identity_fields = ["email"]
+exemption_risk = "overseas"
+escalation = []
+effort = "easy"
+
+[[channels]]
+kind = "web-form"
+address = "https://www.lusha.com/privacy-center/request-removal/"
+levers = []
+
+[manual_check]
+url = "https://www.lusha.com/privacy-center/"
