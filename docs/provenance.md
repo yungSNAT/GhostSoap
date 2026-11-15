@@ -259,7 +259,7 @@ Not added:
 - Snov.io: its terms name Snov.io Inc., incorporated in the United States with a Wilmington, Delaware address, and its privacy policy offers a 'Clear from list' form and help@snov.io, but no page of its own read here states its Australian coverage.
 - Swordfish: every page tried (opt-out form, terms, FAQ, privacy policies) served only a bot check, to a browser and to Firecrawl, so nothing could be confirmed from its own pages.
 
-Evidence: 10 `[[evidence]]` hashes across the 3 entries, taken on 16 November 2026 by a script that follows the hash steps in [registry/README.md](../registry/README.md#evidence-hashes-and-drift) and first reproduced all 8 hashes recorded for the entries above. 2 fetches about 40 seconds apart gave the same hashes, none shared. Not tracked: RocketReach's removal form (no text without a browser) and the 3 coverage pages.
+Evidence: 10 `[[evidence]]` hashes across the 3 entries, taken on 16 November 2026 by a script that follows the hash steps in [registry/README.md](../registry/README.md#evidence-hashes-and-drift) and first reproduced all 8 hashes recorded for the entries above. 2 fetches about 40 seconds apart gave the same hashes, none shared. The xtask's `evidence-hash` command, run from another network 40 minutes later, gave the same 8 hashes for the ContactOut and UpLead pages; RocketReach's 2 pages answered it with 403, so the monthly check may log them as unconfirmed. Not tracked: RocketReach's removal form (no text without a browser) and the 3 coverage pages.
 
 ### Rejected candidates (M1)
 
