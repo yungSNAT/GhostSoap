@@ -54,7 +54,7 @@ ghostsoap clean                                  # delete the drafts once sent
 ghostsoap law                                    # each request's legal basis and deadline
 ```
 
-`plan` and `draft` take `--pack` or `--entry` (repeatable). Without `--lever`, they ask each business to stop direct marketing, to stop passing your details to other marketers and to say where it got them (APP 7). Other requests are named with `--lever`. Requests that return your details or need your own words go to one business at a time, and those that need your own words take `--detail`, for example `ghostsoap draft --entry equifax-au --lever s20t-correction --detail "The default listed for 2024 is not mine."`. Each letter includes only the details that business needs. Overseas people-search sites, and services whose privacy policy names an overseas company with no ABN (Indeed, LinkedIn), get no letter: GhostSoap has not established that Australian privacy law reaches them (it can reach an overseas business that carries on business in Australia, under section 5B), so it shows their own search page and opt-out form instead.
+`plan` and `draft` take `--pack` or `--entry` (repeatable). Without `--lever`, they ask each business to stop direct marketing, to stop passing your details to other marketers and to say where it got them (APP 7). Other requests are named with `--lever`. Requests that return your details or need your own words go to one business at a time, and those that need your own words take `--detail`, for example `ghostsoap draft --entry equifax-au --lever s20t-correction --detail "The default listed for 2024 is not mine."`. Each letter includes only the details that business needs. Overseas people-search sites, and services whose privacy policy names an overseas company with no ABN (Indeed, LinkedIn), get no letter: GhostSoap has not established that Australian privacy law reaches them (it can reach an overseas business that carries on business in Australia, under section 5B), so it names a page of their own to check (a people-search site's search page, or the privacy or help page for Indeed and LinkedIn) and their own opt-out or privacy request form instead.
 
 Packs: `start-here`, `marketing`, `people-search`, `property`, `credit`, `loyalty`, `recruitment`, `data-breaches`, `telecommunications`, `banks-and-lenders`, `insurers` and `retail`. To ask a business you no longer deal with to destroy or de-identify your details (APP 11.2), name that request, for example `ghostsoap draft --entry hays-au --lever app11-destroy` (add the APP 7 levers too if you want both). With `--pack`, the request goes to every business in the pack that accepts it, including any you still deal with or work through, so use a pack only if you have left them all. Only you know whether you still deal with a business, so for consumer firms choose the ones you have left with `--entry`, for example `--entry optus-au --lever app11-destroy`. SEEK is in no pack. `--entry seek-au` alone asks SEEK for the APP 7 requests. A named lever replaces those, so to ask it as well to destroy what it no longer needs, name all 3: `--entry seek-au --lever app7-no-marketing --lever app7-source --lever app11-destroy`. Neither closes your SEEK account. Records of your employment through an agency, for example as a labour-hire worker, may be exempt from the Privacy Act (section 7B(3)); your records as a candidate are not.
 
@@ -66,11 +66,9 @@ If you edit a draft or write your own words, `ghostsoap check <file>` warns of c
 
 [`skills/ghostsoap/SKILL.md`](skills/ghostsoap/SKILL.md) lets an AI agent help you choose requests and explain them, using `ghostsoap plan --pack start-here --json` and `ghostsoap law --json`, which need no profile. You still run `init` and `draft` and send every letter yourself.
 
-| Agent | How to add it | What it can do |
-| --- | --- | --- |
-| Agent on your computer that reads skills, such as Muse Code | Copy `skills/ghostsoap` into its skills folder | Run `plan` and `law` |
-| Grok Bot | Ask the bot to add the skill from this repository | Depends on where it runs commands: on your computer, `plan` and `law`; otherwise as a hosted agent |
-| ChatGPT Dot and other hosted agents | Point the agent at this repository | Runs on its own computer, not yours: it reads the register or builds GhostSoap there. Never put your profile there |
+- **An agent on your computer that reads skills, such as Muse Code:** copy `skills/ghostsoap` into its skills folder. It can run `plan` and `law`.
+- **Grok Bot:** ask the bot to add the skill from this repository. What it can do depends on where it runs commands: on your computer, `plan` and `law`; otherwise it works as a hosted agent does.
+- **ChatGPT Dot and other hosted agents:** point the agent at this repository. It runs on its own computer, not yours: it reads the register or builds GhostSoap there. Never put your profile there.
 
 These routes come from third-party guides and press coverage and have not yet been tested in any of these products.
 
@@ -80,7 +78,7 @@ The skill is guidance, not a lock. It does not stop an agent that can read your 
 
 - Your profile is encrypted with [age](https://age-encryption.org/) under your passphrase and kept in your user data folder: `%LOCALAPPDATA%\GhostSoap` on Windows, `~/Library/Application Support/GhostSoap` on macOS, and `$XDG_DATA_HOME/ghostsoap` (by default `~/.local/share/ghostsoap`) on Linux. Set `GHOSTSOAP_HOME` to use another folder. A lost passphrase cannot be recovered.
 - Requests for access return personal information. Make them only about yourself: requesting someone else's information may be an offence. GhostSoap never puts them in a pack.
-- If someone with access to your device may be watching what you do, read eSafety's guidance on [device safety](https://www.esafety.gov.au/) before you start.
+- If someone with access to your device may be watching what you do, read eSafety's [online safety checklist](https://www.esafety.gov.au/key-topics/domestic-family-violence/online-safety-checklist) before you start.
 
 ## What leaves your machine
 
