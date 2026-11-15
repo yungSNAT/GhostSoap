@@ -70,6 +70,16 @@ jobs:
           name: coverage-rust
           path: coverage-rust.lcov
           retention-days: 1
+      # Holds the report Codecov reads at 100%: every line in it must have a count above 0.
+      # It prints each uncovered file:line and also fails on a report with no lines.
+      # cargo llvm-cov's --fail-under-lines reads its own summary, which put this code at
+      # 98.97% when no line in the report had a count of 0.
+      - name: Hold line coverage at 100%
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          awk -F'[:,]' '/^SF:/ { file = substr($0, 4) }
+            /^DA:/ { lines++; if ($3 == 0) { print file ":" $2; missed = 1 } }
+            END { exit missed || !lines }' coverage-rust.lcov
       - run: cargo build --locked --release
 
   # The upload runs apart from the tests so the OIDC token is never available
