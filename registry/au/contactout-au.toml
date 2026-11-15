@@ -1,0 +1,20 @@
+id = "contactout-au"
+name = "ContactOut"
+legal_entity = "ContactOut Limited"
+kinds = ["marketing-list"]
+priority = "standard"
+quality = "verified"
+verified_at = 2026-11-16
+sources = ["https://contactout.com/privacy_policy", "https://contactout.com/privacy_data_subjects", "https://contactout.com/optout", "https://contactout.com/terms", "https://contactout.com/contact", "https://contactout.com/alternatives/apollo-vs-contactout"]
+identity_fields = ["email"]
+exemption_risk = "overseas"
+escalation = []
+effort = "easy"
+
+[[channels]]
+kind = "web-form"
+address = "https://contactout.com/optout"
+levers = []
+
+[manual_check]
+url = "https://contactout.com/privacy_data_subjects"

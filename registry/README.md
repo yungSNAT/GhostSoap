@@ -74,6 +74,7 @@ Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI
 | `charterhouse-au` | Charterhouse Partnership | recruitment | `recruitment` | letter |
 | `coles-au` | Coles | retail | `retail` | letter |
 | `conexum-au` | Conexum | marketing-list | `marketing`, `start-here` | letter |
+| `contactout-au` | ContactOut | marketing-list | `marketing` | its own web form |
 | `cotality-au` | Cotality (formerly CoreLogic Australia; brands include RP Data, Cordell, onthehouse.com.au) | property-data, marketing-list | `property`, `start-here` | letter |
 | `domain-au` | Domain (Allhomes) | property-data | `property` | letter |
 | `dymocks-au` | Dymocks | retail | `data-breaches`, `retail` | letter |
@@ -124,6 +125,7 @@ Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI
 | `records-finder-au` | Records Finder Australia | people-search | `people-search` | its own web form |
 | `robert-half-au` | Robert Half | recruitment | `recruitment` | letter |
 | `robert-walters-au` | Robert Walters | recruitment | `recruitment` | letter |
+| `rocketreach-au` | RocketReach | marketing-list | `marketing` | its own web form |
 | `seek-au` | SEEK | recruitment |  | letter |
 | `smrtr-au` | smrtr | marketing-list, ad-tech | `marketing` | letter |
 | `suncorp-au` | Suncorp Insurance (AAMI, GIO, Apia) | insurance | `insurers` | letter |
@@ -134,6 +136,7 @@ Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI
 | `thryv-au` | Thryv Australia (White Pages, Yellow Pages) | directory, marketing-list | `marketing`, `start-here` | letter |
 | `ticketek-au` | Ticketek | retail | `data-breaches`, `retail` | letter |
 | `tpg-telecom-au` | TPG Telecom | telecommunications | `data-breaches`, `telecommunications` | letter |
+| `uplead-au` | UpLead | marketing-list | `marketing` | its own web form |
 | `velocity-frequent-flyer-au` | Velocity Frequent Flyer | loyalty | `loyalty` | letter |
 | `westpac-au` | Westpac | financial-services | `banks-and-lenders` | letter |
 | `winr-alchemist-au` | WINR Data | ad-tech | `marketing` | letter |

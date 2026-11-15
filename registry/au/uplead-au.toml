@@ -1,0 +1,20 @@
+id = "uplead-au"
+name = "UpLead"
+legal_entity = "UpLead, LLC"
+kinds = ["marketing-list"]
+priority = "standard"
+quality = "verified"
+verified_at = 2026-11-16
+sources = ["https://www.uplead.com/privacy/", "https://www.uplead.com/opt-out/", "https://support.uplead.com/en/articles/10836637-data-removal-requests-handled-correctly", "https://www.uplead.com/construction-email-list/"]
+identity_fields = ["full_name", "email", "phone"]
+exemption_risk = "overseas"
+escalation = []
+effort = "easy"
+
+[[channels]]
+kind = "web-form"
+address = "https://www.uplead.com/opt-out/"
+levers = []
+
+[manual_check]
+url = "https://support.uplead.com/en/articles/10836637-data-removal-requests-handled-correctly"
