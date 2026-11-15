@@ -375,6 +375,42 @@ fn overseas_services_get_a_manual_step_without_a_search() {
 }
 
 #[test]
+fn marketing_pack_shows_the_contact_data_brokers_own_forms() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = ghostsoap(tmp.path(), &["plan", "--pack", "marketing"], "");
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    let stdout = text(&out.stdout);
+    for (id, page, form) in [
+        (
+            "contactout-au",
+            "https://contactout.com/privacy_data_subjects",
+            "https://contactout.com/optout",
+        ),
+        (
+            "rocketreach-au",
+            "https://rocketreach.co/privacy",
+            "https://rocketreach.co/remove-profile",
+        ),
+        (
+            "uplead-au",
+            "https://support.uplead.com/en/articles/10836637-data-removal-requests-handled-correctly",
+            "https://www.uplead.com/opt-out/",
+        ),
+    ] {
+        let line = stdout
+            .lines()
+            .find(|l| l.starts_with(&format!("manual  {id}: run from overseas;")))
+            .unwrap_or_else(|| panic!("no manual step for {id}"));
+        assert!(
+            line.contains(&format!(
+                "See {page}, then use its own opt-out or privacy request form at {form} (effort:"
+            )),
+            "{line}"
+        );
+    }
+}
+
+#[test]
 fn plan_refuses_access_levers_in_bulk() {
     let tmp = tempfile::tempdir().unwrap();
     let out = ghostsoap(

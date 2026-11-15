@@ -229,11 +229,37 @@ ABN Lookup's active-ABN search was run for each name on 15 November 2026, during
 
 Not added:
 
-- ContactOut: its policies and terms name ContactOut Limited without a country; the policy sends complaints to the UK Information Commissioner's Office and the terms take Hong Kong law and courts. Where the company is based was not established, so it waits for a page that says.
-- RocketReach: its terms name RocketReach, LLC of Brooklyn, New York, and its removal form asks for an email address, but no page of its own read here states its Australian coverage.
+- ContactOut: its policies and terms name ContactOut Limited without a country; the policy sends complaints to the UK Information Commissioner's Office and the terms take Hong Kong law and courts. Where the company is based was not established, so it waits for a page that says. Added on 16 November 2026 (below).
+- RocketReach: its terms name RocketReach, LLC of Brooklyn, New York, and its removal form asks for an email address, but no page of its own read here states its Australian coverage. Added on 16 November 2026 (below).
 - People Data Labs: its only web form is headed 'Do Not Sell or Share My Personal Information', is for US opt-out requests and says requests for rights outside the United States go to a 'Privacy Request Center'; its Privacy Center lists only that form and privacy@peopledatalabs.com, and its 'Make a Privacy Request' button opens a choice of consumer, staff and applicant, whose consumer request types were not read. An overseas entry needs the broker's own web form, so it waits until one that serves people outside the United States is confirmed.
 
 Evidence: 8 `[[evidence]]` hashes across the 3 entries, taken on 15 November 2026 with the xtask's `evidence-hash` command; 2 fetches about 30 seconds apart gave the same hashes, none shared. Not tracked: ZoomInfo's removal form (403 to a plain fetch) and the 3 coverage pages, read after the hashes were taken.
+
+### More business contact-data brokers (16 November 2026)
+
+The 3 brokers held back above and 3 more names from Optery's Australian list (UpLead, Snov.io and Swordfish) were checked on 16 November 2026 (AEDT) by an AI agent working for the maintainer, in the same way: public pages only, with no name or email searched, no form submitted and no account created. No person has re-checked them. 3 became overseas entries in the marketing pack: GhostSoap shows the broker's own opt-out form and sends no letter.
+
+Australian coverage, from each broker's own pages: ContactOut's comparison with Apollo gives its coverage in Australia, for sales leaders at companies of 51 to 1,000 employees, as 80% for work email, 78% for personal email and 79% for phone, and its Telstra company page gives 35,493 employees found; RocketReach's Australia companies page offers direct emails and phone numbers for staff of Australian companies, and its Telstra email format page offers verified emails for 35,347 Telstra employees; UpLead sells Australian lists by industry, such as 90,518 verified construction contacts and 32,143 banking contacts.
+
+ABN Lookup was searched for each name at 8:01 am and 8:35 am AEDT on 16 November 2026, and every page of each all-ABN result list was read at about 9:10 am, after the maintenance window noted above had ended, though the page still showed its notice and warned that updates could appear late for a short time. No active or cancelled ABN or name matched a broker. All ABNs: 42 matches for 'RocketReach' and 36 for 'UpLead'; 'ContactOut' gives more than 200 across all name types, so its entity, business and trading names were read separately (150, 188 and 183 matches, the business names again by state). The near matches were Contact Outsourcing Pty Ltd, a Victorian private company with an ABN active since 2000, 15 years before ContactOut was founded, and a cancelled, historic business name 'upleads' in New South Wales, while UpLead's pages read name no Australian entity or address.
+
+| Entry | Lead | Verified from | Entity and base |
+|---|---|---|---|
+| `contactout-au` | Optery's Australian list | Privacy policy, privacy notice, terms, contact page, opt-out form and Apollo comparison page on contactout.com | The policies and terms name ContactOut Limited. The terms take Hong Kong law and courts, the notice sends complaints to the UK Information Commissioner's Office, the contact page gives an office at 934 Howard St, San Francisco, and ContactOut's own company page gives its headquarters as San Francisco, US. No page read names an Australian address |
+| `rocketreach-au` | Optery's Australian list | Privacy policy, terms, removal form and Australia companies page on rocketreach.co | The terms name RocketReach, LLC of Brooklyn, New York, and take Washington law |
+| `uplead-au` | Optery's Australian list | Privacy policy, opt-out form, removal help article and construction email list page on uplead.com | The policy names UpLead, LLC, a California limited liability company of Covina, California |
+
+- `contactout-au`: the opt-out form asks for an email address and sends a verification link; the page says the profile is deleted within 24 hours.
+- `rocketreach-au`: the 'Remove Your Profile' form asks for an email address and sends a verification link; the privacy policy points deletion requests to it.
+- `uplead-au`: the opt-out form asks for a full name, a contact email, the email or phone number to look up, a privacy jurisdiction ('Other' is one choice) and whether to receive or delete the information; UpLead confirms by email or SMS before acting.
+
+Not added:
+
+- People Data Labs: no page of its own read here states its Australian coverage. Its Privacy Center lists only the US 'Do not share or sell my personal information' form under 'Request Forms'; its 'Make a Privacy Request' button was not followed.
+- Snov.io: its terms name Snov.io Inc. (Snovio Inc. in its privacy policy), incorporated in the United States with a Wilmington, Delaware address, and its privacy policy offers a 'Clear from list' form and help@snov.io, but no page of its own read here states its Australian coverage.
+- Swordfish: every page tried (opt-out form, terms, FAQ, privacy policies) served only a bot check, to a browser and to Firecrawl, so nothing could be confirmed from its own pages.
+
+Evidence: 10 `[[evidence]]` hashes across the 3 entries, taken on 16 November 2026 by a script that follows the hash steps in [registry/README.md](../registry/README.md#evidence-hashes-and-drift) and first reproduced all 8 hashes recorded for the entries above. 2 fetches about 40 seconds apart gave the same hashes, none shared. The xtask's `evidence-hash` command, run from another network 40 minutes later, gave the same 8 hashes for the ContactOut and UpLead pages; RocketReach's 2 pages answered it with 403, so the monthly check may log them as unconfirmed. Not tracked: RocketReach's removal form (no text without a browser) and the 3 coverage pages.
 
 ### Rejected candidates (M1)
 

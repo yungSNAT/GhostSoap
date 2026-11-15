@@ -34,7 +34,7 @@ fn built_in_register_passes() {
         .output()
         .expect("run ghostsoap");
     assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
-    assert!(text(&out.stdout).contains("Checked 83 entries and 12 packs; errors: 0,"));
+    assert!(text(&out.stdout).contains("Checked 86 entries and 12 packs; errors: 0,"));
 }
 
 #[test]

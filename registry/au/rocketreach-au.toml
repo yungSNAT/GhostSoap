@@ -1,0 +1,30 @@
+id = "rocketreach-au"
+name = "RocketReach"
+legal_entity = "RocketReach, LLC"
+kinds = ["marketing-list"]
+priority = "standard"
+quality = "verified"
+verified_at = 2026-11-16
+sources = ["https://rocketreach.co/privacy", "https://rocketreach.co/terms", "https://rocketreach.co/remove-profile", "https://rocketreach.co/cl/australia-companies_004"]
+identity_fields = ["email"]
+exemption_risk = "overseas"
+escalation = []
+effort = "easy"
+
+[[channels]]
+kind = "web-form"
+address = "https://rocketreach.co/remove-profile"
+levers = []
+
+[manual_check]
+url = "https://rocketreach.co/privacy"
+
+[[evidence]]
+url = "https://rocketreach.co/privacy"
+checked_at = 2026-11-16
+sha256 = "b4546d0cb95307b5194a0de9f90f15d27daca2a6fadb933e30f3ad5900f791fa"
+
+[[evidence]]
+url = "https://rocketreach.co/terms"
+checked_at = 2026-11-16
+sha256 = "56aed9fa7077c64931b6720f63235dbc7941eb28d4c12d5bf5df556c40e22a5c"
