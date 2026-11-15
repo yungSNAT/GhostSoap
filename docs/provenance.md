@@ -207,6 +207,34 @@ The Optery Australian list named PERSONLOOKUP AUSTRALIA, Radaris Australia and R
 | Radaris Australia | radaris.com, au.radaris.com, radaris.com/au/ | Gone. Every path serves one notice: the New Jersey Superior Court (docket MID-L-000847-24) entered a default judgment against Radaris.com on 27 August 2026 and transferred the domain to Atlas Data Privacy Corporation. radaris.com.au, radaris.au and radaris.net.au do not exist in DNS |
 | ReverseAustralia | www.reverseaustralia.com home, `/about.php`, `/contact.php`, `/privacy.php`, `/acceptableuse.php`, `/developer/`, `/llms.txt` | Still as at M1. The privacy page returns an error page, and no page names a legal entity or ABN. The site is a community spam-report lookup for phone numbers, like NumberCheck and PhoneLookup (rejected at M1), though its about page says it may show names linked to a number; its contact page gives `residential@reverseaustralia.com` for residential listing removal. ABN Lookup lists the business names 'Reverse Australia' (from 2 November 2026) and 'Reverse Phone Lookup Australia' (from 1 November 2026) under ABN 21 663 563 611 (WWW ENTERPRISES PTY. LTD., WA), but no page of the site names that company, so the link is unconfirmed. Recheck once the privacy policy loads |
 
+### Business contact-data brokers (15 November 2026)
+
+On 13 November 2026 the maintainer ruled that business contact-data brokers, which sell work emails and phone numbers for sales and recruiting (ZoomInfo, Apollo and the like), belong in the register. The first 6 candidates were checked on 15 November 2026 by an AI agent working for the maintainer, from public pages only: no name or email was searched, no form submitted and no account created. No person has re-checked them. Each entity's privacy policy and opt-out page were read, and each legal entity and opt-out form was matched against that text or the page's links. 3 became overseas entries with no levers: GhostSoap shows the broker's own opt-out form and sends no letter. Each policy describes rights under the GDPR or US state laws. None mentions the Privacy Act; only Lusha's names Australia, as a country where recipients of its data may be. They are in the marketing pack.
+
+Leads: ZoomInfo and Apollo from the maintainer's ruling; Lusha from the peer comparison that raised it; ContactOut, RocketReach and People Data Labs by name from Optery's Australian list, which lists ZoomInfo and Apollo too. Only names were taken from that list.
+
+Australian coverage comes from each broker's own sales pages, read on 15 November 2026: ZoomInfo's data page gives 12.7M+ contacts for Australia and New Zealand, Lusha's 9.3M+ contacts for Australia, and Apollo's Australia email database page offers 'verified Australian contacts' filtered by state, without a count.
+
+ABN Lookup's active-ABN search was run for each name on 15 November 2026, during a maintenance window in which, its notice said, new or updated ABNs could appear late. No result matched a broker. The 'Lusha' search stopped before listing every match, so 'Lusha Systems' was searched too.
+
+| Entry | Lead | Verified from | Entity and ABN Lookup, 15 November 2026 |
+|---|---|---|---|
+| `zoominfo-au` | Maintainer's ruling | Privacy policy, Trust Center privacy page, removal form and data page on www.zoominfo.com and privacyrequest.zoominfo.com | The policy names ZoomInfo Technologies LLC, a Delaware limited liability company. No ABN for 'ZoomInfo' |
+| `apollo-au` | Maintainer's ruling | Privacy policy, Privacy Center, opt-out form and Australia email database page on www.apollo.io | The policy names ZenLeads, Inc. d/b/a Apollo.io and says Apollo is based in the United States. No ABN for 'Apollo.io' or 'ZenLeads' (one unrelated Western Australian builder) |
+| `lusha-au` | Peer comparison | Privacy notice, Privacy Center, removal form and data page on www.lusha.com | The notice names Lusha Systems Inc., incorporated in Delaware, of Boston, and for the people it holds data on adds Lusha Systems Ltd., incorporated in Israel, as joint controller. No ABN for 'Lusha' or 'Lusha Systems' |
+
+- `zoominfo-au`: the removal form asks for an email address; the Trust Center page says removal also opts the profile out of sale or sharing where that applies, and that ZoomInfo keeps limited information to honour the request.
+- `apollo-au`: the opt-out form takes a work email address; the policy also gives privacy@apollo.io, which the entry does not list because overseas entries get no letter.
+- `lusha-au`: the removal form asks why you reached the page, your country and your email; Lusha keeps the details in a suppression list so they are not added again.
+
+Not added:
+
+- ContactOut: its policies and terms name ContactOut Limited without a country; the policy sends complaints to the UK Information Commissioner's Office and the terms take Hong Kong law and courts. Where the company is based was not established, so it waits for a page that says.
+- RocketReach: its terms name RocketReach, LLC of Brooklyn, New York, and its removal form asks for an email address, but no page of its own read here states its Australian coverage.
+- People Data Labs: its only web form is headed 'Do Not Sell or Share My Personal Information', is for US opt-out requests and says requests for rights outside the United States go to a 'Privacy Request Center'; its Privacy Center lists only that form and privacy@peopledatalabs.com, and its 'Make a Privacy Request' button opens a choice of consumer, staff and applicant, whose consumer request types were not read. An overseas entry needs the broker's own web form, so it waits until one that serves people outside the United States is confirmed.
+
+Evidence: 8 `[[evidence]]` hashes across the 3 entries, taken on 15 November 2026 with the xtask's `evidence-hash` command; 2 fetches about 30 seconds apart gave the same hashes, none shared. Not tracked: ZoomInfo's removal form (403 to a plain fetch) and the 3 coverage pages, read after the hashes were taken.
+
 ### Rejected candidates (M1)
 
 | Candidate | Reason |

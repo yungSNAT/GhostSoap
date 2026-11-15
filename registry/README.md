@@ -14,7 +14,7 @@ Without `--path`, `registry check` validates the register built into the binary.
 
 An entity belongs in the register when all of these hold:
 
-- It holds personal information about many people in Australia, and it fits one of the `kinds` below. That covers data brokers and people-search sites, recruiters, firms behind large Australian data breaches and large consumer firms.
+- It holds personal information about many people in Australia, and it fits one of the `kinds` below. That covers data brokers and people-search sites, business contact-data brokers (which sell work emails and phone numbers for sales and recruiting), recruiters, firms behind large Australian data breaches and large consumer firms.
 - People can reach it: its own pages give a privacy contact or an opt-out.
 - It has an ABN, or it is an overseas entry as `exemption_risk` defines one. An entity that may fall under the small business exemption can stay, marked `small-business-possible`.
 - Its details come from its own pages. Another list may point you to it, but nothing is copied from a list whose licence does not allow it ([clean-room rules](../CONTRIBUTING.md#clean-room-rules)).
@@ -38,7 +38,7 @@ A listed business that asks to be taken out of the register stays in it unless e
 | `levers` | The requests this entity is eligible for; listing a lever does not mean it is always sent (see below). `app7-no-marketing`, `app7-no-facilitation`, `app7-source`, `app11-destroy`, `app13`, `app13-notify-recipients`, `app13-statement`, `s20t-correction`, `s20k-ban`, `s21v-correction`, `spam-unsubscribe` |
 | `opt_in_levers` | Levers the user must choose per entity. The access levers `app12`, `s20r-access` and `s21t-access` return personal information, so they are allowed only here |
 | `identity_fields` | `full_name`, `alias_names`, `email`, `phone`, `date_of_birth`, `address`, `previous_addresses`, `postcode`. Document numbers are never collected |
-| `exemption_risk` | `none`, `small-business-possible`, `overseas`. An overseas entry is a site whose responsible entity is overseas with no ABN found (a people-search site that lists Australians but has no Australian presence, or a service whose privacy policy names an overseas company, such as Indeed and LinkedIn; provisional, since section 5B can reach an overseas organisation that carries on business in Australia whether or not it has an ABN, and GhostSoap has not assessed that): it has no `abn`, no levers, a `[manual_check]` page and its own web-form opt-out as a channel with `levers = []` |
+| `exemption_risk` | `none`, `small-business-possible`, `overseas`. An overseas entry is a site whose responsible entity is overseas with no ABN found (a people-search site that lists Australians but has no Australian presence, or a service whose privacy policy names an overseas company, such as Indeed, LinkedIn and ZoomInfo; provisional, since section 5B can reach an overseas organisation that carries on business in Australia whether or not it has an ABN, and GhostSoap has not assessed that): it has no `abn`, no levers, a `[manual_check]` page and its own web-form opt-out as a channel with `levers = []` |
 | `escalation` | Ordered: `afca`, `tio`, `acma`, `oaic`. A `telecommunications` entry must list `tio` first. List an entity's external dispute resolution scheme before `oaic`, because the OAIC generally expects a complaint to go there first |
 | `effort` | `easy`, `medium`, `hard`, `impossible` |
 | `[[channels]]` | `kind` (`email`, `web-form`, `post`, `phone`), `address`, `levers` (the entry's levers this channel can carry; `[]` for a contact-only channel such as a phone line) and optional `preferred = true`. Every lever in `levers` and `opt_in_levers` needs at least one channel; a channel may list only the entry's levers; at most one channel is preferred for each lever |
@@ -62,6 +62,7 @@ Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI
 | `allianz-au` | Allianz Australia | insurance | `insurers` | letter |
 | `amazon-au` | Amazon Australia | retail | `retail` | letter |
 | `anz-au` | ANZ | financial-services | `banks-and-lenders` | letter |
+| `apollo-au` | Apollo.io | marketing-list | `marketing` | its own web form |
 | `aussie-broadband-au` | Aussie Broadband | telecommunications | `telecommunications` | letter |
 | `australia-post-au` | Australia Post (data services, National Change of Address) | marketing-list | `marketing` | letter |
 | `bunnings-au` | Bunnings | retail | `retail` | letter |
@@ -102,6 +103,7 @@ Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI
 | `list-factory-au` | List Factory | marketing-list | `marketing` | letter |
 | `liveramp-au` | LiveRamp Australia | ad-tech | `marketing`, `start-here` | letter |
 | `locate-family-au` | Locate Family | people-search | `people-search` | its own web form |
+| `lusha-au` | Lusha | marketing-list | `marketing` | its own web form |
 | `macquarie-au` | Macquarie Bank | financial-services | `banks-and-lenders` | letter |
 | `manpowergroup-au` | ManpowerGroup | recruitment | `recruitment` | letter |
 | `medibank-au` | Medibank | insurance | `data-breaches`, `insurers` | letter |
@@ -136,6 +138,7 @@ Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI
 | `westpac-au` | Westpac | financial-services | `banks-and-lenders` | letter |
 | `winr-alchemist-au` | WINR Data | ad-tech | `marketing` | letter |
 | `zip-au` | Zip | financial-services | `banks-and-lenders` | letter |
+| `zoominfo-au` | ZoomInfo | marketing-list | `marketing` | its own web form |
 <!-- entries:end -->
 
 ## Evidence hashes and drift
