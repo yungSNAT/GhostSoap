@@ -8,7 +8,7 @@
 
 use std::env;
 use std::fs::{self, OpenOptions};
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
@@ -238,15 +238,23 @@ fn discard(path: &Path, error: &io::Error) -> io::Error {
     )
 }
 
-/// Whether `path` is an export GhostSoap wrote under its default name: dated, and starting
-/// with the line `export` writes.
+/// Whether `path` is an export GhostSoap wrote under its default name: a regular file (never
+/// a link, pipe or folder), dated, and starting with the line `export` writes. Only that
+/// line's first bytes are read.
 fn is_export(path: &Path) -> bool {
     let name = path.file_name().unwrap_or_default().to_string_lossy();
     let dated = name
         .strip_prefix("ghostsoap-export-")
         .and_then(|rest| rest.strip_suffix(".toml"))
         .is_some_and(|date| chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").is_ok());
-    dated && fs::read_to_string(path).is_ok_and(|text| text.starts_with(EXPORT_HEADER))
+    if !dated || !fs::symlink_metadata(path).is_ok_and(|meta| meta.is_file()) {
+        return false;
+    }
+    let mut start = Vec::new();
+    let header = EXPORT_HEADER.as_bytes();
+    fs::File::open(path)
+        .and_then(|file| file.take(header.len() as u64).read_to_end(&mut start))
+        .is_ok_and(|_| start == header)
 }
 
 /// The files in the data folder `forget` deletes: the state file, a temporary file an
