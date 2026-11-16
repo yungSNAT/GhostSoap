@@ -106,7 +106,8 @@ fn decode(text: &str) -> io::Result<State> {
             Ok(State::new(old.profile))
         }
         Some(2) => {
-            let state: State = toml::from_str(text).map_err(unreadable)?;
+            let mut state: State = toml::from_str(text).map_err(unreadable)?;
+            state.read_days();
             match state.problems().first() {
                 None => Ok(state),
                 Some(problem) => Err(io::Error::other(format!(
