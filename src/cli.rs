@@ -606,13 +606,21 @@ fn publish_drafts<'a>(
 fn publish_with<'a>(
     drafted: Vec<Drafted<'a>>,
     mut redraft: io::drafts::Redraft,
-    _copy: bool,
+    copy: bool,
     state: &mut State,
     mut hand: impl FnMut(&Drafted) -> Result<(), String>,
 ) -> Result<Vec<Drafted<'a>>, String> {
     redraft.unlock();
-    for letter in &drafted {
-        hand(letter)?;
+    for (at, letter) in drafted.iter().enumerate() {
+        // The letters written before a failure are plaintext on disk (R1946).
+        hand(letter).map_err(|e| match at {
+            0 => e,
+            _ if copy => e,
+            _ => format!(
+                "{e}\nThe letters written before it are plaintext drafts. Once you no longer \
+                 need them, run `ghostsoap clean`."
+            ),
+        })?;
     }
     redraft.discard();
     for message in &mut state.messages {
