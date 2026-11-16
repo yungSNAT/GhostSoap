@@ -170,7 +170,9 @@ fn check_repeats_nothing_personal_from_the_file() {
 
 #[test]
 fn check_says_it_passes_the_tables_wording_whoever_the_letter_goes_to() {
-    let out = check_bytes(b"Telco: reply within the period of 30 days that starts on the day the request is made.\n");
+    let out = check_bytes(
+        b"Telco: reply within the period of 30 days that starts on the day the request is made.\n",
+    );
     assert_eq!(out.status.code(), Some(0));
     let stdout = text(&out.stdout);
     assert!(stdout.contains("Claims to recheck: 0."), "{stdout}");
@@ -459,4 +461,25 @@ fn plan_json_tells_people_search_and_other_overseas_entries_apart() {
     assert_eq!(plan["steps"][0]["page_step"], "See");
     let plan = json_of(&["plan", "--entry", "infotracer-au", "--json"]);
     assert_eq!(plan["steps"][0]["page_step"], "Search for yourself at");
+}
+
+#[test]
+fn a_reader_that_stops_early_is_not_an_error() {
+    // As `ghostsoap law | head -1` leaves it: the reading end is closed before the output.
+    let (reader, writer) = std::io::pipe().expect("make a pipe");
+    drop(reader);
+    for args in [&["law"][..], &["plan", "--pack", "start-here"]] {
+        let out = Command::new(env!("CARGO_BIN_EXE_ghostsoap"))
+            .args(args)
+            .stdout(writer.try_clone().expect("share the pipe"))
+            .output()
+            .expect("run ghostsoap");
+        assert_eq!(
+            out.status.code(),
+            Some(0),
+            "{args:?}: {}",
+            text(&out.stderr)
+        );
+        assert!(out.stderr.is_empty(), "{args:?}: {}", text(&out.stderr));
+    }
 }
