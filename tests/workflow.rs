@@ -539,8 +539,12 @@ fn forget_deletes_what_ghostsoap_wrote_after_confirmation_and_nothing_else() {
     assert_eq!(declined.status.code(), Some(1));
     assert!(text(&declined.stderr).contains("nothing was deleted"));
     let listed = text(&declined.stdout);
-    for path in [home.join("state.age"), out.clone()] {
-        assert!(listed.contains(&path.display().to_string()), "{listed}");
+    assert!(listed.contains(&home.join("state.age").display().to_string()));
+    // Each folder once; the recorded `--out` folder may be shown with links resolved.
+    let sep = std::path::MAIN_SEPARATOR;
+    for folder in ["drafts", "out"] {
+        let line = format!("{sep}{folder} that still hold what it wrote");
+        assert_eq!(listed.matches(&line).count(), 1, "{listed}");
     }
     assert!(listed.contains("ghostsoap-export-"), "{listed}");
     assert!(home.join("state.age").exists());

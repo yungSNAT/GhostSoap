@@ -1438,7 +1438,7 @@ fn list_forgotten(files: &[PathBuf], folders: &[PathBuf], no_passphrase: bool) {
     for folder in folders {
         println!(
             "    the drafts it wrote in {} that still hold what it wrote; other files stay",
-            folder.display()
+            io::exposure::display(folder)
         );
     }
     if no_passphrase {
@@ -1465,8 +1465,11 @@ fn draft_folders(
         .map_err(|e| e.to_string())?;
     let state = state::load(dir, passphrase).map_err(|e| e.to_string())?;
     for draft in state.messages.iter().filter_map(|m| m.draft.as_ref()) {
+        // A folder reached 2 ways, such as the drafts folder recorded with links resolved,
+        // is cleaned once.
         let folder = PathBuf::from(&draft.folder);
-        if !folders.contains(&folder) {
+        let real = io::exposure::resolve(&folder);
+        if !folders.iter().any(|f| io::exposure::resolve(f) == real) {
             folders.push(folder);
         }
     }
