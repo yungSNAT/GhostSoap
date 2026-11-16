@@ -1048,14 +1048,14 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();
         let drafts = dir.path().join("drafts");
+        let name = "a-GS-11111.eml";
+        let path = write(&drafts, name, "letter").unwrap();
         // A name longer than the file system allows cannot be looked up at all.
         let long = format!("{}-GS-11111.eml", "a".repeat(300));
         let err = draft_present(&drafts.join(&long)).unwrap_err();
         assert_ne!(err.kind(), io::ErrorKind::NotFound);
         assert!(draft_status(&drafts, &long, &[]).is_err());
 
-        let name = "a-GS-11111.eml";
-        let path = write(&drafts, name, "letter").unwrap();
         let records = read_manifest(&drafts).unwrap();
         fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
         let readable = fs::read(&path).is_ok();
