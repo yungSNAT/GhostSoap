@@ -84,11 +84,19 @@ pub fn due(message: &Message, request: &Request) -> Due {
 }
 
 /// The day of the latest refusal in effect on `message`'s APP 13 correction, unless a later
-/// status in effect there says it was made.
+/// status in effect there says it was made. A later step such as a complaint leaves the
+/// refusal standing.
 fn correction_refused(message: &Message) -> Option<NaiveDate> {
     let correction = message.requests.iter().find(|r| r.lever == Lever::App13)?;
-    let latest = *correction.in_effect().statuses.last()?;
-    matches!(latest.status, Status::Refused | Status::RefusedWithReasons).then_some(latest.on)
+    let mut refused = None;
+    for event in correction.in_effect().statuses {
+        match event.status {
+            Status::Refused | Status::RefusedWithReasons => refused = Some(event.on),
+            Status::Fulfilled => refused = None,
+            _ => {}
+        }
+    }
+    refused
 }
 
 #[cfg(test)]
@@ -236,6 +244,14 @@ mod tests {
         assert_eq!(
             due_of(&message, Lever::App13Statement),
             Due::Guide(day(12, 10))
+        );
+        message.requests[0]
+            .events
+            .push(answer(day(11, 11), Status::Escalated));
+        assert_eq!(
+            due_of(&message, Lever::App13Statement),
+            Due::Guide(day(12, 10)),
+            "a complaint about the refusal leaves it in effect"
         );
         message.requests[0]
             .events

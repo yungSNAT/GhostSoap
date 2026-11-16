@@ -128,6 +128,8 @@ impl Message {
                     "{tag} {lever} has no period the law lets you agree to lengthen"
                 ));
             };
+            // A period ending at a weekend already runs to the Monday (s 36(2)).
+            let last = deadline::past_weekend(last);
             if extension.until <= last {
                 return Err(format!(
                     "{tag} {lever}: {} is not later than the law's last day, {last}",

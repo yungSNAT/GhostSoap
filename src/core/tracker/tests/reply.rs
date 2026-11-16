@@ -184,6 +184,26 @@ fn a_longer_period_needs_a_credit_correction_and_a_later_day() {
 }
 
 #[test]
+fn a_longer_period_must_end_after_the_last_day_moved_past_a_weekend() {
+    let december = |day: u32| NaiveDate::from_ymd_opt(2026, 12, day).unwrap();
+    let mut sent = message("GS-7K3QX");
+    sent.requests = vec![Request::new(Lever::S20tCorrection)];
+    // Sent on Friday 6 November: 30 days end on Saturday 5 December, moved to Monday 7.
+    sent.drafted = day(5);
+    sent.sends = vec![SendRecord::Sent(email(day(6)))];
+    let sunday = Extension {
+        on: day(12),
+        until: december(6),
+        note: None,
+    };
+    assert_eq!(
+        sent.record_extension(BOTH, sunday, day(20)).unwrap_err(),
+        "GS-7K3QX s20t-correction: 2026-12-06 is not later than the law's last day, \
+         2026-12-07"
+    );
+}
+
+#[test]
 fn a_withdrawal_needs_something_in_effect_to_withdraw() {
     let mut sent = sent_message("GS-7K3QX");
     for (of, what) in [
