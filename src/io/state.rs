@@ -219,6 +219,34 @@ pub fn export(dir: &Path, passphrase: SecretString, path: &Path, date: &str) -> 
     file.sync_all()
 }
 
+/// The files in the data folder `forget` deletes: the state file, a temporary file an
+/// interrupted write left, and exports written under their default name. A folder that does
+/// not exist holds none.
+pub fn own_files(dir: &Path) -> io::Result<Vec<PathBuf>> {
+    let items = match fs::read_dir(dir) {
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        items => items?,
+    };
+    let state = state_path(dir);
+    let tmp = state.with_extension("age.tmp");
+    let mut files = Vec::new();
+    for item in items {
+        let path = item?.path();
+        let name = path.file_name().unwrap_or_default().to_string_lossy();
+        let export = name.starts_with("ghostsoap-export-") && name.ends_with(".toml");
+        if export || path == state || path == tmp {
+            files.push(path);
+        }
+    }
+    files.sort();
+    Ok(files)
+}
+
+/// Take the state's lock, so no other GhostSoap writes the state whilst it is held.
+pub(crate) fn lock(dir: &Path) -> io::Result<Lock> {
+    Lock::acquire(dir, LOCK_FILE)
+}
+
 /// Read and decrypt the state file. Nothing is written: a format 1 file stays as it is.
 pub fn load(dir: &Path, passphrase: SecretString) -> io::Result<State> {
     read(&state_path(dir), passphrase)
