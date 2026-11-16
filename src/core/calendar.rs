@@ -15,10 +15,14 @@ pub struct Item<'a> {
     pub entry: &'a str,
     pub lever: &'a str,
     pub due: Due,
+    /// How many records the request's letter holds (records of sending and every request's
+    /// events). They are only ever added, so it never falls and it rises with every record
+    /// that can move the date: the event's SEQUENCE.
+    pub sequence: usize,
 }
 
-/// The calendar for `items`, stamped with `stamp` (UTC), with CRLF line ends and lines
-/// folded at 75 octets. Items without a date are left out.
+/// The calendar for `items`, stamped with `stamp` (UTC, the time of this export), with CRLF
+/// line ends and lines folded at 75 octets. Items without a date are left out.
 pub fn ics(items: &[Item], stamp: NaiveDateTime, version: &str) -> String {
     let mut lines = vec![
         "BEGIN:VCALENDAR".to_owned(),
@@ -58,7 +62,7 @@ pub fn ics(items: &[Item], stamp: NaiveDateTime, version: &str) -> String {
             ),
             format!("DESCRIPTION:{}", escape(description)),
             "TRANSP:TRANSPARENT".to_owned(),
-            "SEQUENCE:0".to_owned(),
+            format!("SEQUENCE:{}", item.sequence),
             "END:VEVENT".to_owned(),
         ]);
     }
@@ -126,18 +130,22 @@ mod tests {
             entry,
             lever,
             due,
+            sequence: 0,
         }
     }
 
     #[test]
     fn each_dated_request_is_one_all_day_event_with_a_stable_uid() {
         let items = [
-            item(
-                "GS-7K3QX",
-                "quantium-au",
-                "app12",
-                Due::Statutory(day(12, 31)),
-            ),
+            Item {
+                sequence: 3,
+                ..item(
+                    "GS-7K3QX",
+                    "quantium-au",
+                    "app12",
+                    Due::Statutory(day(12, 31)),
+                )
+            },
             item("GS-7K3QX", "quantium-au", "app7-no-marketing", Due::None),
             item("GS-AB2CD", "equifax-au", "app13", Due::Guide(day(12, 1))),
             item("GS-EF3GH", "telstra-au", "spam-unsubscribe", Due::Unknown),
@@ -150,6 +158,7 @@ mod tests {
             "DTSTAMP:20261117T090507Z",
             "DTSTART;VALUE=DATE:20261231",
             "DTEND;VALUE=DATE:20270101",
+            "SEQUENCE:3",
             r"SUMMARY:GhostSoap GS-7K3QX: quantium-au app12\, law's last day",
             "UID:GS-AB2CD-app13@ghostsoap.invalid",
             "DTSTART;VALUE=DATE:20261201",

@@ -171,6 +171,7 @@ fn status_ics_writes_each_open_dated_request_once_without_personal_details() {
     for line in [
         format!("UID:{tag}-s20t-correction@ghostsoap.invalid"),
         format!("DTSTART;VALUE=DATE:{}", law.format("%Y%m%d")),
+        "SEQUENCE:1".to_owned(),
     ] {
         assert!(
             calendar.contains(&format!("{line}\r\n")),

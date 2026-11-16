@@ -1123,6 +1123,12 @@ fn write_calendar(
             entry: &message.entry,
             lever: request.lever.name(),
             due,
+            sequence: message.sends.len()
+                + message
+                    .requests
+                    .iter()
+                    .map(|r| r.events.len())
+                    .sum::<usize>(),
         })
         .collect();
     let stamp = chrono::Utc::now().naive_utc();
