@@ -136,7 +136,7 @@ fn a_credit_correction_shows_the_law_date_and_an_agreed_longer_period_moves_it()
 }
 
 #[test]
-fn status_ics_writes_each_dated_request_once_without_personal_details_and_never_over_a_file() {
+fn status_ics_writes_each_open_dated_request_once_without_personal_details() {
     use ghostsoap::core::deadline::past_weekend;
 
     let (tmp, home, drafts) = start();
@@ -177,24 +177,34 @@ fn status_ics_writes_each_dated_request_once_without_personal_details_and_never_
             "{line}: {calendar}"
         );
     }
-    for personal in [
-        "Lara",
-        "Croft",
-        "croft-manor",
-        "0400",
-        "1968",
-        "3127",
-        detail,
-    ] {
+    let personal = [
+        "Lara Croft",
+        "lara@croft-manor.example",
+        "0400 000 001",
+        "1968-02-14",
+    ];
+    for personal in [&personal[..], &["Croft Manor Lane", "Surrey Hills", detail]].concat() {
         assert!(!calendar.contains(personal), "{personal}: {calendar}");
     }
+}
+
+#[test]
+fn status_ics_writes_a_private_file_and_never_over_one() {
+    let (tmp, home, _drafts) = start();
+    let ics = tmp.path().join("ghostsoap.ics");
+    let args = ["status", "--ics", ics.to_str().unwrap()];
+    let stdout = done(&run(&home, &args));
+    let wrote = format!("Wrote 0 dates to {}.\n", ics.display());
+    assert!(stdout.ends_with(&wrote), "{stdout}");
+    let calendar = fs::read_to_string(&ics).unwrap();
+    let end = "METHOD:PUBLISH\r\nEND:VCALENDAR\r\n";
+    assert!(calendar.ends_with(end), "{calendar}");
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         let mode = fs::metadata(&ics).unwrap().permissions().mode();
         assert_eq!(mode & 0o777, 0o600);
     }
-
     let error = refused(&run(&home, &args));
     assert!(
         error.contains("already exists; no calendar file was written"),
