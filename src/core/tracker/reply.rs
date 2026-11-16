@@ -223,6 +223,19 @@ impl Request {
         if latest == Some(event) {
             return Ok(false);
         }
+        // A finished request takes no new status, except that information on show again
+        // reopens a closed one.
+        if let Some(finished) = latest.and_then(|l| match (l.status, event.status) {
+            (Status::Closed, Status::Relisted) => None,
+            (Status::Closed, _) => Some("closed"),
+            (Status::Abandoned, _) => Some("abandoned"),
+            _ => None,
+        }) {
+            return Err(format!(
+                "is {finished}; to record another status, withdraw that one first \
+                 (--withdraw status)"
+            ));
+        }
         if let Some(latest) = latest
             && event.on < latest.on
         {

@@ -16,7 +16,9 @@ use std::time::Duration;
 use age::secrecy::SecretString;
 use serde::Deserialize;
 
+use crate::core::law::{self, Deadline};
 use crate::core::profile::Profile;
+use crate::core::register::Lever;
 use crate::core::tracker::FORMAT;
 pub use crate::core::tracker::State;
 
@@ -106,8 +108,13 @@ fn decode(text: &str) -> io::Result<State> {
             Ok(State::new(old.profile))
         }
         Some(2) => {
-            let mut state: State = toml::from_str(text).map_err(unreadable)?;
-            state.read_days();
+            let mut table = table;
+            // Parsing the text, not the table, keeps the line of an error.
+            let state: State = if rename_days(&mut table) {
+                table.try_into().map_err(unreadable)?
+            } else {
+                toml::from_str(text).map_err(unreadable)?
+            };
             match state.problems().first() {
                 None => Ok(state),
                 Some(problem) => Err(io::Error::other(format!(
@@ -123,6 +130,40 @@ fn decode(text: &str) -> io::Result<State> {
             "cannot read the state: it has no format this version knows",
         )),
     }
+}
+
+/// Format 2 as first merged (main at fffb4d1) wrote both fixed periods as `days`. Rename each
+/// to the kind its lever's law gives, so the typed read sees only the kinds' own names and
+/// refuses a kind written by its name for a lever whose law does not give it. Whether any
+/// was renamed.
+fn rename_days(table: &mut toml::Table) -> bool {
+    let mut renamed = false;
+    let messages = table
+        .get_mut("messages")
+        .and_then(toml::Value::as_array_mut);
+    let requests = messages
+        .into_iter()
+        .flatten()
+        .filter_map(|message| message.get_mut("requests")?.as_array_mut())
+        .flatten()
+        .filter_map(toml::Value::as_table_mut);
+    for request in requests {
+        let lever: Option<Lever> = request.get("lever").and_then(|v| v.clone().try_into().ok());
+        let deadline = request
+            .get_mut("deadline")
+            .and_then(toml::Value::as_table_mut);
+        if let (Some(lever), Some(deadline)) = (lever, deadline)
+            && let Some(days) = deadline.remove("days")
+        {
+            let kind = match law::law(lever).deadline {
+                Deadline::DaysAfter(_) => "days-after",
+                _ => "days-starting",
+            };
+            deadline.insert(kind.to_owned(), days);
+            renamed = true;
+        }
+    }
+    renamed
 }
 
 fn encrypt(state: &State, passphrase: SecretString) -> io::Result<Vec<u8>> {
@@ -448,6 +489,21 @@ mod tests {
         );
         assert_eq!(first.matches("\ndays = ").count(), 2, "{first}");
         assert_eq!(decode(&first).unwrap(), state);
+        // A kind written by its own name is read as written, and refused where the
+        // lever's law does not give it.
+        for (from, to, lever) in [
+            ("days-after = 10", "days-starting = 10", "s20r-access"),
+            ("days-starting = 30", "days-after = 30", "s20t-correction"),
+        ] {
+            let wrong = text.replacen(from, to, 1);
+            assert_eq!(
+                decode(&wrong).unwrap_err().to_string(),
+                format!(
+                    "cannot read the state: GS-7K3QX {lever} has a deadline kind its lever's \
+                     law does not give"
+                )
+            );
+        }
     }
 
     #[test]

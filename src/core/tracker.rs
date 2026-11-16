@@ -419,10 +419,14 @@ fn is_refusal(status: Status) -> bool {
 }
 
 impl Request {
-    /// What is wrong with this request's events, given the message's record of sending in
-    /// effect. Each reads after the tag and lever.
+    /// What is wrong with this request's deadline and events, given the message's record of
+    /// sending in effect. Each reads after the tag and lever.
     fn problems(&self, sent: Option<Send>) -> Vec<&'static str> {
         let mut problems = Vec::new();
+        let kind = std::mem::discriminant(&law::law(self.lever).deadline);
+        if std::mem::discriminant(&self.deadline) != kind {
+            problems.push("has a deadline kind its lever's law does not give");
+        }
         for event in &self.events {
             match event {
                 Event::Status(status) => {
@@ -471,19 +475,6 @@ impl State {
 
     pub fn message(&self, tag: &str) -> Option<&Message> {
         self.messages.iter().find(|m| m.tag == tag)
-    }
-
-    /// After reading format 2 as first merged, which wrote both fixed periods as `days`
-    /// (read as `DaysStarting`): give s 20R(3)'s request, the only one whose period begins
-    /// after the day, its own kind. The law table gives no other lever a fixed period.
-    pub fn read_days(&mut self) {
-        for request in self.messages.iter_mut().flat_map(|m| &mut m.requests) {
-            if let (Lever::S20rAccess, Deadline::DaysStarting(days)) =
-                (request.lever, request.deadline)
-            {
-                request.deadline = Deadline::DaysAfter(days);
-            }
-        }
     }
 
     pub fn message_mut(&mut self, tag: &str) -> Option<&mut Message> {
