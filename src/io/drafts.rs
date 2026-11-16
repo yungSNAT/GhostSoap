@@ -71,12 +71,29 @@ pub fn write(dir: &Path, name: &str, text: &str) -> io::Result<PathBuf> {
         .write_all(text.as_bytes())
         .and_then(|()| file.sync_all())
         .and_then(|()| add_record(dir, &sha256(text.as_bytes()), name))
-        .and_then(|()| fs::hard_link(&tmp, &path));
+        .and_then(|()| fs::hard_link(&tmp, &path).map_err(|e| link_failure(e, &path)));
     drop(file);
     let _ = fs::remove_file(&tmp);
     published?;
     sync_dir(dir)?;
     Ok(path)
+}
+
+/// `error` from linking a finished draft to `path`, naming the likely cause: FAT, exFAT and
+/// some network shares have no hard links, and the OS error alone does not say so.
+fn link_failure(error: io::Error, path: &Path) -> io::Error {
+    if error.kind() == io::ErrorKind::AlreadyExists {
+        return error;
+    }
+    io::Error::new(
+        error.kind(),
+        format!(
+            "could not create {}: {error}. Drafts are put in place by a hard link, which FAT, \
+             exFAT and some network shares do not support; if the folder is on one, choose a \
+             folder on an internal drive with --out",
+            path.display()
+        ),
+    )
 }
 
 fn lock_new(dir: &Path) -> io::Result<Lock> {
@@ -809,6 +826,26 @@ mod tests {
         write(&out, "a-GS-11111.eml", "x").unwrap();
         assert_eq!(clean(&out, true).unwrap().deleted, 1);
         assert!(!out.exists(), "GhostSoap's own emptied folder is removed");
+    }
+
+    /// FAT, exFAT and some network shares refuse hard links, as EPERM on Linux and as an
+    /// unsupported function on Windows; CI has no such volume, so the errors are made here.
+    #[test]
+    fn a_folder_without_hard_links_is_named_as_the_likely_cause() {
+        let path = Path::new("/media/usb/drafts/a-GS-11111.eml");
+        for kind in [io::ErrorKind::PermissionDenied, io::ErrorKind::Unsupported] {
+            let error = link_failure(io::Error::from(kind), path);
+            assert_eq!(error.kind(), kind);
+            let message = error.to_string();
+            assert!(message.starts_with("could not create /media/usb/drafts/a-GS-11111.eml: "));
+            assert!(
+                message.contains("FAT, exFAT and some network shares"),
+                "{message}"
+            );
+            assert!(message.ends_with("choose a folder on an internal drive with --out"));
+        }
+        let exists = link_failure(io::Error::from(io::ErrorKind::AlreadyExists), path);
+        assert_eq!(exists.to_string(), "entity already exists");
     }
 
     #[test]
