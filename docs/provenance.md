@@ -261,6 +261,31 @@ Not added:
 
 Evidence: 10 `[[evidence]]` hashes across the 3 entries, taken on 16 November 2026 by a script that follows the hash steps in [registry/README.md](../registry/README.md#evidence-hashes-and-drift) and first reproduced all 8 hashes recorded for the entries above. 2 fetches about 40 seconds apart gave the same hashes, none shared. The xtask's `evidence-hash` command, run from another network 40 minutes later, gave the same 8 hashes for the ContactOut and UpLead pages; RocketReach's 2 pages answered it with 403, so the monthly check may log them as unconfirmed. Not tracked: RocketReach's removal form (no text without a browser) and the 3 coverage pages.
 
+### Rechecks and Snov.io (16 November 2026, evening)
+
+Checked on 16 November 2026 from about 6:40 pm to 7:45 pm AEDT by an AI agent working for the maintainer, in the same way: public pages only, with no name or email searched, no form submitted and no account created. No person has re-checked them. Snov.io became an overseas entry in the marketing pack.
+
+ABN Lookup, all ABNs, every page of each result list read:
+
+- At about 6:45 pm, 'RocketReach', 'UpLead' and ContactOut's entity, business and trading names gave the same rows as the morning's read.
+- At about 7:40 pm, the 3 brokers first searched during the 15 November maintenance window. 'ZoomInfo' gives one match, ZOOMINFO AUSTRALIA PTY LTD, a New South Wales entity name whose ABN is cancelled; no active ABN or name matches ZoomInfo. 'Apollo' gives more than 200 (the top 200 read), 'Apollo.io' 36 and 'ZenLeads' 4, none the broker; the only active 'ZenLeads' match is still the Western Australian builder. 'Lusha' still stops before listing every match, and 'Lusha Systems' gives 58, none the broker.
+- 'Snov.io' gives 2 matches and 'Snovio' 33, none the broker (the nearest is SNOVA PTY LTD, a Victorian company). 'People Data Labs' gives 56, none the broker (the nearest is a historic Victorian business name 'people data'). 'Swordfish' gives 119, including companies named SWORDFISH PTY LTD in New South Wales (cancelled) and Western Australia (active); no page of the broker read here names an entity to match them against.
+
+| Entry | Lead | Verified from | Entity and base |
+|---|---|---|---|
+| `snovio-au` | Optery's Australian list | Privacy policy (effective 26 June 2026), 'Clear from list' form, email finder page and Commonwealth Bank company page on snov.io | The policy names Snovio Inc.; its terms, read that morning, name Snov.io Inc. with a Wilmington, Delaware address |
+
+- `snovio-au`: Australian coverage, from its own pages: the email finder offers '500M+ B2B contacts', and its Commonwealth Bank page says the bank is 'Based in Sydney, New South Wales, Australia', gives the bank's most common email format as used by '64.0% of work email addresses' and offers verified work emails 'for every employee'. The policy's 'Clear from list' form removes a confirmed email address from the database and from search results on the platform; the policy also gives help@snov.io and snovio_dpo@snov.io, which the entry does not list because overseas entries get no letter.
+
+Not added:
+
+- People Data Labs: its own documentation page 'Aggregations by Country' gives 14,463,244 resume records for Australia, so its coverage is now established. Its 'Do Not Sell or Share' form offers 'I do not live in the United States' but says it is for US opt-out requests and sends rights outside the United States to its Privacy Request Center, whose request form could not be opened without a browser session (one automated attempt timed out). It waits until that form is read.
+- Swordfish: its privacy policy gave no readable text and its opt-out article named no operator, route or country, so nothing could be confirmed from its own pages.
+
+RocketReach's 2 evidence hashes were taken on 16 November 2026 by a script ported from the xtask, because the xtask's `evidence-hash` got 403 from those pages. It still gets 403 from 2 networks, and so does a plain fetch with a browser user agent. Given the same HTML (each page as Firecrawl returned it, fetched twice), the script and the xtask gave identical hashes, so the port matches the xtask; that HTML is not what the recorded hashes were taken from, so those hashes stand and the monthly check may still log the pages as unconfirmed.
+
+Evidence: 3 `[[evidence]]` hashes for `snovio-au`, taken on 16 November 2026 with the xtask's `evidence-hash` command; 2 fetches from the maintainer's network about 6 seconds apart and 2 from another network about 35 minutes earlier gave the same hashes for the 2 pages fetched on both, none shared. Not tracked: the 'Clear from list' form (no text without a browser).
+
 ### Rejected candidates (M1)
 
 | Candidate | Reason |

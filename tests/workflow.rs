@@ -341,6 +341,11 @@ fn marketing_pack_shows_the_contact_data_brokers_own_forms() {
             "https://rocketreach.co/remove-profile",
         ),
         (
+            "snovio-au",
+            "https://snov.io/privacy-policy",
+            "https://app.snov.io/clear-email",
+        ),
+        (
             "uplead-au",
             "https://support.uplead.com/en/articles/10836637-data-removal-requests-handled-correctly",
             "https://www.uplead.com/opt-out/",
