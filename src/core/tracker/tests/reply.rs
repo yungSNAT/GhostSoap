@@ -143,6 +143,42 @@ fn a_reply_must_follow_what_is_already_recorded() {
 }
 
 #[test]
+fn a_closed_or_abandoned_request_takes_no_new_status() {
+    let today = day(20);
+    let mut sent = sent_message("GS-7K3QX");
+    let fulfilled = status(day(12), Status::Fulfilled);
+    sent.record_status(SOURCE, fulfilled, today).unwrap();
+    let closed = status(day(13), Status::Closed);
+    sent.record_status(SOURCE, closed.clone(), today).unwrap();
+    let marketing: &[Lever] = &[Lever::App7NoMarketing];
+    let given_up = status(day(12), Status::Abandoned);
+    sent.record_status(marketing, given_up.clone(), today)
+        .unwrap();
+    let before = sent.clone();
+    for (levers, finished) in [(SOURCE, "closed"), (marketing, "abandoned")] {
+        let lever = levers[0].name();
+        for to in [Status::Acknowledged, Status::Relisted, Status::Escalated] {
+            let error = sent.record_status(levers, status(day(14), to), today);
+            assert_eq!(
+                error.unwrap_err(),
+                format!(
+                    "GS-7K3QX {lever} is {finished}; to record another status, withdraw that \
+                     one first (--withdraw status)"
+                )
+            );
+        }
+    }
+    assert_eq!(sent, before);
+    // A repeat records nothing, and the finishing status can still be withdrawn.
+    assert_eq!(sent.record_status(SOURCE, closed, today), Ok(false));
+    assert_eq!(sent.record_status(marketing, given_up, today), Ok(false));
+    sent.withdraw_event(SOURCE, Withdrawn::Status, None)
+        .unwrap();
+    let relisted = status(day(14), Status::Relisted);
+    assert_eq!(sent.record_status(SOURCE, relisted, today), Ok(true));
+}
+
+#[test]
 fn a_longer_period_needs_a_credit_correction_and_a_later_day() {
     let today = day(20);
     let agreed = |on: NaiveDate, until: NaiveDate| Extension {

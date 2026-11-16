@@ -448,6 +448,21 @@ mod tests {
         );
         assert_eq!(first.matches("\ndays = ").count(), 2, "{first}");
         assert_eq!(decode(&first).unwrap(), state);
+        // A kind written by its own name is read as written, and refused where the
+        // lever's law does not give it.
+        for (from, to, lever) in [
+            ("days-after = 10", "days-starting = 10", "s20r-access"),
+            ("days-starting = 30", "days-after = 30", "s20t-correction"),
+        ] {
+            let wrong = text.replacen(from, to, 1);
+            assert_eq!(
+                decode(&wrong).unwrap_err().to_string(),
+                format!(
+                    "cannot read the state: GS-7K3QX {lever} has a deadline kind its lever's \
+                     law does not give"
+                )
+            );
+        }
     }
 
     #[test]
