@@ -63,13 +63,21 @@ pub fn state_path(dir: &Path) -> PathBuf {
 /// The state as the text that is encrypted. Refuses text that would not read back as the
 /// same state, so a state file is never replaced by one GhostSoap cannot read.
 fn encode(state: &State) -> io::Result<String> {
+    encode_checked(state, |text| toml::from_str(text).ok())
+}
+
+/// `encode`, reading the text back with `read_back`.
+fn encode_checked(
+    state: &State,
+    read_back: impl FnOnce(&str) -> Option<State>,
+) -> io::Result<String> {
     let unsaved = |why: &str| io::Error::other(format!("{why}; nothing was saved"));
     if let Some(problem) = state.problems().first() {
         return Err(unsaved(problem));
     }
     let text = toml::to_string(state).map_err(io::Error::other)?;
-    match toml::from_str::<State>(&text) {
-        Ok(back) if back == *state => Ok(text),
+    match read_back(&text) {
+        Some(back) if back == *state => Ok(text),
         _ => Err(unsaved("the state would not read back as it was written")),
     }
 }
@@ -131,7 +139,7 @@ pub fn create(dir: &Path, state: &State, passphrase: SecretString) -> io::Result
             format!("{} already exists", path.display()),
         ));
     }
-    write_atomic(&path, &bytes, || {})
+    write_atomic(dir, &bytes, || {})
 }
 
 /// Read and decrypt the state file. Nothing is written: a format 1 file stays as it is.
@@ -171,9 +179,7 @@ pub(crate) fn update_then<T, U>(
     let mut state = before.clone();
     let mut value = change(&mut state).map_err(io::Error::other)?;
     if state != before {
-        write_atomic(&path, &encrypt(&state, passphrase)?, || {
-            committed(&mut value)
-        })?;
+        write_atomic(dir, &encrypt(&state, passphrase)?, || committed(&mut value))?;
     } else {
         committed(&mut value);
     }
@@ -265,7 +271,8 @@ impl Drop for Lock {
 /// survives a power cut. A temporary file left by an interrupted write is removed first, so
 /// GhostSoap keeps only what it reported as saved: after an interrupted update `path` still
 /// holds the last complete state, and after an interrupted `init` the user runs it again.
-fn write_atomic(path: &Path, bytes: &[u8], replaced: impl FnOnce()) -> io::Result<()> {
+fn write_atomic(dir: &Path, bytes: &[u8], replaced: impl FnOnce()) -> io::Result<()> {
+    let path = state_path(dir);
     let tmp = path.with_extension("age.tmp");
     // Whatever holds the temporary name is removed and the file made anew: opening it in
     // place would write through a link, and a link to the state would empty the state.
@@ -277,20 +284,19 @@ fn write_atomic(path: &Path, bytes: &[u8], replaced: impl FnOnce()) -> io::Resul
     file.write_all(bytes)?;
     file.sync_all()?;
     drop(file);
-    rename_with_retry(|| fs::rename(&tmp, path))?;
+    rename_with_retry(|| fs::rename(&tmp, &path))?;
     // The new state is in place from here, so a failure must not read as nothing saved.
     replaced();
     #[cfg(unix)]
-    if let Some(dir) = path.parent() {
-        let flushed = fs::File::open(dir).and_then(|dir| dir.sync_all());
-        flushed.map_err(|e| {
+    fs::File::open(dir)
+        .and_then(|dir| dir.sync_all())
+        .map_err(|e| {
             let saved = "the state was saved, but its folder could not be flushed to disk";
             io::Error::new(
                 e.kind(),
                 format!("{saved}, so a power cut now could undo it: {e}"),
             )
         })?;
-    }
     Ok(())
 }
 
@@ -520,13 +526,12 @@ mod tests {
         let dir = m2_home();
         let mode = |mode| fs::set_permissions(dir.path(), fs::Permissions::from_mode(mode));
         mode(0o300).unwrap();
-        if fs::read_dir(dir.path()).is_ok() {
-            // Root reads any folder, so the flush cannot be made to fail this way.
-            mode(0o700).unwrap();
-            return;
-        }
-        let err = update(dir.path(), m2(), add("GS-7K3QX")).unwrap_err();
+        let readable = fs::read_dir(dir.path()).is_ok();
+        let result = (!readable).then(|| update(dir.path(), m2(), add("GS-7K3QX")));
         mode(0o700).unwrap();
+        // Root reads any folder, so the flush cannot be made to fail this way.
+        let Some(result) = result else { return };
+        let err = result.unwrap_err();
         assert!(
             err.to_string().starts_with("the state was saved, but"),
             "{err}"
@@ -551,6 +556,20 @@ mod tests {
             "tag GS-7K3QX is used twice; nothing was saved"
         );
         assert_eq!(fs::read(state_path(dir.path())).unwrap(), M2_FILE);
+    }
+
+    #[test]
+    fn text_that_would_not_read_back_is_never_written() {
+        let state = State::new(profile());
+        let unchanged = |text: &str| toml::from_str(text).ok();
+        assert!(encode_checked(&state, unchanged).is_ok());
+        for read_back in [None, Some(State::new(Profile::default()))] {
+            let err = encode_checked(&state, |_| read_back).unwrap_err();
+            assert_eq!(
+                err.to_string(),
+                "the state would not read back as it was written; nothing was saved"
+            );
+        }
     }
 
     #[test]

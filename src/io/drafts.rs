@@ -464,6 +464,14 @@ impl Redraft {
 /// until either the replacement write takes over the name or `clean` drops the missing entry.
 /// The caller holds the drafts lock.
 fn stage_remove(dir: &Path, name: &str) -> io::Result<Option<StagedRemoval>> {
+    stage_remove_with(dir, name, |path| fs::remove_file(path))
+}
+
+fn stage_remove_with(
+    dir: &Path,
+    name: &str,
+    remove: impl FnOnce(&Path) -> io::Result<()>,
+) -> io::Result<Option<StagedRemoval>> {
     let path = dir.join(name);
     let records = read_manifest(dir)?;
     match draft_status(dir, name, &records)? {
@@ -481,7 +489,7 @@ fn stage_remove(dir: &Path, name: &str) -> io::Result<Option<StagedRemoval>> {
         .map_or(0, |d| d.as_nanos());
     let backup = dir.join(format!(".{name}.{}-{nanos}.tmp", std::process::id()));
     fs::hard_link(&path, &backup)?;
-    if let Err(error) = fs::remove_file(&path) {
+    if let Err(error) = remove(&path) {
         let _ = fs::remove_file(&backup);
         return Err(error);
     }
@@ -957,5 +965,106 @@ mod tests {
         assert!(write(&drafts, "b-GS-22222.eml", "y").is_err());
         assert!(clean(&drafts, true).is_err());
         assert_eq!(fs::read_to_string(&canary).unwrap(), "unchanged");
+    }
+
+    #[test]
+    fn a_batch_stages_several_drafts_in_one_folder_under_one_lock() {
+        let dir = tempfile::tempdir().unwrap();
+        let drafts = dir.path().join("drafts");
+        let a = write(&drafts, "a-GS-11111.eml", "first").unwrap();
+        let b = write(&drafts, "b-GS-22222.eml", "second").unwrap();
+        let mut batch = Redraft::default();
+        batch.stage(&drafts, "a-GS-11111.eml").unwrap();
+        batch.stage(&drafts, "b-GS-22222.eml").unwrap();
+        assert_eq!(batch.locks.len(), 1);
+        batch.commit();
+        batch.unlock();
+        batch.discard();
+        assert!(!a.exists() && !b.exists());
+        assert!(!drafts.join(LOCK).exists());
+    }
+
+    #[test]
+    fn a_draft_that_cannot_be_removed_stays_where_it_was() {
+        let dir = tempfile::tempdir().unwrap();
+        let drafts = dir.path().join("drafts");
+        let path = write(&drafts, "a-GS-11111.eml", "letter").unwrap();
+        let err = stage_remove_with(&drafts, "a-GS-11111.eml", |_| {
+            Err(io::ErrorKind::PermissionDenied.into())
+        })
+        .unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::PermissionDenied);
+        assert_eq!(fs::read_to_string(&path).unwrap(), "letter");
+        let left: Vec<_> = fs::read_dir(&drafts)
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .filter(|n| n.to_string_lossy().ends_with(".tmp"))
+            .collect();
+        assert!(left.is_empty(), "the temporary copy is removed: {left:?}");
+    }
+
+    #[test]
+    fn staged_removals_report_what_they_could_not_finish() {
+        let dir = tempfile::tempdir().unwrap();
+        // A folder where the superseded copy should be: removing it fails.
+        let backup = dir.path().join("in-the-way");
+        fs::create_dir(&backup).unwrap();
+        fs::write(backup.join("keep"), "").unwrap();
+        let removal = StagedRemoval {
+            original: dir.path().join("a-GS-11111.eml"),
+            backup: Some(backup.clone()),
+            committed: true,
+        };
+        let err = removal.discard().unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("could not remove the superseded draft"),
+            "{err}"
+        );
+        let batch = Redraft {
+            removals: vec![StagedRemoval {
+                original: dir.path().join("a-GS-11111.eml"),
+                backup: Some(backup.clone()),
+                committed: true,
+            }],
+            locks: BTreeMap::new(),
+        };
+        batch.discard();
+        assert!(backup.join("keep").exists());
+
+        // A restore whose copy has gone warns and leaves the original name free.
+        let original = dir.path().join("b-GS-22222.eml");
+        drop(StagedRemoval {
+            original: original.clone(),
+            backup: Some(dir.path().join("gone")),
+            committed: false,
+        });
+        assert!(!original.exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn draft_checks_report_errors_other_than_a_missing_draft() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let drafts = dir.path().join("drafts");
+        // A name longer than the file system allows cannot be looked up at all.
+        let long = format!("{}-GS-11111.eml", "a".repeat(300));
+        let err = draft_present(&drafts.join(&long)).unwrap_err();
+        assert_ne!(err.kind(), io::ErrorKind::NotFound);
+        assert!(draft_status(&drafts, &long, &[]).is_err());
+
+        let name = "a-GS-11111.eml";
+        let path = write(&drafts, name, "letter").unwrap();
+        let records = read_manifest(&drafts).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
+        let readable = fs::read(&path).is_ok();
+        let status = draft_status(&drafts, name, &records);
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        // Root reads any file, so the read cannot be made to fail this way.
+        let Err(err) = status else {
+            return assert!(readable);
+        };
+        assert_eq!(err.kind(), io::ErrorKind::PermissionDenied);
     }
 }

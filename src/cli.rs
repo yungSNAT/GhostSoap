@@ -707,14 +707,14 @@ fn hand_over(dir: &Path, drafted: &Drafted, output: Output) -> Result<(), String
 /// an earlier draft. On Unix the final component must still pass the private-folder check.
 fn draft_destination(dir: &Path) -> Result<String, String> {
     let full = std::path::absolute(dir).map_err(|e| e.to_string())?;
-    let resolved = if cfg!(unix) {
-        full.parent()
-            .zip(full.file_name())
-            .map(|(parent, name)| io::exposure::resolve(parent).join(name))
-            .unwrap_or(full)
-    } else {
-        io::exposure::resolve(&full)
-    };
+    #[cfg(unix)]
+    let resolved = full
+        .parent()
+        .zip(full.file_name())
+        .map(|(parent, name)| io::exposure::resolve(parent).join(name))
+        .unwrap_or(full);
+    #[cfg(not(unix))]
+    let resolved = io::exposure::resolve(&full);
     resolved
         .to_str()
         .map(str::to_owned)
