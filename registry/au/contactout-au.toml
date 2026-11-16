@@ -1,0 +1,45 @@
+id = "contactout-au"
+name = "ContactOut"
+legal_entity = "ContactOut Limited"
+kinds = ["marketing-list"]
+priority = "standard"
+quality = "verified"
+verified_at = 2026-11-16
+sources = ["https://contactout.com/privacy_policy", "https://contactout.com/privacy_data_subjects", "https://contactout.com/optout", "https://contactout.com/terms", "https://contactout.com/contact", "https://contactout.com/alternatives/apollo-vs-contactout"]
+identity_fields = ["email"]
+exemption_risk = "overseas"
+escalation = []
+effort = "easy"
+
+[[channels]]
+kind = "web-form"
+address = "https://contactout.com/optout"
+levers = []
+
+[manual_check]
+url = "https://contactout.com/privacy_data_subjects"
+
+[[evidence]]
+url = "https://contactout.com/privacy_policy"
+checked_at = 2026-11-16
+sha256 = "1c282390452e4e6e36b9ac36ba93bd11467a2884ceb103bca5c7247ad1646a86"
+
+[[evidence]]
+url = "https://contactout.com/privacy_data_subjects"
+checked_at = 2026-11-16
+sha256 = "ef75e5dcd9c4c1e0a4cc4e8ad2b1c58450a221ee367fdc8f8b50e8309223f244"
+
+[[evidence]]
+url = "https://contactout.com/optout"
+checked_at = 2026-11-16
+sha256 = "e4213d4ef734581377f699ef0bcd41a1142ed4c2975b32783570b68e4ebc2aed"
+
+[[evidence]]
+url = "https://contactout.com/terms"
+checked_at = 2026-11-16
+sha256 = "7e7e3ac24297dcd488334f0acfe46144e53f8b0cb6797b4fade93c50abd057b9"
+
+[[evidence]]
+url = "https://contactout.com/contact"
+checked_at = 2026-11-16
+sha256 = "dcd71af031ab985de7eaa99d6b53bf6b082fe8d3102589d456746a879372de09"

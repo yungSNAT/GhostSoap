@@ -1,0 +1,35 @@
+id = "uplead-au"
+name = "UpLead"
+legal_entity = "UpLead, LLC"
+kinds = ["marketing-list"]
+priority = "standard"
+quality = "verified"
+verified_at = 2026-11-16
+sources = ["https://www.uplead.com/privacy/", "https://www.uplead.com/opt-out/", "https://support.uplead.com/en/articles/10836637-data-removal-requests-handled-correctly", "https://www.uplead.com/construction-email-list/"]
+identity_fields = ["full_name", "email", "phone"]
+exemption_risk = "overseas"
+escalation = []
+effort = "easy"
+
+[[channels]]
+kind = "web-form"
+address = "https://www.uplead.com/opt-out/"
+levers = []
+
+[manual_check]
+url = "https://support.uplead.com/en/articles/10836637-data-removal-requests-handled-correctly"
+
+[[evidence]]
+url = "https://www.uplead.com/privacy/"
+checked_at = 2026-11-16
+sha256 = "e04ba358e2cb8c98c1172a005b5b97cdfe059cf105bbce7696835f254018dd0c"
+
+[[evidence]]
+url = "https://www.uplead.com/opt-out/"
+checked_at = 2026-11-16
+sha256 = "144407bbc4871c8fcad6020f0b5e5bcd8ee3418203dbf8f108c531b9107fdba9"
+
+[[evidence]]
+url = "https://support.uplead.com/en/articles/10836637-data-removal-requests-handled-correctly"
+checked_at = 2026-11-16
+sha256 = "20e29e767932e0506fb7c1eb7cd6738c8495347a5251e1a71f7a6961bb9be743"

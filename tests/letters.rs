@@ -139,6 +139,32 @@ fn combined_post_spam_and_small_business_letters_match_their_snapshots() {
     );
 }
 
+#[test]
+fn a_destroy_request_beside_an_opt_out_asks_to_keep_only_what_the_opt_out_needs() {
+    let entry = entry();
+    let keeps = |levers: &[Lever]| {
+        let letter = compose(&entry, &profile(), levers, 0);
+        assert!(check(&letters::eml(&letter)).is_empty());
+        letter
+            .body
+            .replace('\n', " ")
+            .contains("please keep only what you need for that")
+    };
+    snapshot(
+        "destroy-with-opt-out",
+        &compose(
+            &entry,
+            &profile(),
+            &[Lever::App7NoMarketing, Lever::App11Destroy],
+            0,
+        ),
+    );
+    assert!(keeps(&[Lever::App7NoMarketing, Lever::App11Destroy]));
+    assert!(keeps(&[Lever::App11Destroy, Lever::App7NoFacilitation]));
+    assert!(!keeps(&[Lever::App11Destroy]));
+    assert!(!keeps(&[Lever::App7Source, Lever::App11Destroy]));
+}
+
 /// The shipped entry, so the snapshot follows the register rather than a fixture. The
 /// profile leaves out the phone number and address, so none reaches the snapshot.
 #[test]

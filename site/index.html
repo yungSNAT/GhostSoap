@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GhostSoap: Privacy Act requests to data brokers, sent by you</title>
+<meta name="description" content="GhostSoap is a free tool for people in Australia. It prepares Privacy Act requests to data brokers, recruiters and other businesses for you to send from your own mailbox, and keeps your details on your computer.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <picture>
+    <source media="(max-width: 600px)" srcset="banner-phone.svg">
+    <img src="banner.svg" alt="GhostSoap. Privacy Act requests to data brokers, sent by you. Pixel art of a startled ghost with soap bubbles beside the GhostSoap wordmark.">
+  </picture>
+  <p class="tagline"><em>GhostSoap at no Price.</em></p>
+</header>
+
+<main>
+  <section aria-labelledby="what">
+    <h1 id="what">Ask Australian businesses to stop using your details</h1>
+    <p>GhostSoap is a free tool for people in Australia. It prepares requests under the Privacy Act to data brokers, recruiters and other businesses, and you send each one from your own mailbox. Your details stay on your computer, encrypted under your passphrase.</p>
+    <p class="actions">
+      <a class="button" href="https://github.com/yungSNAT/GhostSoap#install">Install it</a>
+      <a href="https://github.com/yungSNAT/GhostSoap">Read the code and the README</a>
+    </p>
+  </section>
+
+  <section aria-labelledby="does">
+    <h2 id="does">What it does</h2>
+    <ul>
+      <li>Keeps a register of <strong id="register-entries">86</strong> businesses that hold personal information about people in Australia, each with the business's own source pages and the date it was checked: data brokers, business contact-data brokers, people-search sites, credit reporting bodies, recruiters, banks, insurers, telcos and large retailers. The register is public domain (CC0-1.0).</li>
+      <li>Drafts letters that cite the Australian Privacy Principles and Part IIIA of the Privacy Act: stop direct marketing, say where you got my information, destroy what you no longer need, give me access, correct it.</li>
+      <li>Names the right place to complain: the business first, then its external dispute resolution scheme, such as the Telecommunications Industry Ombudsman or the Australian Financial Complaints Authority, before the Office of the Australian Information Commissioner.</li>
+      <li>Sends nothing itself. It makes no network connections, and its CI fails if a known network crate or socket use reaches it. There is no server, account, telemetry or analytics.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="doesnt">
+    <h2 id="doesnt">What it does not do</h2>
+    <ul>
+      <li>Act for you: you review and send every request.</li>
+      <li>Scrape people-search sites, solve CAPTCHAs or fill in web forms. For overseas sites with no Australian business number, it shows their own opt-out form instead of drafting a letter.</li>
+      <li>Promise deletion. Australian law has no general right to erasure, and GhostSoap says what each request can and cannot achieve.</li>
+      <li>Track replies and deadlines yet. The <a href="https://github.com/yungSNAT/GhostSoap/blob/main/docs/plan.md">plan</a> sets out when it will.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="choose">
+    <h2 id="choose">Is it for you?</h2>
+    <p>GhostSoap suits you if you want to keep your details on your own computer and send each request yourself. If you would rather someone else did the work, paid services such as ClearTrace AU and Optery handle removals for you, which means giving them your details. The README's <a href="https://github.com/yungSNAT/GhostSoap#when-to-choose-something-else">'When to choose something else'</a> compares the options, with the date each was checked.</p>
+  </section>
+
+  <section aria-labelledby="start">
+    <h2 id="start">Start</h2>
+    <p>There is no prebuilt download yet, so you need <a href="https://git-scm.com/">Git</a> and <a href="https://rustup.rs/">Rust</a>. These commands build GhostSoap and show what it would send. They need none of your details and send nothing.</p>
+    <pre><code>git clone https://github.com/yungSNAT/GhostSoap
+cd GhostSoap
+cargo install --locked --path .
+ghostsoap plan --pack start-here</code></pre>
+    <p>The <a href="https://github.com/yungSNAT/GhostSoap#use">README</a> shows the next steps: <code>ghostsoap init</code> for your encrypted profile, then <code>ghostsoap draft</code>.</p>
+  </section>
+
+  <section aria-labelledby="advice">
+    <h2 id="advice">Not legal advice</h2>
+    <p>GhostSoap provides information and templates, not legal advice. For advice, contact a community legal centre or the <a href="https://www.oaic.gov.au/">Office of the Australian Information Commissioner</a>. For help in a language other than English, the OAIC has <a href="https://www.oaic.gov.au/engage-with-us/translations">translated information</a>.</p>
+  </section>
+</main>
+
+<footer>
+  <p>Code: <a href="https://github.com/yungSNAT/GhostSoap/blob/main/LICENSE">FSL-1.1-ALv2</a>. Register data: <a href="https://github.com/yungSNAT/GhostSoap/blob/main/LICENSE-DATA">CC0-1.0</a>. GhostSoap is not affiliated with Activision or the Call of Duty franchise.</p>
+  <p>Your details, your mailbox, your call.<br>Made by <a href="https://github.com/yungSNAT">yungSNAT</a>. <i>Ad gloriam eius, non meam.</i></p>
+</footer>
+</body>
+</html>

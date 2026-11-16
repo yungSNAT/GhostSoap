@@ -788,19 +788,21 @@ fn print_clean_reminder() {
 /// writes nothing.
 fn warn_about_out(dir: &Path, named: bool, output: Output) {
     if !output.copy {
-        warn_unchecked_out(named);
+        warn_unchecked_out(named, cfg!(windows), std::io::stderr());
         warn_exposed(dir, DRAFTS_FOLDER);
     }
 }
 
 /// On Windows the drafts folder keeps the access list it inherits, which GhostSoap does not
 /// check; say so when the user names the folder (`named`).
-fn warn_unchecked_out(named: bool) {
-    if cfg!(windows) && named {
-        eprintln!(
+fn warn_unchecked_out(named: bool, windows: bool, mut output: impl std::io::Write) {
+    if windows && named {
+        writeln!(
+            output,
             "note: on Windows GhostSoap does not check who else can open the --out folder; \
              choose one only you can open"
-        );
+        )
+        .expect("write the drafts folder warning");
     }
 }
 
@@ -850,12 +852,18 @@ fn update_state<T, U>(
 /// tags only need to be distinct, not secret.
 fn new_tag(used: &[String]) -> String {
     let state = RandomState::new();
-    let mut n = 0u64;
-    loop {
+    unused_tag(used, |n| {
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .map_or(0, |d| d.as_nanos());
-        let tag = letters::tag(state.hash_one((now, n)));
+        letters::tag(state.hash_one((now, n)))
+    })
+}
+
+fn unused_tag(used: &[String], candidate: impl Fn(u64) -> String) -> String {
+    let mut n = 0u64;
+    loop {
+        let tag = candidate(n);
         if !used.contains(&tag) {
             return tag;
         }
@@ -870,18 +878,18 @@ fn write_draft(
     letter: &Letter,
     mailto: bool,
 ) -> Result<(), String> {
+    let how = match letter.kind {
+        ChannelKind::Email => format!("email to {}", letter.to),
+        ChannelKind::Post => format!("print and post to {}", letter.to),
+        ChannelKind::WebForm => format!("paste into the form at {}", letter.to),
+        ChannelKind::Phone => return Err("plans never send letters by phone".to_owned()),
+    };
     let text = match letter.kind {
         ChannelKind::Email => letters::eml(letter),
         _ => format!("{}\n", letter.body),
     };
     let name = draft_name(entry, tag, letter.kind);
     let path = io::drafts::write(dir, &name, &text).map_err(|e| e.to_string())?;
-    let how = match letter.kind {
-        ChannelKind::Email => format!("email to {}", letter.to),
-        ChannelKind::Post => format!("print and post to {}", letter.to),
-        ChannelKind::WebForm => format!("paste into the form at {}", letter.to),
-        ChannelKind::Phone => unreachable!("plans never send letters by phone"),
-    };
     println!(
         "draft   {}  {how}: {}",
         entry.id,
@@ -1147,5 +1155,87 @@ fn registry_check(files: &RegisterFiles, place_name: &str) -> ExitCode {
         ExitCode::SUCCESS
     } else {
         ExitCode::FAILURE
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_repeated_tag_is_retried() {
+        let used = ["GS-ABCDE".to_owned()];
+        let tag = unused_tag(&used, |attempt| {
+            ["GS-ABCDE", "GS-FGHJK"][attempt as usize].to_owned()
+        });
+        assert_eq!(tag, "GS-FGHJK");
+    }
+
+    #[test]
+    fn named_windows_output_calls_for_a_folder_warning() {
+        let mut output = Vec::new();
+        warn_unchecked_out(false, true, &mut output);
+        warn_unchecked_out(true, false, &mut output);
+        assert!(output.is_empty());
+        warn_unchecked_out(true, true, &mut output);
+        let warning = String::from_utf8(output).unwrap();
+        assert!(warning.contains("does not check who else can open the --out folder"));
+    }
+
+    #[test]
+    fn draft_files_match_the_written_channel_and_never_use_phone() {
+        let dir = tempfile::tempdir().unwrap();
+        let drafts = dir.path().join("drafts");
+        let register = built_in_register().unwrap();
+        let entry = &register.entries["australia-post-au"];
+        let phone = Letter {
+            kind: ChannelKind::Phone,
+            to: "0000000000".to_owned(),
+            subject: "Test letter".to_owned(),
+            body: "Test body".to_owned(),
+        };
+        let err = write_draft(&drafts, entry, "GS-01234", &phone, false).unwrap_err();
+        assert_eq!(err, "plans never send letters by phone");
+        assert!(!drafts.exists());
+
+        for (kind, to, tag) in [
+            (ChannelKind::Post, "PO Box 1", "GS-ABCDE"),
+            (
+                ChannelKind::WebForm,
+                "https://example.invalid/form",
+                "GS-FGHJK",
+            ),
+        ] {
+            let letter = Letter {
+                kind,
+                to: to.to_owned(),
+                subject: "Test letter".to_owned(),
+                body: "Test body".to_owned(),
+            };
+            write_draft(&drafts, entry, tag, &letter, true).unwrap();
+            let path = drafts.join(format!("australia-post-au-{tag}.txt"));
+            assert_eq!(std::fs::read_to_string(path).unwrap(), "Test body\n");
+        }
+        let email = Letter {
+            kind: ChannelKind::Email,
+            to: "privacy@example.invalid".to_owned(),
+            ..phone
+        };
+        write_draft(&drafts, entry, "GS-56789", &email, true).unwrap();
+        assert!(drafts.join("australia-post-au-GS-56789.eml").is_file());
+    }
+
+    #[test]
+    fn channel_and_deadline_labels_preserve_their_distinctions() {
+        assert_eq!(ChannelKind::Phone.label(), "phone");
+        assert_eq!(
+            deadline_summary(Deadline::BusinessDays(5)),
+            "5 business days"
+        );
+        assert_eq!(
+            deadline_summary(Deadline::Reasonable { guide_days: None }),
+            "a reasonable period"
+        );
+        assert_eq!(deadline_summary(Deadline::NotStated), "no time set");
     }
 }

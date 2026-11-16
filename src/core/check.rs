@@ -17,8 +17,8 @@ use crate::core::register::Lever;
 pub struct Flag {
     /// The line the claim starts on, from 1.
     pub line: usize,
-    /// The words that matched. They come only from the fixed phrases and from numbers, so
-    /// a flag repeats nothing personal from the text.
+    /// The words that matched. They come only from the fixed phrases and from numbers of up
+    /// to 3 digits, so a flag repeats nothing personal from the text.
     pub found: String,
     /// Why the claim needs rechecking.
     pub why: &'static str,
@@ -195,13 +195,28 @@ fn number_and_unit(word: &str) -> [&str; 2] {
     }
 }
 
-fn is_number(word: &Word) -> bool {
-    word.text.chars().all(|c| c.is_ascii_digit()) || NUMBER_WORDS.contains(&word.text.as_str())
+fn is_digits(word: &str) -> bool {
+    word.chars().all(|c| c.is_ascii_digit())
+}
+
+/// How many words the number at `start` spans: a number in digits or one number word, or a
+/// tens word and a units word such as 'twenty one'. A phone number before '30 days', in
+/// digits or in words, is therefore left out of the period.
+fn number_len(words: &[Word], start: usize) -> usize {
+    let text = |i: usize| words.get(i).map_or("", |w| w.text.as_str());
+    let (units, tens) = (&NUMBER_WORDS[..9], &NUMBER_WORDS[19..]);
+    if tens.contains(&text(start)) && units.contains(&text(start + 1)) {
+        2
+    } else if is_digits(text(start)) || NUMBER_WORDS.contains(&text(start)) {
+        1
+    } else {
+        0
+    }
 }
 
 /// The index after the period of time that starts at `start`, if one does.
 fn period_end(words: &[Word], start: usize) -> Option<usize> {
-    let numbers = words[start..].iter().take_while(|w| is_number(w)).count();
+    let numbers = number_len(words, start);
     let article = ["a", "an"].contains(&words[start].text.as_str());
     if numbers == 0 && !article {
         return None;
@@ -280,8 +295,30 @@ fn is_source_or_duty(sentence: &[Word], index: usize) -> bool {
     LEGAL_SOURCES.contains(&word)
         || DUTY_WORDS.contains(&word)
         || (CITING_WORDS.contains(&word) && number(next))
-        || (word.starts_with('s') && number(word.trim_start_matches(['s', '.'])))
+        || is_short_section(word)
         || (["have", "has"].contains(&word) && next == "to")
+}
+
+/// A section cited as 's' and a number, such as 's41' or 's.20t'.
+fn is_short_section(word: &str) -> bool {
+    word.starts_with('s')
+        && word
+            .trim_start_matches(['s', '.'])
+            .starts_with(|c: char| c.is_ascii_digit())
+}
+
+/// How a matched word appears in a flag. A short section citation has the shape of an
+/// account or reference number, such as 'S4471923', so it is shown as 'section', and a
+/// number of more than 3 digits, such as a phone or customer number, as 'number'. Articles,
+/// California's sections after '1798.' and periods of time cited in a letter fit in 3 digits.
+fn shown(word: &str) -> &str {
+    if is_short_section(word) {
+        "section"
+    } else if word.len() > 3 && is_digits(word) {
+        "number"
+    } else {
+        word
+    }
 }
 
 /// The sentences that may claim a right or duty to erase, keyed by the index of the first
@@ -295,7 +332,11 @@ fn erasure_claims(words: &[Word], covered: &[bool]) -> BTreeMap<usize, String> {
         let cited = (0..sentence.len()).find(|&i| is_source_or_duty(sentence, i));
         if let (Some(erasing), Some(cited)) = (erasing, cited) {
             let (first, second) = (erasing.min(cited), erasing.max(cited));
-            let found = format!("{} ... {}", sentence[first].text, sentence[second].text);
+            let found = format!(
+                "{} ... {}",
+                shown(&sentence[first].text),
+                shown(&sentence[second].text)
+            );
             claims.insert(offset + first, found);
         }
         offset += sentence.len();
@@ -311,7 +352,7 @@ fn citation_at(words: &[Word], start: usize) -> Option<(String, &'static str)> {
     let word = words[start].text.as_str();
     if let Some(section) = word.strip_prefix("1798.") {
         let section = before_paren(section);
-        return digits(&section).then(|| (format!("1798.{section}"), CCPA));
+        return digits(&section).then(|| (format!("1798.{}", shown(&section)), CCPA));
     }
     let (word, number) = match word.strip_prefix("art.") {
         Some(number) => ("art", number),
@@ -319,7 +360,7 @@ fn citation_at(words: &[Word], start: usize) -> Option<(String, &'static str)> {
     };
     let number = before_paren(number);
     (["article", "articles", "art"].contains(&word) && digits(&number))
-        .then(|| (format!("article {number}"), ARTICLE))
+        .then(|| (format!("article {}", shown(&number)), ARTICLE))
 }
 
 /// Whether `text`, which starts with '<', opens with a tag that only HTML has: `</word>`,
@@ -417,7 +458,7 @@ pub fn check(text: &str) -> Vec<Flag> {
         }
         if let Some(end) = period_end(&words, start) {
             if !covered[start] && is_deadline(&words, start, end) {
-                let found: Vec<&str> = words[start..end].iter().map(|w| w.text.as_str()).collect();
+                let found: Vec<&str> = words[start..end].iter().map(|w| shown(&w.text)).collect();
                 let found = found.join(" ");
                 flags.push(Flag {
                     line,
@@ -774,5 +815,51 @@ mod tests {
     fn a_flag_repeats_only_its_pattern() {
         let flags = check("Jane Citizen of 1 Test Street claims the GDPR");
         assert_eq!(flags[0].found, "gdpr");
+    }
+
+    #[test]
+    fn a_short_section_citation_is_shown_without_its_number() {
+        assert_eq!(
+            found("Please delete my account S4471923."),
+            ["delete ... section"]
+        );
+        assert_eq!(found("See s20T and remove it."), ["section ... remove"]);
+    }
+
+    #[test]
+    fn a_long_number_in_a_citation_or_period_is_shown_as_number() {
+        for (text, shown, number) in [
+            ("Regards,\nArt\n0412345678", "article number", "0412345678"),
+            ("under art.0412345678", "article number", "0412345678"),
+            ("see 1798.0412345678", "1798.number", "0412345678"),
+        ] {
+            let found = found(text);
+            assert_eq!(found, [shown], "{text:?}");
+            assert!(found.iter().all(|f| !f.contains(number)), "{text:?}");
+        }
+    }
+
+    #[test]
+    fn a_period_holds_only_the_number_next_to_its_unit() {
+        for text in [
+            "My customer number is 4471923. 30 days have passed.",
+            "Call me on +61 412 345 678. 30 days have passed.",
+            "Call me on 0412 345 678. 30 days have passed.",
+            "Call me on four one two three four five six seven eight, 30 days on.",
+        ] {
+            assert_eq!(found(text), ["30 days"], "{text:?}");
+        }
+        assert_eq!(
+            found("Call four one two three nine days on."),
+            ["nine days"]
+        );
+        assert_eq!(found("within twenty one days"), ["twenty one days"]);
+    }
+
+    #[test]
+    fn a_citation_or_period_keeps_its_own_number() {
+        assert_eq!(found("under Article 99"), ["article 99"]);
+        assert_eq!(found("§1798.100 and §1798.199"), ["1798.100", "1798.199"]);
+        assert_eq!(found("within 365 days"), ["365 days"]);
     }
 }

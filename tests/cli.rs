@@ -32,6 +32,26 @@ fn version_prints_name_and_version() {
     );
 }
 
+// The release workflow names the release from VERSION and refuses one that
+// Cargo.toml does not match.
+#[test]
+fn version_file_matches_the_package_version() {
+    let file = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/VERSION"))
+        .expect("read VERSION");
+    assert_eq!(file.trim_end(), env!("CARGO_PKG_VERSION"));
+}
+
+// The release gates refuse a tag unless RELEASE_NOTES.md opens with its version.
+#[test]
+fn release_notes_open_with_the_package_version() {
+    let notes = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/RELEASE_NOTES.md"))
+        .expect("read RELEASE_NOTES.md");
+    assert_eq!(
+        notes.lines().next(),
+        Some(format!("# v{}", env!("CARGO_PKG_VERSION")).as_str())
+    );
+}
+
 #[test]
 fn no_arguments_prints_help() {
     let out = ghostsoap(&[]);
@@ -86,6 +106,58 @@ fn check_of_a_plain_request_flags_nothing_and_calls_it_nothing() {
     let stdout = text(&out.stdout);
     assert!(stdout.contains("Claims to recheck: 0."), "{stdout}");
     assert_check_limits(&stdout);
+}
+
+#[test]
+fn check_accepts_plain_text_with_an_unclosed_angle_bracket() {
+    let out = check_bytes(b"Please stop sending me direct marketing. Use amount < 10");
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    assert!(text(&out.stdout).contains("Claims to recheck: 0."));
+}
+
+#[test]
+fn init_reports_end_of_input_without_creating_a_profile() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_ghostsoap"))
+        .args(["init", "--passphrase-stdin"])
+        .env("GHOSTSOAP_HOME", tmp.path())
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1), "{}", text(&out.stderr));
+    assert!(text(&out.stderr).contains("input ended"));
+    assert!(!tmp.path().join("state.age").exists());
+}
+
+#[test]
+fn clean_resolves_the_platform_data_folder_and_reports_missing_settings() {
+    let tmp = tempfile::tempdir().unwrap();
+    let expected = if cfg!(windows) {
+        tmp.path().join("GhostSoap")
+    } else if cfg!(target_os = "macos") {
+        tmp.path().join("Library/Application Support/GhostSoap")
+    } else {
+        tmp.path().join("ghostsoap")
+    }
+    .join("drafts");
+    let mut command = Command::new(env!("CARGO_BIN_EXE_ghostsoap"));
+    command.args(["clean"]).env_remove("GHOSTSOAP_HOME");
+    let out = command
+        .env("LOCALAPPDATA", tmp.path())
+        .env("HOME", tmp.path())
+        .env("XDG_DATA_HOME", tmp.path())
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    assert!(text(&out.stdout).contains(&format!("Deleted 0 drafts from {}.", expected.display())));
+    let out = command
+        .env_remove("LOCALAPPDATA")
+        .env_remove("HOME")
+        .env_remove("XDG_DATA_HOME")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    assert!(text(&out.stderr).contains("cannot find a data directory; set GHOSTSOAP_HOME"));
+    assert!(std::fs::read_dir(tmp.path()).unwrap().next().is_none());
 }
 
 #[test]
@@ -230,6 +302,64 @@ fn plan_json_error_stays_off_stdout() {
 }
 
 #[test]
+fn plan_text_names_the_channel_and_prints_the_access_warning() {
+    let args = ["plan", "--entry", "equifax-au", "--lever", "s20r-access"];
+    let mut json_args = args.to_vec();
+    json_args.push("--json");
+    let plan = json_of(&json_args);
+    let step = &plan["steps"][0];
+    let out = ghostsoap(&args);
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    let stdout = text(&out.stdout);
+    assert!(stdout.contains(&format!(
+        "letter  equifax-au  by {} to {}",
+        step["channel"].as_str().unwrap(),
+        step["address"].as_str().unwrap()
+    )));
+    assert!(stdout.contains("s20r-access"));
+    assert!(stdout.contains("details used:"));
+    assert!(stdout.contains(plan["warnings"][0].as_str().unwrap()));
+}
+
+#[test]
+fn plan_and_draft_both_explain_when_no_lever_applies() {
+    let args = ["--entry", "quantium-au"];
+    let plan = json_of(&["plan", args[0], args[1], "--json"]);
+    let step = &plan["steps"][0];
+    assert_eq!(step["action"], "skip");
+    let reason = step["reason"].as_str().unwrap();
+    assert!(reason.contains("none of the chosen levers applies"));
+    let tmp = tempfile::tempdir().unwrap();
+    for subcommand in ["plan", "draft"] {
+        let out = Command::new(env!("CARGO_BIN_EXE_ghostsoap"))
+            .arg(subcommand)
+            .args(args)
+            .env("GHOSTSOAP_HOME", tmp.path())
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+        assert!(text(&out.stdout).contains(&format!("skip    quantium-au: {reason}")));
+    }
+    assert!(std::fs::read_dir(tmp.path()).unwrap().next().is_none());
+}
+
+#[test]
+fn draft_shows_an_overseas_manual_step_without_a_profile() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_ghostsoap"))
+        .args(["draft", "--entry", "infotracer-au", "--copy"])
+        .env("GHOSTSOAP_HOME", tmp.path())
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    let stdout = text(&out.stdout);
+    assert!(stdout.contains("infotracer-au"));
+    assert!(stdout.contains("has not established"));
+    assert!(stdout.contains("it drafts no letter"));
+    assert!(std::fs::read_dir(tmp.path()).unwrap().next().is_none());
+}
+
+#[test]
 fn law_json_covers_every_lever_with_the_notice() {
     let law = json_of(&["law", "--json"]);
     let levers = law["levers"].as_array().expect("levers");
@@ -286,6 +416,29 @@ fn registry_list_json_names_every_pack_entry() {
         }
     }
     assert!(list["entries"][0]["kinds"][0].is_string());
+}
+
+#[test]
+fn registry_list_text_prints_pack_counts_and_entry_names() {
+    let list = json_of(&["registry", "list", "--json"]);
+    let out = ghostsoap(&["registry", "list"]);
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    let stdout = text(&out.stdout);
+    for pack in list["packs"].as_array().unwrap() {
+        assert!(stdout.contains(&format!(
+            "pack    {}: {} ({} entries)",
+            pack["id"].as_str().unwrap(),
+            pack["description"].as_str().unwrap(),
+            pack["entries"].as_array().unwrap().len(),
+        )));
+    }
+    for entry in list["entries"].as_array().unwrap() {
+        assert!(stdout.contains(&format!(
+            "entry   {}: {}",
+            entry["id"].as_str().unwrap(),
+            entry["name"].as_str().unwrap(),
+        )));
+    }
 }
 
 #[test]

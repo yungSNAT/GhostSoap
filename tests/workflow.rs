@@ -6,6 +6,7 @@
 mod common;
 
 use std::fs;
+use std::io::Write;
 use std::path::Path;
 use std::process::Output;
 
@@ -41,6 +42,9 @@ fn init_draft_and_clean() {
     ];
     let out = ghostsoap(&home, &args, &format!("{PASSPHRASE}\n"));
     assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    if cfg!(windows) {
+        assert!(text(&out.stderr).contains("does not check who else can open the --out folder"));
+    }
     let stdout = text(&out.stdout);
     assert!(stdout.contains("draft   cotality-au  email to AU-Privacy@Cotality.com"));
     let files = emls(&drafts);
@@ -189,6 +193,15 @@ fn init_rejects_a_short_passphrase_and_bad_details() {
     );
     assert_eq!(out.status.code(), Some(1));
     assert!(text(&out.stderr).contains("at least 12 characters"));
+    let different = format!(
+        "{}another long passphrase\n",
+        init_answers(PASSPHRASE)
+            .strip_suffix(&format!("{PASSPHRASE}\n"))
+            .unwrap()
+    );
+    let out = ghostsoap(&home, &["init", "--passphrase-stdin"], &different);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(text(&out.stderr).contains("the passphrases do not match"));
     let answers = init_answers(PASSPHRASE).replace("1968-02-14", "14/02/1968");
     let out = ghostsoap(&home, &["init", "--passphrase-stdin"], &answers);
     assert_eq!(out.status.code(), Some(1));
@@ -198,6 +211,70 @@ fn init_rejects_a_short_passphrase_and_bad_details() {
         "errors do not echo profile values"
     );
     assert!(!home.join("state.age").exists());
+}
+
+#[test]
+fn drafting_with_an_incomplete_profile_reports_omitted_fields() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    let input = format!("Lara Croft\n\n\n\n\n\n\n\n{PASSPHRASE}\n{PASSPHRASE}\n");
+    let out = ghostsoap(&home, &["init", "--passphrase-stdin"], &input);
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    let out = ghostsoap(
+        &home,
+        &[
+            "draft",
+            "--entry",
+            "cotality-au",
+            "--copy",
+            "--passphrase-stdin",
+        ],
+        &format!("{PASSPHRASE}\n"),
+    );
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    let stdout = text(&out.stdout);
+    assert!(stdout.contains("so the letter leaves it out"), "{stdout}");
+    assert!(stdout.contains("Name: Lara Croft"), "{stdout}");
+    assert!(!home.join("drafts").exists());
+}
+
+#[test]
+fn clean_reports_edited_pending_and_interrupted_drafts() {
+    use ghostsoap::io::drafts;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("drafts");
+    let edited = "example-au-GS-ABCDE.eml";
+    let pending = "example-au-GS-FGHJK.eml";
+    let leftover = ".example-au-GS-01234.eml.42.tmp";
+    let path = drafts::write(&dir, edited, "original letter").unwrap();
+    fs::write(path, "edited letter").unwrap();
+    fs::write(dir.join(pending), "unconfirmed letter").unwrap();
+    fs::write(dir.join(leftover), "interrupted letter").unwrap();
+    writeln!(
+        fs::OpenOptions::new()
+            .append(true)
+            .open(dir.join(".ghostsoap-drafts"))
+            .unwrap(),
+        "pending {pending}"
+    )
+    .unwrap();
+
+    let out = ghostsoap(tmp.path(), &["clean", "--out", dir.to_str().unwrap()], "");
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    let stdout = text(&out.stdout);
+    assert!(stdout.contains("Deleted 0 drafts"), "{stdout}");
+    assert!(stdout.contains(&format!("kept    {edited}:")), "{stdout}");
+    for name in [pending, leftover] {
+        assert!(stdout.contains(&format!("check   {name}:")), "{stdout}");
+    }
+    for (name, body) in [
+        (edited, "edited letter"),
+        (pending, "unconfirmed letter"),
+        (leftover, "interrupted letter"),
+    ] {
+        assert_eq!(fs::read_to_string(dir.join(name)).unwrap(), body);
+    }
 }
 
 #[test]
@@ -244,6 +321,42 @@ fn overseas_services_get_a_manual_step_without_a_search() {
          https://www.linkedin.com/help/linkedin/answer/63, then use its own opt-out or privacy \
          request form at https://www.linkedin.com/help/linkedin/ask/TSO-DPO"
     ));
+}
+
+#[test]
+fn marketing_pack_shows_the_contact_data_brokers_own_forms() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = ghostsoap(tmp.path(), &["plan", "--pack", "marketing"], "");
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    let stdout = text(&out.stdout);
+    for (id, page, form) in [
+        (
+            "contactout-au",
+            "https://contactout.com/privacy_data_subjects",
+            "https://contactout.com/optout",
+        ),
+        (
+            "rocketreach-au",
+            "https://rocketreach.co/privacy",
+            "https://rocketreach.co/remove-profile",
+        ),
+        (
+            "uplead-au",
+            "https://support.uplead.com/en/articles/10836637-data-removal-requests-handled-correctly",
+            "https://www.uplead.com/opt-out/",
+        ),
+    ] {
+        let line = stdout
+            .lines()
+            .find(|l| l.starts_with(&format!("manual  {id}: run from overseas;")))
+            .unwrap_or_else(|| panic!("no manual step for {id}"));
+        assert!(
+            line.contains(&format!(
+                "See {page}, then use its own opt-out or privacy request form at {form} (effort:"
+            )),
+            "{line}"
+        );
+    }
 }
 
 #[test]
