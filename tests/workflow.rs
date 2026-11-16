@@ -594,6 +594,7 @@ fn forget_without_the_passphrase_deletes_the_state_and_says_what_it_skipped() {
         assert_eq!(fs::read_to_string(home.join(name)).unwrap(), body);
         fs::remove_file(home.join(name)).unwrap();
     }
+    fs::remove_dir(&home).unwrap();
     let nothing = ghostsoap(&home, &["forget", "--no-passphrase", "--yes"], "");
     assert_eq!(nothing.status.code(), Some(0));
     assert!(text(&nothing.stdout).contains("nothing to delete"));
