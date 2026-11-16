@@ -507,3 +507,65 @@ fn export_refuses_a_link_at_its_destination() {
     assert_eq!(out.status.code(), Some(1), "{}", text(&out.stderr));
     assert!(!target.exists());
 }
+
+/// `forget` asks first, then deletes the state, exports and the drafts GhostSoap wrote,
+/// wherever the state records them, and leaves every other file.
+#[test]
+fn forget_deletes_what_ghostsoap_wrote_after_confirmation_and_nothing_else() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    let out = tmp.path().join("out");
+    init(&home);
+    let pass = format!("{PASSPHRASE}\n");
+    let drafted = draft_to(&home, &out, &[], &[]);
+    assert_eq!(drafted.status.code(), Some(0), "{}", text(&drafted.stderr));
+    let own = ["draft", "--entry", "hays-au", "--passphrase-stdin"];
+    assert_eq!(ghostsoap(&home, &own, &pass).status.code(), Some(0));
+    let exported = ghostsoap(&home, &["export", "--passphrase-stdin"], &pass);
+    assert_eq!(
+        exported.status.code(),
+        Some(0),
+        "{}",
+        text(&exported.stderr)
+    );
+    fs::write(out.join("notes.txt"), "mine").unwrap();
+    assert_eq!(emls(&out).len(), 1);
+
+    let declined = ghostsoap(
+        &home,
+        &["forget", "--passphrase-stdin"],
+        &format!("{pass}no\n"),
+    );
+    assert_eq!(declined.status.code(), Some(1));
+    assert!(text(&declined.stderr).contains("nothing was deleted"));
+    let listed = text(&declined.stdout);
+    for path in [home.join("state.age"), out.clone()] {
+        assert!(listed.contains(&path.display().to_string()), "{listed}");
+    }
+    assert!(listed.contains("ghostsoap-export-"), "{listed}");
+    assert!(home.join("state.age").exists());
+
+    let forgot = ghostsoap(
+        &home,
+        &["forget", "--passphrase-stdin"],
+        &format!("{pass}forget\n"),
+    );
+    assert_eq!(forgot.status.code(), Some(0), "{}", text(&forgot.stderr));
+    assert!(!home.exists(), "{}", text(&forgot.stdout));
+    assert!(emls(&out).is_empty());
+    assert_eq!(fs::read_to_string(out.join("notes.txt")).unwrap(), "mine");
+}
+
+#[test]
+fn forget_without_the_passphrase_deletes_the_state_and_says_what_it_skipped() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    init(&home);
+    let forgot = ghostsoap(&home, &["forget", "--no-passphrase", "--yes"], "");
+    assert_eq!(forgot.status.code(), Some(0), "{}", text(&forgot.stderr));
+    assert!(text(&forgot.stdout).contains("--out"));
+    assert!(!home.exists());
+    let nothing = ghostsoap(&home, &["forget", "--no-passphrase", "--yes"], "");
+    assert_eq!(nothing.status.code(), Some(0));
+    assert!(text(&nothing.stdout).contains("nothing to delete"));
+}
