@@ -278,6 +278,26 @@ fn clean_reports_edited_pending_and_interrupted_drafts() {
 }
 
 #[test]
+fn clean_reports_a_draft_it_has_no_record_of_and_leaves_it() {
+    use ghostsoap::io::drafts;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("drafts");
+    drafts::write(&dir, "example-au-GS-ABCDE.eml", "recorded letter").unwrap();
+    // As a draft whose manifest record was lost: the letter is there, its record is not.
+    let unrecorded = "example-au-GS-KLMNP.eml";
+    fs::write(dir.join(unrecorded), "a letter").unwrap();
+
+    let out = ghostsoap(tmp.path(), &["clean", "--out", dir.to_str().unwrap()], "");
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    let stdout = text(&out.stdout);
+    assert!(stdout.contains("Deleted 1 drafts"), "{stdout}");
+    let check = format!("check   {unrecorded}: GhostSoap has no record of writing it");
+    assert!(stdout.contains(&check), "{stdout}");
+    assert_eq!(fs::read_to_string(dir.join(unrecorded)).unwrap(), "a letter");
+}
+
+#[test]
 fn draft_without_a_profile_says_to_run_init() {
     let tmp = tempfile::tempdir().unwrap();
     let args = [
