@@ -128,6 +128,7 @@ Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI
 | `rocketreach-au` | RocketReach | marketing-list | `marketing` | its own web form |
 | `seek-au` | SEEK | recruitment |  | letter |
 | `smrtr-au` | smrtr | marketing-list, ad-tech | `marketing` | letter |
+| `snovio-au` | Snov.io | marketing-list | `marketing` | its own web form |
 | `suncorp-au` | Suncorp Insurance (AAMI, GIO, Apia) | insurance | `insurers` | letter |
 | `talefin-au` | TaleFin | credit-reporting-body | `credit` | letter |
 | `talent-international-au` | Talent International | recruitment | `recruitment` | letter |
