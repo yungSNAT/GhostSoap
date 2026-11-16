@@ -220,3 +220,7 @@ The first monthly drift check ([issue 26](https://github.com/yungSNAT/GhostSoap/
 ## Obsolete reasons
 
 The `[obsolete]` reasons and the rule that a moved entry must name its replacement follow the obsolete records of [datenanfragen/data](https://github.com/datenanfragen/data) (CC0-1.0). The names are adapted; no records were copied.
+
+## Request reasons
+
+Three of the reasons a request can record for a refusal (`outside-jurisdiction`, `insufficient-verification` and `other`) follow the `denied` reason codes `outside_jurisdiction`, `insuf_verification` and `other` of the [Data Rights Protocol](https://github.com/consumer-reports-innovation-lab/data-rights-protocol) v1.0 (Apache-2.0), read on 10 November 2026. Only the names are adapted; no text, schema or code was copied.

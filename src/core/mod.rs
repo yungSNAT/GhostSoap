@@ -10,3 +10,4 @@ pub mod letters;
 pub mod plan;
 pub mod profile;
 pub mod register;
+pub mod tracker;

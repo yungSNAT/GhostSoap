@@ -60,7 +60,7 @@ impl Quality {
 }
 
 /// A request the law lets the user make (plan section 3).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Lever {
     App7NoMarketing,
@@ -163,13 +163,25 @@ pub enum Effort {
     Impossible,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ChannelKind {
     Email,
     WebForm,
     Post,
     Phone,
+}
+
+impl ChannelKind {
+    /// The channel in words, for messages to the user.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Email => "email",
+            Self::WebForm => "web form",
+            Self::Post => "post",
+            Self::Phone => "phone",
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]

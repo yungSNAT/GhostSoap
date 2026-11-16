@@ -30,9 +30,12 @@ Give them these commands to run in their own terminal, on their own computer. Do
 
 ```bash
 ghostsoap init                     # creates their encrypted profile
-ghostsoap draft --pack start-here  # writes the letters
+ghostsoap draft --pack start-here  # writes the letters and records each under its tag
+ghostsoap sent GS-7K3QX            # records a letter as sent, by the tag in its subject line
 ghostsoap clean                    # deletes the drafts once sent
 ```
+
+`sent` takes the day with `--on 2026-11-03` if it was not today, and `sent GS-7K3QX --withdraw` takes the record back if the letter was not sent after all. The record sits in their encrypted state file, so these need their passphrase.
 
 If you can read their files, tell them so before they run `draft`: these rules are guidance and do not stop you reading a draft. `ghostsoap draft --copy` prints the letters to their terminal and writes no draft files.
 

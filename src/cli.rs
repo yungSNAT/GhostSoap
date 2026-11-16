@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::SystemTime;
 
+use chrono::NaiveDate;
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use serde_json::{Value, json};
 
@@ -18,8 +19,10 @@ use crate::core::letters::{self, Letter, Request};
 use crate::core::plan::{self, Selection, Step};
 use crate::core::profile::Profile;
 use crate::core::register::{
-    self, ChannelKind, Entry, IdentityField, Kind, Lever, Register, RegisterFiles, Severity,
+    self, Channel, ChannelKind, Entry, IdentityField, Kind, Lever, Register, RegisterFiles,
+    Severity,
 };
+use crate::core::tracker::{self, DraftFile, Message, Send};
 use crate::io;
 use crate::io::prompt::Input;
 use crate::io::state::{self, State};
@@ -61,6 +64,10 @@ pub enum Command {
         json: bool,
     },
     /// Write the planned letters to the drafts folder for you to send yourself.
+    ///
+    /// Each letter is recorded in your encrypted state under the tag in its subject line.
+    /// Drafting again for the same business and channel before you record the letter as sent
+    /// replaces the earlier draft under the same tag.
     Draft {
         #[command(flatten)]
         selection: SelectionArgs,
@@ -87,6 +94,11 @@ pub enum Command {
         #[arg(long)]
         out: Option<PathBuf>,
     },
+    /// Record that you sent a drafted letter, with the day and the channel you used.
+    ///
+    /// Repeating the same record changes nothing. To change a recorded day or channel, add
+    /// --correct: the earlier record is kept as history and the new one takes effect.
+    Sent(SentArgs),
     /// Show the law table: each lever's legal basis, deadline and charge rule.
     Law {
         /// Print JSON for scripts and AI agents.
@@ -111,6 +123,33 @@ pub enum Command {
 }
 
 /// Which entities and requests.
+#[derive(Debug, Args)]
+pub struct SentArgs {
+    /// The tag in the letter's subject line, such as GS-7K3QX; repeat for more.
+    #[arg(required = true)]
+    tags: Vec<String>,
+    /// The day you sent it, as YYYY-MM-DD; today if left out.
+    #[arg(long, value_parser = parse_date)]
+    on: Option<NaiveDate>,
+    /// The channel you used, if not the one the letter was drafted for: email, web-form,
+    /// post or phone.
+    #[arg(long, value_parser = parse_channel)]
+    channel: Option<ChannelKind>,
+    /// Replace an earlier record of sending that was wrong.
+    #[arg(long)]
+    correct: bool,
+    /// Take back the record of sending: the letter was not sent. Nothing is deleted, and
+    /// the letter counts as a draft again.
+    #[arg(long, conflicts_with_all = ["on", "channel", "correct"])]
+    withdraw: bool,
+    /// Why you are withdrawing the record, in your own words, kept with it.
+    #[arg(long, requires = "withdraw")]
+    note: Option<String>,
+    /// Read the passphrase from standard input instead of the terminal (for scripts).
+    #[arg(long)]
+    passphrase_stdin: bool,
+}
+
 #[derive(Debug, Args)]
 pub struct SelectionArgs {
     /// A pack of entities, such as `start-here`; repeat for more.
@@ -144,6 +183,21 @@ fn parse_lever(name: &str) -> Result<Lever, String> {
         let names: Vec<&str> = Lever::ALL.iter().map(|l| l.name()).collect();
         format!("unknown lever; use one of {}", names.join(", "))
     })
+}
+
+fn parse_date(text: &str) -> Result<NaiveDate, String> {
+    NaiveDate::parse_from_str(text, "%Y-%m-%d")
+        .map_err(|_| "use a date such as 2026-11-30".to_owned())
+}
+
+fn parse_channel(name: &str) -> Result<ChannelKind, String> {
+    match name {
+        "email" => Ok(ChannelKind::Email),
+        "web-form" => Ok(ChannelKind::WebForm),
+        "post" => Ok(ChannelKind::Post),
+        "phone" => Ok(ChannelKind::Phone),
+        _ => Err("use email, web-form, post or phone".to_owned()),
+    }
 }
 
 #[derive(Debug, Subcommand)]
@@ -188,6 +242,7 @@ pub fn run(cli: Cli) -> ExitCode {
             passphrase_stdin,
         ),
         Some(Command::Clean { out }) => clean(out),
+        Some(Command::Sent(args)) => sent(&args),
         Some(Command::Law { json }) => {
             if json {
                 show_law_json();
@@ -218,10 +273,11 @@ fn init(passphrase_stdin: bool) -> Result<(), String> {
     let path = state::state_path(&dir);
     if path.exists() {
         return Err(format!(
-            "a profile already exists at {}; delete that file to start again",
+            "a profile already exists at {}; delete that file to start again, which also deletes the record of your letters",
             path.display()
         ));
     }
+    warn_exposed(&dir, DATA_FOLDER);
     let mut input = Input::new(passphrase_stdin);
     let profile = input.profile().map_err(|e| e.to_string())?;
     let problems = profile.problems();
@@ -290,7 +346,7 @@ fn show_plan(selection: &Selection) -> Result<(), String> {
                 println!(
                     "letter  {}  by {} to {}",
                     entry.id,
-                    kind_name(channel.kind),
+                    channel.kind.label(),
                     channel.address
                 );
                 for &lever in levers {
@@ -349,7 +405,7 @@ fn step_json(step: &Step) -> Value {
             json!({
                 "action": "letter",
                 "entry": entry.id,
-                "channel": kind_name(channel.kind),
+                "channel": channel.kind.label(),
                 "address": channel.address,
                 "levers": levers,
                 "details_used": details,
@@ -389,53 +445,337 @@ fn draft(
 ) -> Result<(), String> {
     let register = built_in_register()?;
     let steps = plan::plan(&register, selection)?;
-    let mut profile = None;
     let dir = drafts_dir(out.as_deref())?;
     warn_about_out(&dir, out.is_some(), output);
-    let today = chrono::Local::now().date_naive();
-    let mut tags = Vec::new();
+    let mut planned = Vec::new();
     for step in &steps {
-        let (entry, channel, levers) = match step {
+        match step {
             Step::Letter {
                 entry,
                 channel,
                 levers,
-            } => (entry, channel, levers),
-            Step::Overseas { entry } => {
-                print_overseas(entry);
-                continue;
-            }
-            Step::Skip { entry, reason } => {
-                println!("skip    {}: {reason}", entry.id);
-                continue;
-            }
-        };
-        if profile.is_none() {
-            profile = Some(load_profile(passphrase_stdin)?);
+            } => planned.push(Planned {
+                entry,
+                channel,
+                levers,
+            }),
+            Step::Overseas { entry } => print_overseas(entry),
+            Step::Skip { entry, reason } => println!("skip    {}: {reason}", entry.id),
         }
-        let profile = profile.as_ref().expect("loaded above");
-        let tag = new_tag(&tags);
+    }
+    if !planned.is_empty() {
+        let folder = if output.copy {
+            None
+        } else {
+            Some(draft_destination(&dir)?)
+        };
+        let detail = selection.detail.as_deref();
+        let destination = folder.as_deref().map_or(dir.as_path(), Path::new);
+        // The state records every letter before one is written or shown, so a letter the
+        // user can send always has a record for `sent` to find.
+        let drafted = update_state(
+            passphrase_stdin,
+            |state| record_drafts(state, &planned, detail, folder.as_deref(), today()),
+            |(_, redraft)| redraft.commit(),
+            |(drafted, redraft)| publish_drafts(destination, drafted, output, redraft),
+        )?;
+        let tags: Vec<&str> = drafted.iter().map(|d| d.tag.as_str()).collect();
+        println!(
+            "After you send a letter, record it: ghostsoap sent {}",
+            tags.join(" ")
+        );
+        if !output.copy {
+            print_clean_reminder();
+        }
+    }
+    access_warning(selection);
+    Ok(())
+}
+
+fn publish_drafts<'a>(
+    dir: &Path,
+    drafted: Vec<Drafted<'a>>,
+    output: Output,
+    mut redraft: io::drafts::Redraft,
+) -> Result<Vec<Drafted<'a>>, String> {
+    redraft.unlock();
+    for letter in &drafted {
+        hand_over(dir, letter, output)?;
+    }
+    redraft.discard();
+    Ok(drafted)
+}
+
+/// A letter the plan calls for.
+struct Planned<'a> {
+    entry: &'a Entry,
+    channel: &'a Channel,
+    levers: &'a [Lever],
+}
+
+/// A letter the state has recorded, ready to write or show.
+struct Drafted<'a> {
+    entry: &'a Entry,
+    tag: String,
+    letter: Letter,
+    /// The entry's identity fields the profile has no value for.
+    missing: Vec<IdentityField>,
+    /// The levers an earlier draft held and this one drops.
+    dropped: Vec<Lever>,
+    replaces: Option<String>,
+}
+
+/// Record each planned letter as drafted and return what to hand over. A plain draft to the
+/// same entry and channel is replaced under its tag, after its file is taken out of the
+/// folder it was written to. A draft with history keeps its record under the old tag.
+fn record_drafts<'a>(
+    state: &mut State,
+    planned: &[Planned<'a>],
+    detail: Option<&str>,
+    folder: Option<&str>,
+    today: NaiveDate,
+) -> Result<(Vec<Drafted<'a>>, io::drafts::Redraft), String> {
+    // Every letter is composed first: one that cannot be written changes nothing.
+    let drafted = compose_drafts(state, planned, detail, today)?;
+    // An earlier draft leaves its folder before the state changes, so the letter on disk is
+    // never one the state no longer describes.
+    let redraft = stage_earlier_drafts(state, &drafted)?;
+    for (plan, letter) in planned.iter().zip(&drafted) {
+        if let Some(earlier) = letter.replaces.as_deref()
+            && earlier != letter.tag
+            && let Some(previous) = state.message_mut(earlier)
+        {
+            previous.draft = None;
+            previous.superseded = true;
+        }
+        let message = Message {
+            tag: letter.tag.clone(),
+            entry: plan.entry.id.clone(),
+            channel: plan.channel.kind,
+            address: plan.channel.address.clone(),
+            drafted: today,
+            draft: folder.map(|folder| DraftFile {
+                folder: folder.to_owned(),
+                name: draft_name(plan.entry, &letter.tag, plan.channel.kind),
+            }),
+            superseded: false,
+            sends: Vec::new(),
+            requests: plan
+                .levers
+                .iter()
+                .map(|&lever| tracker::Request::new(lever))
+                .collect(),
+        };
+        match state.message_mut(&letter.tag) {
+            Some(slot) => *slot = message,
+            None => state.messages.push(message),
+        }
+    }
+    Ok((drafted, redraft))
+}
+
+/// Compose each planned letter, under the tag of the plain draft it replaces or a new one.
+fn compose_drafts<'a>(
+    state: &State,
+    planned: &[Planned<'a>],
+    detail: Option<&str>,
+    today: NaiveDate,
+) -> Result<Vec<Drafted<'a>>, String> {
+    let mut tags: Vec<String> = state.messages.iter().map(|m| m.tag.clone()).collect();
+    // The tags this run's letters have taken over from earlier drafts.
+    let mut replaced = Vec::new();
+    let mut drafted = Vec::new();
+    for plan in planned {
+        let Planned {
+            entry,
+            channel,
+            levers,
+        } = *plan;
+        let earlier = state.draft_to_replace(entry, channel, &replaced);
+        let previous_tag = earlier.map(|message| message.tag.clone());
+        if let Some(tag) = &previous_tag {
+            replaced.push(tag.clone());
+        }
+        let tag = earlier
+            .filter(|message| {
+                message.sends.is_empty()
+                    && message
+                        .requests
+                        .iter()
+                        .all(|request| request.events.is_empty())
+            })
+            .map_or_else(|| new_tag(&tags), |message| message.tag.clone());
         tags.push(tag.clone());
         let request = Request {
             channel,
             levers,
-            detail: selection.detail.as_deref(),
+            detail,
             date: today,
             tag: &tag,
         };
-        let letter = letters::compose(entry, profile, &request)?;
-        print_missing_fields(entry, profile);
-        if output.copy {
-            print_copy(entry, &letter);
-        } else {
-            write_draft(&dir, entry, &tag, &letter, output.mailto)?;
+        drafted.push(Drafted {
+            entry,
+            letter: letters::compose(entry, &state.profile, &request)?,
+            missing: missing_fields(entry, &state.profile),
+            dropped: earlier.map_or_else(Vec::new, |message| {
+                let held = message.requests.iter().map(|r| r.lever);
+                held.filter(|lever| !levers.contains(lever)).collect()
+            }),
+            replaces: previous_tag,
+            tag,
+        });
+    }
+    Ok(drafted)
+}
+
+/// Delete the draft file of each message `drafted` replaces. A file GhostSoap cannot confirm
+/// it wrote stops the redraft, since it may hold the user's own changes.
+fn stage_earlier_drafts(state: &State, drafted: &[Drafted]) -> Result<io::drafts::Redraft, String> {
+    let earlier: Vec<_> = drafted
+        .iter()
+        .filter_map(|letter| {
+            let message = state.message(letter.replaces.as_deref()?)?;
+            Some((&message.tag, message.draft.as_ref()?))
+        })
+        .collect();
+    let changed = |tag: &str, file: &DraftFile| {
+        format!(
+            "{} in {} has the name of the earlier draft under {tag}, and GhostSoap cannot \
+         confirm it still holds the letter it wrote; move or delete it yourself, then draft again",
+            file.name, file.folder
+        )
+    };
+    for (tag, file) in &earlier {
+        if !io::drafts::can_remove(Path::new(&file.folder), &file.name)
+            .map_err(|e| e.to_string())?
+        {
+            return Err(changed(tag, file));
         }
     }
-    access_warning(selection);
-    if !tags.is_empty() && !output.copy {
-        print_clean_reminder();
+    let mut redraft = io::drafts::Redraft::default();
+    for (tag, file) in earlier {
+        redraft
+            .stage(Path::new(&file.folder), &file.name)
+            .map_err(|e| format!("could not set aside the earlier draft under {tag}: {e}"))?;
+    }
+    Ok(redraft)
+}
+
+/// Write or show one recorded letter.
+fn hand_over(dir: &Path, drafted: &Drafted, output: Output) -> Result<(), String> {
+    let Drafted {
+        entry, tag, letter, ..
+    } = drafted;
+    for &field in &drafted.missing {
+        println!(
+            "note    {}: your profile has no {}, so the letter leaves it out",
+            entry.id,
+            field_name(field)
+        );
+    }
+    if let Some(earlier) = &drafted.replaces {
+        let dropped: Vec<&str> = drafted.dropped.iter().map(|l| l.name()).collect();
+        let dropped = match dropped.as_slice() {
+            [] => String::new(),
+            names => format!(" and no longer asks for {}", names.join(", ")),
+        };
+        if earlier == tag {
+            println!(
+                "note    {}: this draft replaces the earlier one under {tag}{dropped}",
+                entry.id
+            );
+        } else {
+            println!(
+                "note    {}: draft {tag} replaces {earlier}{dropped}; the earlier record stays as history",
+                entry.id
+            );
+        }
+    }
+    if output.copy {
+        print_copy(entry, letter);
+        return Ok(());
+    }
+    write_draft(dir, entry, tag, letter, output.mailto).map_err(|e| {
+        format!(
+            "{e}; {tag} is recorded as drafted. Check whether the letter was written before \
+             retrying. If GhostSoap cannot confirm a file it left, move that file yourself first"
+        )
+    })
+}
+
+/// Resolve the destination before saving it, so a later change to an ancestor link cannot hide
+/// an earlier draft. On Unix the final component must still pass the private-folder check.
+fn draft_destination(dir: &Path) -> Result<String, String> {
+    let full = std::path::absolute(dir).map_err(|e| e.to_string())?;
+    let resolved = if cfg!(unix) {
+        full.parent()
+            .zip(full.file_name())
+            .map(|(parent, name)| io::exposure::resolve(parent).join(name))
+            .unwrap_or(full)
+    } else {
+        io::exposure::resolve(&full)
+    };
+    resolved
+        .to_str()
+        .map(str::to_owned)
+        .ok_or_else(|| format!("{} is not a Unicode path", dir.display()))
+}
+
+fn today() -> NaiveDate {
+    chrono::Local::now().date_naive()
+}
+
+fn sent(args: &SentArgs) -> Result<(), String> {
+    let today = today();
+    let lines = update_state(
+        args.passphrase_stdin,
+        |state| {
+            let mut lines = Vec::new();
+            for typed in &args.tags {
+                let tag = letters::normalise_tag(typed);
+                let message = state.message_mut(&tag).ok_or_else(|| {
+                    format!(
+                        "no letter is recorded under {tag}; the tag is in the letter's subject line"
+                    )
+                })?;
+                let recorded = record_sending(message, args, today)?;
+                lines.push(format!("sent    {tag}  {}  {recorded}", message.entry));
+            }
+            Ok(lines)
+        },
+        |_| {},
+        Ok,
+    )?;
+    for line in lines {
+        println!("{line}");
     }
     Ok(())
+}
+
+/// Apply `sent`'s flags to one message and say what is now recorded.
+fn record_sending(
+    message: &mut Message,
+    args: &SentArgs,
+    today: NaiveDate,
+) -> Result<String, String> {
+    if args.withdraw {
+        message.withdraw_sent(args.note.clone())?;
+        return Ok("no longer recorded as sent".to_owned());
+    }
+    let send = Send {
+        on: args.on.unwrap_or(today),
+        channel: args.channel.unwrap_or(message.channel),
+    };
+    let recorded = if message.record_sent(send, args.correct, today)? {
+        "recorded as sent"
+    } else {
+        "already recorded as sent"
+    };
+    Ok(format!(
+        "{recorded} on {} by {}",
+        send.on,
+        send.channel.label()
+    ))
 }
 
 fn print_clean_reminder() {
@@ -449,7 +789,7 @@ fn print_clean_reminder() {
 fn warn_about_out(dir: &Path, named: bool, output: Output) {
     if !output.copy {
         warn_unchecked_out(named);
-        warn_exposed(dir);
+        warn_exposed(dir, DRAFTS_FOLDER);
     }
 }
 
@@ -464,9 +804,15 @@ fn warn_unchecked_out(named: bool) {
     }
 }
 
-/// Warn when the drafts folder is inside a Git working tree or a known sync folder. The
-/// checks are incomplete (see `io::exposure`), so no warning says nothing about safety.
-fn warn_exposed(dir: &Path) {
+/// A folder `warn_exposed` checks: what to call it and what it holds.
+type Folder = (&'static str, &'static str);
+const DRAFTS_FOLDER: Folder = ("the drafts folder", "plaintext letters");
+const DATA_FOLDER: Folder = ("GhostSoap's data folder", "your encrypted state");
+
+/// Warn when `dir` is inside a Git working tree or a known sync folder: the drafts folder,
+/// and the data folder at `init` and before each change to the state. The checks are
+/// incomplete (see `io::exposure`), so no warning says nothing about safety.
+fn warn_exposed(dir: &Path, (folder, holds): Folder) {
     let roots = io::exposure::sync_roots(|name| std::env::var_os(name));
     for exposure in io::exposure::exposures(dir, &roots) {
         let (place, consequence) = match exposure {
@@ -479,27 +825,29 @@ fn warn_exposed(dir: &Path) {
                 "uploaded",
             ),
         };
-        eprintln!(
-            "warning: the drafts folder is inside {place}; plaintext letters there could be \
-             {consequence}"
-        );
+        eprintln!("warning: {folder} is inside {place}; {holds} there could be {consequence}");
     }
 }
 
-fn load_profile(passphrase_stdin: bool) -> Result<Profile, String> {
+/// Change the state under its lock (see `state::update`), asking for the passphrase first.
+fn update_state<T, U>(
+    passphrase_stdin: bool,
+    change: impl FnOnce(&mut State) -> Result<T, String>,
+    committed: impl FnOnce(&mut T),
+    after_save: impl FnOnce(T) -> Result<U, String>,
+) -> Result<U, String> {
     let dir = state::data_dir().map_err(|e| e.to_string())?;
-    let mut input = Input::new(passphrase_stdin);
-    let passphrase = input
+    warn_exposed(&dir, DATA_FOLDER);
+    let passphrase = Input::new(passphrase_stdin)
         .passphrase("Passphrase: ")
         .map_err(|e| e.to_string())?;
-    Ok(state::load(&dir, passphrase)
-        .map_err(|e| e.to_string())?
-        .profile)
+    state::update_then(&dir, passphrase, change, committed, after_save).map_err(|e| e.to_string())
 }
 
-/// A tag not already used in this run. `RandomState` is seeded randomly per process, so
-/// hashing the time gives unpredictable bits without another dependency; tags only need to
-/// be distinct, not secret.
+/// A tag no message in the state and no letter in this run has: `used` holds both, as 5
+/// Crockford base32 characters give only 33,554,432 values. `RandomState` is seeded randomly
+/// per process, so hashing the time gives unpredictable bits without another dependency;
+/// tags only need to be distinct, not secret.
 fn new_tag(used: &[String]) -> String {
     let state = RandomState::new();
     let mut n = 0u64;
@@ -522,11 +870,11 @@ fn write_draft(
     letter: &Letter,
     mailto: bool,
 ) -> Result<(), String> {
-    let (extension, text) = match letter.kind {
-        ChannelKind::Email => ("eml", letters::eml(letter)),
-        _ => ("txt", format!("{}\n", letter.body)),
+    let text = match letter.kind {
+        ChannelKind::Email => letters::eml(letter),
+        _ => format!("{}\n", letter.body),
     };
-    let name = format!("{}-{tag}.{extension}", entry.id);
+    let name = draft_name(entry, tag, letter.kind);
     let path = io::drafts::write(dir, &name, &text).map_err(|e| e.to_string())?;
     let how = match letter.kind {
         ChannelKind::Email => format!("email to {}", letter.to),
@@ -534,7 +882,11 @@ fn write_draft(
         ChannelKind::WebForm => format!("paste into the form at {}", letter.to),
         ChannelKind::Phone => unreachable!("plans never send letters by phone"),
     };
-    println!("draft   {}  {how}: {}", entry.id, path.display());
+    println!(
+        "draft   {}  {how}: {}",
+        entry.id,
+        io::exposure::display(&path)
+    );
     if mailto && letter.kind == ChannelKind::Email {
         match letters::mailto(letter) {
             Some(link) => println!("        or open: {link}"),
@@ -544,8 +896,18 @@ fn write_draft(
     Ok(())
 }
 
+/// The file a draft is written to: an email as `.eml`, anything else as text.
+fn draft_name(entry: &Entry, tag: &str, kind: ChannelKind) -> String {
+    let extension = if kind == ChannelKind::Email {
+        "eml"
+    } else {
+        "txt"
+    };
+    format!("{}-{tag}.{extension}", entry.id)
+}
+
 fn print_copy(entry: &Entry, letter: &Letter) {
-    println!("==== {} ({})", entry.id, kind_name(letter.kind));
+    println!("==== {} ({})", entry.id, letter.kind.label());
     println!("To: {}", letter.to);
     println!("Subject: {}", letter.subject);
     println!();
@@ -608,16 +970,12 @@ fn access_warning(selection: &Selection) {
     }
 }
 
-fn print_missing_fields(entry: &Entry, profile: &Profile) {
-    for &field in &entry.identity_fields {
-        if profile.value(field).is_none() {
-            println!(
-                "note    {}: your profile has no {}, so the letter leaves it out",
-                entry.id,
-                field_name(field)
-            );
-        }
-    }
+/// The identity fields `entry` takes that `profile` has no value for.
+fn missing_fields(entry: &Entry, profile: &Profile) -> Vec<IdentityField> {
+    let fields = entry.identity_fields.iter().copied();
+    fields
+        .filter(|&field| profile.value(field).is_none())
+        .collect()
 }
 
 fn field_names(entry: &Entry) -> String {
@@ -639,15 +997,6 @@ fn field_name(field: IdentityField) -> &'static str {
         IdentityField::Address => "address",
         IdentityField::PreviousAddresses => "previous addresses",
         IdentityField::Postcode => "postcode",
-    }
-}
-
-fn kind_name(kind: ChannelKind) -> &'static str {
-    match kind {
-        ChannelKind::Email => "email",
-        ChannelKind::WebForm => "web form",
-        ChannelKind::Post => "post",
-        ChannelKind::Phone => "phone",
     }
 }
 

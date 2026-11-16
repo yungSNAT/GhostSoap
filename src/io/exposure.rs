@@ -126,7 +126,7 @@ fn push_new(found: &mut Vec<Exposure>, exposure: Exposure) {
 
 /// `path` with links resolved: its nearest existing ancestor made canonical, then the rest
 /// of the path as given. Unchanged if no ancestor can be resolved.
-fn resolve(path: &Path) -> PathBuf {
+pub(crate) fn resolve(path: &Path) -> PathBuf {
     let mut existing = path;
     let mut rest = Vec::new();
     loop {
