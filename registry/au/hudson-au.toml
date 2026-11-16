@@ -26,5 +26,5 @@ levers = ["app7-no-marketing", "app7-source", "app11-destroy", "app13", "app13-n
 
 [[evidence]]
 url = "https://au.hudson.com/privacy-policy/"
-checked_at = 2026-10-26
-sha256 = "45d3550eec9b8dcf898b0e6c1db6354702a30a332177951bfc953a3c6ed8aba6"
+checked_at = 2026-11-17
+sha256 = "689111bd7af46c195f77c67e3560fc16adc30bf59c6d286f181384217d10d4d5"

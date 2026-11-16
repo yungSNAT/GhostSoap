@@ -31,5 +31,5 @@ sha256 = "2867e18657d1979a6ee061398900514d430e2b8ac4f2d12ac54f18a7861fd043"
 
 [[evidence]]
 url = "https://programmed.com.au/policies/"
-checked_at = 2026-10-26
-sha256 = "ff504323e1e63a733b9c033e1594960415cbdc572bb6eed017af4632c49339fe"
+checked_at = 2026-11-17
+sha256 = "56163613a58626d43e526a3d0fb55e3e8debaa614065d80fb3f50921bfcbe74c"

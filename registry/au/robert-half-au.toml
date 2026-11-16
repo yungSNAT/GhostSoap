@@ -26,5 +26,5 @@ levers = ["app7-no-marketing"]
 
 [[evidence]]
 url = "https://www.roberthalf.com/au/en/privacy"
-checked_at = 2026-10-26
-sha256 = "0eab417ba541de7c0f92e221376e1e8b3c40d3bb0bf8b9f71a60a7a0608b0c8b"
+checked_at = 2026-11-17
+sha256 = "98dcaacdbe6e7404227a363cc6f53a55d11d61ed544dd80cf96569daf1bf82c4"

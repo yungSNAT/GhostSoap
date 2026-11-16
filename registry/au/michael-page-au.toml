@@ -31,5 +31,5 @@ levers = []
 
 [[evidence]]
 url = "https://www.michaelpage.com.au/privacy-policy"
-checked_at = 2026-11-02
-sha256 = "a666427dccee8a8c573ebc94aca1c040638592b413cc9515d727d26af5f757b9"
+checked_at = 2026-11-17
+sha256 = "d5e19445b003698752a6e5e1ddf601c82fcd7fc6bb902c1cabc33aeb7f6c17d0"
