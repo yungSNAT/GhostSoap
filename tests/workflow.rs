@@ -574,6 +574,26 @@ fn forget_without_the_passphrase_deletes_the_state_and_says_what_it_skipped() {
     assert_eq!(forgot.status.code(), Some(0), "{}", text(&forgot.stderr));
     assert!(text(&forgot.stdout).contains("--out"));
     assert!(!home.exists());
+
+    // Files named like an export that GhostSoap did not write stay.
+    init(&home);
+    let yours = [
+        (
+            "ghostsoap-export-notes.toml",
+            "# GhostSoap export of 2026-11-17. mine",
+        ),
+        ("ghostsoap-export-2026-11-17.toml", "my own notes"),
+    ];
+    for (name, body) in yours {
+        fs::write(home.join(name), body).unwrap();
+    }
+    let forgot = ghostsoap(&home, &["forget", "--no-passphrase", "--yes"], "");
+    assert_eq!(forgot.status.code(), Some(0), "{}", text(&forgot.stderr));
+    assert!(!home.join("state.age").exists());
+    for (name, body) in yours {
+        assert_eq!(fs::read_to_string(home.join(name)).unwrap(), body);
+        fs::remove_file(home.join(name)).unwrap();
+    }
     let nothing = ghostsoap(&home, &["forget", "--no-passphrase", "--yes"], "");
     assert_eq!(nothing.status.code(), Some(0));
     assert!(text(&nothing.stdout).contains("nothing to delete"));
@@ -601,4 +621,34 @@ fn forget_reports_a_folder_it_cannot_clean_and_deletes_the_rest() {
     assert!(errors.contains("1 could not be deleted"), "{errors}");
     assert!(!home.join("state.age").exists());
     assert_eq!(emls(&out).len(), 1);
+}
+
+/// A recorded `--out` folder replaced by a link since the draft is left alone.
+#[test]
+fn forget_leaves_a_recorded_folder_that_is_now_a_link() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    let out = tmp.path().join("out");
+    let moved = tmp.path().join("moved");
+    init(&home);
+    assert_eq!(draft_to(&home, &out, &[], &[]).status.code(), Some(0));
+    fs::rename(&out, &moved).unwrap();
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&moved, &out).unwrap();
+    #[cfg(windows)]
+    if let Err(e) = std::os::windows::fs::symlink_dir(&moved, &out) {
+        // Windows needs Developer Mode or an administrator to make links.
+        eprintln!("skipped: cannot create a directory link here: {e}");
+        return;
+    }
+    let pass = format!("{PASSPHRASE}\n");
+    let forgot = ghostsoap(&home, &["forget", "--passphrase-stdin", "--yes"], &pass);
+    assert_eq!(forgot.status.code(), Some(1));
+    assert!(
+        text(&forgot.stderr).contains("is now a link"),
+        "{}",
+        text(&forgot.stderr)
+    );
+    assert_eq!(emls(&moved).len(), 1);
+    assert!(!home.join("state.age").exists());
 }
