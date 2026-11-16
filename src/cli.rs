@@ -28,6 +28,30 @@ use crate::io;
 use crate::io::prompt::Input;
 use crate::io::state::{self, State};
 
+// Every `println!` in this file writes through `print_line`, so a reader that stops early,
+// as `ghostsoap law | head -1` does, ends nothing: the command finishes and exits as it
+// would have. A `println!` of the standard library would panic there and exit 101.
+macro_rules! println {
+    () => {
+        print_line(format_args!(""))
+    };
+    ($($arg:tt)*) => {
+        print_line(format_args!($($arg)*))
+    };
+}
+
+/// Write one line to standard output, ignoring only a reader that has gone.
+fn print_line(line: std::fmt::Arguments) {
+    use std::io::Write;
+    if let Err(e) = writeln!(std::io::stdout().lock(), "{line}") {
+        assert_eq!(
+            e.kind(),
+            std::io::ErrorKind::BrokenPipe,
+            "failed printing to stdout: {e}"
+        );
+    }
+}
+
 const LEGAL_NOTICE: &str = "GhostSoap provides information and templates, not legal advice.";
 const CHECK_LIMITS: &str = "This check matches words. It flags a sentence that holds a word for \
                             erasing and a legal source or a word of duty, so a flag may be \
