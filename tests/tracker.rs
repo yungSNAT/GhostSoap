@@ -266,16 +266,7 @@ fn a_manifest_error_leaves_no_unconfirmed_replacement_and_allows_retry() {
     done(&run(&home, &["sent", &tag]));
     done(&run(&home, &["sent", &tag, "--withdraw"]));
     let history = stored(&home).message(&tag).unwrap().sends.clone();
-    let output = tmp.path().join("new-drafts");
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::DirBuilderExt;
-        fs::DirBuilder::new().mode(0o700).create(&output).unwrap();
-    }
-    #[cfg(not(unix))]
-    fs::create_dir(&output).unwrap();
-    let blocked = output.join(".ghostsoap-drafts");
-    fs::create_dir(&blocked).unwrap();
+    let (output, blocked) = blocked_drafts(tmp.path());
 
     let error = refused(&draft_cotality(&home, &output, &["--lever", "app7-source"]));
     assert!(error.contains(".ghostsoap-drafts"), "{error}");
@@ -302,6 +293,49 @@ fn a_manifest_error_leaves_no_unconfirmed_replacement_and_allows_retry() {
     assert_ne!(tags(&new).as_slice(), std::slice::from_ref(&tag));
     assert_eq!(stored(&home).message(&tag).unwrap().sends, history);
     assert_eq!(emls(&output).len(), 1);
+}
+
+/// A private drafts folder in `tmp` whose manifest name holds a folder, so writing a draft
+/// there fails; also that folder, which the caller removes to let the next write through.
+fn blocked_drafts(tmp: &Path) -> (PathBuf, PathBuf) {
+    let output = tmp.join("new-drafts");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        fs::DirBuilder::new().mode(0o700).create(&output).unwrap();
+    }
+    #[cfg(not(unix))]
+    fs::create_dir(&output).unwrap();
+    let blocked = output.join(".ghostsoap-drafts");
+    fs::create_dir(&blocked).unwrap();
+    (output, blocked)
+}
+
+#[test]
+fn sent_refuses_a_letter_whose_draft_run_did_not_finish() {
+    let (tmp, home, _drafts, tag, _file) = start_drafted();
+    let (output, blocked) = blocked_drafts(tmp.path());
+    // The redraft takes over the tag, then stops before its letter is written; the user may
+    // still hold the earlier letter under that tag, which asked for other things.
+    refused(&draft_cotality(&home, &output, &["--lever", "app7-source"]));
+    let before = state_bytes(&home);
+    let error = refused(&run(&home, &["sent", &tag]));
+    assert!(
+        error.contains(&format!(
+            "error: the draft run that recorded {tag} did not finish, so the letter you hold \
+             under that tag may not be the one recorded; draft it again and send that letter"
+        )),
+        "{error}"
+    );
+    assert_eq!(state_bytes(&home), before, "nothing is recorded");
+
+    fs::remove_dir(&blocked).unwrap();
+    let again = done(&draft_cotality(&home, &output, &["--lever", "app7-source"]));
+    assert_eq!(tags(&again), [tag.as_str()], "the retry keeps the tag");
+    done(&run(&home, &["sent", &tag]));
+    let message = stored(&home).messages.remove(0);
+    assert!(message.sent().is_some());
+    assert_eq!(message.requests.len(), 1);
 }
 
 #[cfg(unix)]
