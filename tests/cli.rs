@@ -170,7 +170,9 @@ fn check_repeats_nothing_personal_from_the_file() {
 
 #[test]
 fn check_says_it_passes_the_tables_wording_whoever_the_letter_goes_to() {
-    let out = check_bytes(b"Telco: reply within the period of 30 days that starts on the day the request is made.\n");
+    let out = check_bytes(
+        b"Telco: reply within the period of 30 days that starts on the day the request is made.\n",
+    );
     assert_eq!(out.status.code(), Some(0));
     let stdout = text(&out.stdout);
     assert!(stdout.contains("Claims to recheck: 0."), "{stdout}");
