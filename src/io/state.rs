@@ -25,6 +25,11 @@ const LOCK_FILE: &str = "state.lock";
 /// The highest scrypt work factor (2^22) a state file may ask for: the reference age
 /// implementation's default, about 15 seconds and 4 GiB on a modern machine.
 const MAX_WORK_FACTOR: u8 = 22;
+/// The scrypt work factor (2^18) a saved state asks for: the reference age implementation's
+/// default, about a second on a modern machine. Fixed rather than timed, so a fast machine
+/// never writes a state that `MAX_WORK_FACTOR` refuses.
+const WORK_FACTOR: u8 = 18;
+const _: () = assert!(WORK_FACTOR <= MAX_WORK_FACTOR);
 
 /// State format 1, as M2 wrote it.
 #[derive(Deserialize)]
@@ -121,7 +126,8 @@ fn decode(text: &str) -> io::Result<State> {
 
 fn encrypt(state: &State, passphrase: SecretString) -> io::Result<Vec<u8>> {
     let text = encode(state)?;
-    let recipient = age::scrypt::Recipient::new(passphrase);
+    let mut recipient = age::scrypt::Recipient::new(passphrase);
+    recipient.set_work_factor(WORK_FACTOR);
     age::encrypt(&recipient, text.as_bytes()).map_err(io::Error::other)
 }
 
@@ -405,6 +411,18 @@ mod tests {
         recipient.set_work_factor(10);
         let bytes = age::encrypt(&recipient, text.as_bytes()).unwrap();
         fs::write(state_path(dir), bytes).unwrap();
+    }
+
+    #[test]
+    fn a_saved_state_asks_for_no_more_work_than_reading_accepts() {
+        let bytes = encrypt(&State::new(profile()), secret("pass phrase")).unwrap();
+        let header = String::from_utf8_lossy(&bytes[..bytes.len().min(200)]).into_owned();
+        let stanza = header
+            .lines()
+            .find_map(|line| line.strip_prefix("-> scrypt "))
+            .unwrap_or_else(|| panic!("no scrypt stanza in {header}"));
+        let log_n: u8 = stanza.split(' ').nth(1).unwrap().parse().unwrap();
+        assert_eq!(log_n, WORK_FACTOR);
     }
 
     #[test]
