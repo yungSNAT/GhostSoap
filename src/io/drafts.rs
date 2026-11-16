@@ -1063,6 +1063,7 @@ mod tests {
         fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
         // Root reads any file, so the read cannot be made to fail this way.
         let Some(status) = status else { return };
-        assert_eq!(status.unwrap_err().kind(), io::ErrorKind::PermissionDenied);
+        let kind = status.err().map(|e| e.kind());
+        assert_eq!(kind, Some(io::ErrorKind::PermissionDenied));
     }
 }
