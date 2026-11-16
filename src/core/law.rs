@@ -47,7 +47,10 @@ pub enum Deadline {
     /// day is not counted in (s 20R(3); Acts Interpretation Act 1901 s 36(1) item 6).
     DaysAfter(u16),
     /// A fixed number of days that starts on the day the request is made, which is counted
-    /// (ss 20T(2)(a), 21V(2)(a); Acts Interpretation Act 1901 s 36(1) item 2).
+    /// (ss 20T(2)(a), 21V(2)(a); Acts Interpretation Act 1901 s 36(1) item 2). Format 2 as
+    /// first merged wrote both fixed periods as `days`, which reads as this kind;
+    /// `State::read_days` gives s 20R(3)'s back its own.
+    #[serde(alias = "days")]
     DaysStarting(u16),
     /// Business days in the place the message was sent to (Spam Act Sch 2 cl 6(2)).
     BusinessDays(u16),

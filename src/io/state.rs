@@ -106,7 +106,8 @@ fn decode(text: &str) -> io::Result<State> {
             Ok(State::new(old.profile))
         }
         Some(2) => {
-            let state: State = toml::from_str(text).map_err(unreadable)?;
+            let mut state: State = toml::from_str(text).map_err(unreadable)?;
+            state.read_days();
             match state.problems().first() {
                 None => Ok(state),
                 Some(problem) => Err(io::Error::other(format!(
@@ -427,6 +428,26 @@ mod tests {
         recipient.set_work_factor(10);
         let bytes = age::encrypt(&recipient, text.as_bytes()).unwrap();
         fs::write(state_path(dir), bytes).unwrap();
+    }
+
+    /// Format 2 as first merged (main at fffb4d1) wrote both fixed periods as `days`.
+    #[test]
+    fn a_fixed_period_written_as_days_reads_as_the_kind_its_lever_has() {
+        let mut state = State::new(profile());
+        let mut letter = message("GS-7K3QX");
+        letter.requests = vec![
+            Request::new(Lever::S20rAccess),
+            Request::new(Lever::S20tCorrection),
+        ];
+        state.messages.push(letter);
+        let text = toml::to_string(&state).unwrap();
+        let first = text.replacen("days-after = 10", "days = 10", 1).replacen(
+            "days-starting = 30",
+            "days = 30",
+            1,
+        );
+        assert_eq!(first.matches("\ndays = ").count(), 2, "{first}");
+        assert_eq!(decode(&first).unwrap(), state);
     }
 
     #[test]
