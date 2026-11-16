@@ -190,6 +190,35 @@ pub fn create(dir: &Path, state: &State, passphrase: SecretString) -> io::Result
     write_atomic(dir, &bytes, || {})
 }
 
+/// The state as `export` writes it: the text the state file encrypts, after a comment line
+/// dated `date` saying it is plaintext. `decode` reads it back as the same state.
+fn export_text(state: &State, date: &str) -> io::Result<String> {
+    Ok(format!(
+        "# GhostSoap export of {date}. This file is plaintext: it holds your profile and every \
+         letter's record. Keep it private and delete it when you no longer need it.\n{}",
+        encode(state)?
+    ))
+}
+
+/// Write the state, read with `passphrase`, to a new file at `path` as plaintext (mode 600
+/// on Unix). A file or link already at `path` is refused, never replaced.
+pub fn export(dir: &Path, passphrase: SecretString, path: &Path, date: &str) -> io::Result<()> {
+    let text = export_text(&load(dir, passphrase)?, date)?;
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+    let mut file = options.open(path).map_err(|e| match e.kind() {
+        io::ErrorKind::AlreadyExists => io::Error::new(
+            e.kind(),
+            format!("{} already exists; nothing was exported", path.display()),
+        ),
+        _ => e,
+    })?;
+    file.write_all(text.as_bytes())?;
+    file.sync_all()
+}
+
 /// Read and decrypt the state file. Nothing is written: a format 1 file stays as it is.
 pub fn load(dir: &Path, passphrase: SecretString) -> io::Result<State> {
     read(&state_path(dir), passphrase)
@@ -469,6 +498,20 @@ mod tests {
         recipient.set_work_factor(10);
         let bytes = age::encrypt(&recipient, text.as_bytes()).unwrap();
         fs::write(state_path(dir), bytes).unwrap();
+    }
+
+    #[test]
+    fn an_export_reads_back_as_the_state_it_was_made_from() {
+        let mut state = State::new(profile());
+        let mut letter = message("GS-7K3QX");
+        letter.requests = vec![
+            Request::new(Lever::S20rAccess),
+            Request::new(Lever::App7Source),
+        ];
+        state.messages.push(letter);
+        let text = export_text(&state, "2026-11-17").unwrap();
+        assert!(text.starts_with("# GhostSoap export of 2026-11-17. This file is plaintext"));
+        assert_eq!(decode(&text).unwrap(), state);
     }
 
     /// Format 2 as first merged (main at fffb4d1) wrote both fixed periods as `days`.

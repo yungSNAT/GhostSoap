@@ -113,6 +113,17 @@ pub enum Command {
         #[arg(long)]
         passphrase_stdin: bool,
     },
+    /// Write your profile and every letter's record to a new plaintext file, so they
+    /// survive a lost device. Keep it private and delete it when you no longer need it.
+    Export {
+        /// The file to write; it must not exist yet. Defaults to
+        /// `ghostsoap-export-<date>.toml` in GhostSoap's data folder.
+        #[arg(long)]
+        out: Option<PathBuf>,
+        /// Read the passphrase from standard input instead of the terminal (for scripts).
+        #[arg(long)]
+        passphrase_stdin: bool,
+    },
     /// Delete the drafts GhostSoap wrote; other files in the folder are left alone.
     Clean {
         /// Drafts folder; defaults to `drafts` in GhostSoap's data folder.
@@ -355,6 +366,10 @@ pub fn run(cli: Cli) -> ExitCode {
             Output { copy, mailto },
             passphrase_stdin,
         ),
+        Some(Command::Export {
+            out,
+            passphrase_stdin,
+        }) => export(out, passphrase_stdin),
         Some(Command::Clean { out }) => clean(out),
         Some(Command::Sent(args)) => sent(&args),
         Some(Command::Reply(args)) => reply(&args),
@@ -1320,6 +1335,25 @@ fn deadline_summary(deadline: Deadline) -> String {
         Deadline::Reasonable { guide_days: None } => "a reasonable period".to_owned(),
         Deadline::NotStated => "no time set".to_owned(),
     }
+}
+
+fn export(out: Option<PathBuf>, passphrase_stdin: bool) -> Result<(), String> {
+    let dir = state::data_dir().map_err(|e| e.to_string())?;
+    let date = today().to_string();
+    let path = out.unwrap_or_else(|| dir.join(format!("ghostsoap-export-{date}.toml")));
+    let passphrase = Input::new(passphrase_stdin)
+        .passphrase("Passphrase: ")
+        .map_err(|e| e.to_string())?;
+    state::export(&dir, passphrase, &path, &date).map_err(|e| e.to_string())?;
+    println!("Exported your profile and records to {}.", path.display());
+    let folder = path.parent().unwrap_or(Path::new("."));
+    warn_exposed(folder, ("the export's folder", "the plaintext export"));
+    eprintln!(
+        "warning: {} is plaintext: anyone who can open it can read your profile and every \
+         letter's record. Keep it private, and delete it when you no longer need it.",
+        path.display()
+    );
+    Ok(())
 }
 
 fn clean(out: Option<PathBuf>) -> Result<(), String> {
