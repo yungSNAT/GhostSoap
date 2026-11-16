@@ -15,6 +15,10 @@ use crate::core::letters;
 use crate::core::profile::Profile;
 use crate::core::register::{Channel, ChannelKind, Entry, Lever};
 
+mod reply;
+
+pub use reply::Action;
+
 /// The state format these types are written as. Format 1 held the profile alone.
 pub const FORMAT: u32 = 2;
 
@@ -406,22 +410,30 @@ impl Message {
     }
 }
 
+/// A refusal, or a claim that the law does not apply: the statuses a reason goes with.
+fn is_refusal(status: Status) -> bool {
+    matches!(
+        status,
+        Status::RefusedWithReasons | Status::Refused | Status::ExemptClaimed
+    )
+}
+
 impl Request {
-    /// What is wrong with this request's events, given the message's record of sending in
-    /// effect. Each reads after the tag and lever.
+    /// What is wrong with this request's deadline and events, given the message's record of
+    /// sending in effect. Each reads after the tag and lever.
     fn problems(&self, sent: Option<Send>) -> Vec<&'static str> {
         let mut problems = Vec::new();
+        let kind = std::mem::discriminant(&law::law(self.lever).deadline);
+        if std::mem::discriminant(&self.deadline) != kind {
+            problems.push("has a deadline kind its lever's law does not give");
+        }
         for event in &self.events {
             match event {
                 Event::Status(status) => {
                     if matches!(status.status, Status::Drafted | Status::Sent) {
                         problems.push("has an event that sets drafted or sent");
                     }
-                    let refusal = matches!(
-                        status.status,
-                        Status::RefusedWithReasons | Status::Refused | Status::ExemptClaimed
-                    );
-                    if status.reason.is_some() && !refusal {
+                    if status.reason.is_some() && !is_refusal(status.status) {
                         problems.push("gives a reason for an answer that is not a refusal");
                     }
                 }

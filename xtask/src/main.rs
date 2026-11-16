@@ -36,8 +36,9 @@ const DNS_RESOLVER: &str = "https://dns.google/resolve";
 /// Whole-request limit, so one slow or silent site fails instead of stalling the check.
 const TIMEOUT: Duration = Duration::from_secs(30);
 /// Each law the plan pins: its name, Federal Register title and the version read.
-const LAWS: [(&str, &str, &str); 4] = [
+const LAWS: [(&str, &str, &str); 5] = [
     ("Privacy Act 1988", "C2004A03712", "C2026C00227"),
+    ("Acts Interpretation Act 1901", "C1901A00002", "C2026C00117"),
     ("Spam Act 2003", "C2004A01214", "C2016C00614"),
     ("Spam Regulations 2021", "F2021L00285", "F2021L00285"),
     ("Criminal Code", "C2004A04868", "C2026C00243"),
@@ -830,6 +831,7 @@ levers = []
         let lines = law_changes(&|title| match title {
             "C2004A03712" => Ok("C2026C99999".to_owned()),
             "C2004A01214" => Ok("C2016C00614".to_owned()),
+            "C1901A00002" => Ok("C2026C00117".to_owned()),
             "F2021L00285" => Err("timed out".to_owned()),
             _ => Ok("C2026C00243".to_owned()),
         });
@@ -854,7 +856,7 @@ levers = []
             .flat_map(|s| s.split([' ', ',']))
             .filter(|word| word.starts_with("C20") || word.starts_with("F20"))
             .collect();
-        assert_eq!(pins.len(), 3);
+        assert_eq!(pins.len(), 4);
         assert!(pins.iter().all(|pin| LAWS.iter().any(|law| law.2 == *pin)));
         assert!(ghostsoap::core::law::STATUS[0].contains(LAWS[0].2));
     }

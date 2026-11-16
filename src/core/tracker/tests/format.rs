@@ -44,7 +44,7 @@ lever = "s20t-correction"
 letter_version = 2
 
 [messages.requests.deadline]
-days = 30
+days-starting = 30
 
 [[messages.requests.events]]
 kind = "status"
@@ -119,10 +119,6 @@ letter_version = 1
 guide_days = 30
 "#;
 
-fn note(text: &str) -> Option<String> {
-    Some(text.to_owned())
-}
-
 /// The first message `FORMAT_2` holds, before its requests are set.
 fn sent_twice() -> Message {
     let mut message = sent_message("GS-7K3QX");
@@ -142,7 +138,7 @@ fn sent_twice() -> Message {
 /// The state `FORMAT_2` holds.
 fn every_record() -> State {
     let mut full = sent_twice();
-    let mut correction = request(Lever::S20tCorrection, 2, Deadline::Days(30));
+    let mut correction = request(Lever::S20tCorrection, 2, Deadline::DaysStarting(30));
     correction.events = vec![
         answer(day(13), Status::Acknowledged),
         Event::Extension(Extension {
@@ -265,7 +261,10 @@ fn a_file_with_a_field_or_name_this_version_does_not_know_is_refused() {
             "channel = \"post\"",
             "channel = \"post\"\nstatus = \"sent\"",
         ),
-        ("days = 30", "days = 30\nbusiness-days = 5"),
+        (
+            "days-starting = 30",
+            "days-starting = 30\nbusiness-days = 5",
+        ),
         ("guide_days = 30", "guide_days = 30\nweeks = 4"),
         ("kind = \"withdrawal\"", "kind = \"retraction\""),
         ("of = \"status\"", "of = \"send\""),

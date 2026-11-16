@@ -7,6 +7,7 @@ use super::*;
 use crate::core::{embedded, register};
 
 mod format;
+mod reply;
 
 fn day(day: u32) -> NaiveDate {
     NaiveDate::from_ymd_opt(2026, 11, day).unwrap()
@@ -87,6 +88,10 @@ fn state(messages: Vec<Message>) -> State {
     }
 }
 
+fn note(text: &str) -> Option<String> {
+    Some(text.to_owned())
+}
+
 #[test]
 fn a_new_request_keeps_the_law_tables_deadline_and_the_letters_version() {
     for lever in Lever::ALL {
@@ -96,7 +101,10 @@ fn a_new_request_keeps_the_law_tables_deadline_and_the_letters_version() {
         assert_eq!(request.letter_version, letters::letter_version(lever));
         assert!(request.events.is_empty());
     }
-    assert_eq!(Request::new(Lever::S20rAccess).deadline, Deadline::Days(10));
+    assert_eq!(
+        Request::new(Lever::S20rAccess).deadline,
+        Deadline::DaysAfter(10)
+    );
 }
 
 #[test]
@@ -106,7 +114,7 @@ fn a_withdrawal_voids_the_latest_event_of_its_kind_still_in_effect() {
         until: day(until),
         note: None,
     };
-    let mut request = request(Lever::S20tCorrection, 1, Deadline::Days(30));
+    let mut request = request(Lever::S20tCorrection, 1, Deadline::DaysStarting(30));
     assert!(request.in_effect().is_empty());
     request.events = vec![
         answer(day(12), Status::Acknowledged),

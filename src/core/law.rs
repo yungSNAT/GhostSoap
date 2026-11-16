@@ -14,8 +14,9 @@ use serde::{Deserialize, Serialize};
 use crate::core::register::Lever;
 
 /// The legal texts the table cites, with the version read.
-pub const SOURCES: [&str; 4] = [
+pub const SOURCES: [&str; 5] = [
     "Privacy Act 1988 (Cth), compilation C2026C00227, in force from 4 June 2026",
+    "Acts Interpretation Act 1901 (Cth), compilation C2026C00117, in force from 28 March 2026, s 36 (counting periods)",
     "Spam Act 2003 (Cth), compilation C2016C00614",
     "Spam Regulations 2021 (Cth), F2021L00285",
     "OAIC, Australian Privacy Principles guidelines, chapters 7, 12 and 13, read 25 October 2026",
@@ -37,13 +38,20 @@ pub const STATUS: [&str; 7] = [
     "OAIC complaints: as at February 2026 the OAIC said it was unlikely to substantially progress a new complaint for some 6 to 12 months after lodgement, unless it finds exceptional circumstances, and it need not investigate every complaint. Where a recognised external dispute resolution scheme covers the business, such as the TIO or AFCA, generally try that scheme first, but the OAIC may decide not to investigate a complaint made more than 12 months after you became aware of the act or practice (s 41(1)(c)).",
 ];
 
-/// When the entity must act. A request keeps the kind it was drafted under (state format 2),
-/// so a change to how a kind is written is a change of format.
+/// When the entity must act. A request keeps the deadline it was drafted under (state format
+/// 2), whose kind must be the one its lever's law gives, so a change to a lever's kind, or to
+/// how a kind is written, is a change of format.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum Deadline {
-    /// A fixed number of days after the request is made.
-    Days(u16),
+    /// A fixed number of days that begins after the day the request is made, which that
+    /// day is not counted in (s 20R(3); Acts Interpretation Act 1901 s 36(1) item 6).
+    DaysAfter(u16),
+    /// A fixed number of days that starts on the day the request is made, which is counted
+    /// (ss 20T(2)(a), 21V(2)(a); Acts Interpretation Act 1901 s 36(1) item 2). Format 2 as
+    /// first merged wrote both fixed periods as `days`; reading the state renames each to
+    /// its lever's kind.
+    DaysStarting(u16),
     /// Business days in the place the message was sent to (Spam Act Sch 2 cl 6(2)).
     BusinessDays(u16),
     /// 'A reasonable period', with the OAIC's general guide in days where it gives one.
@@ -144,15 +152,15 @@ pub fn law(lever: Lever) -> Law {
         Lever::S20rAccess => Law {
             title: "Give me access to my credit reporting information",
             provision: "Privacy Act s 20R(1), (3)",
-            deadline: Deadline::Days(10),
+            deadline: Deadline::DaysAfter(10),
             deadline_text: "within a reasonable period, but not longer than 10 days, after the request is made (section 20R(3))",
             charge: "No charge may be made if no access request was made to the body in the previous 3 months (section 20R(5)); otherwise any charge must not be excessive and must not apply to making the request (section 20R(6)).",
         },
         Lever::S20tCorrection => Law {
             title: "Correct my credit information",
             provision: "Privacy Act s 20T(1), (2)",
-            deadline: Deadline::Days(30),
-            deadline_text: "within 30 days from the day the request is made, or a longer period I agree to in writing (section 20T(2))",
+            deadline: Deadline::DaysStarting(30),
+            deadline_text: "within the period of 30 days that starts on the day the request is made, or a longer period I agree to in writing (section 20T(2))",
             charge: "No charge may be made for the request or the correction (section 20T(5)).",
         },
         Lever::S20kBan => Law {
@@ -172,8 +180,8 @@ pub fn law(lever: Lever) -> Law {
         Lever::S21vCorrection => Law {
             title: "Correct my credit information",
             provision: "Privacy Act s 21V(1), (2)",
-            deadline: Deadline::Days(30),
-            deadline_text: "within 30 days from the day the request is made, or a longer period I agree to in writing (section 21V(2))",
+            deadline: Deadline::DaysStarting(30),
+            deadline_text: "within the period of 30 days that starts on the day the request is made, or a longer period I agree to in writing (section 21V(2))",
             charge: "No charge may be made for the request or the correction (section 21V(5)).",
         },
         Lever::SpamUnsubscribe => Law {

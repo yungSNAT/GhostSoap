@@ -365,8 +365,14 @@ mod tests {
     #[test]
     fn every_template_has_a_version() {
         for lever in Lever::ALL {
-            // Version 2 asks a destroy request beside an opt-out to keep what the opt-out needs.
-            let expected = if lever == Lever::App11Destroy { 2 } else { 1 };
+            // Version 2 asks a destroy request beside an opt-out to keep what the opt-out needs,
+            // and gives the credit corrections' period in the Act's words.
+            let revised = [
+                Lever::App11Destroy,
+                Lever::S20tCorrection,
+                Lever::S21vCorrection,
+            ];
+            let expected = if revised.contains(&lever) { 2 } else { 1 };
             assert_eq!(letter_version(lever), expected, "{}", lever.name());
         }
         assert!(takes_detail(Lever::App13) && takes_detail(Lever::S20kBan));

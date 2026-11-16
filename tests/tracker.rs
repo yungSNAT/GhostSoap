@@ -1,12 +1,14 @@
 // Copyright 2026 Ryan Duguid
 // SPDX-License-Identifier: FSL-1.1-ALv2
 
-//! The tracker end to end: what `draft` and `sent` record in the encrypted state.
+//! The tracker end to end: what `draft`, `sent` and `reply` record in the encrypted state.
 
 mod common;
-// Under tests/ itself it would be a test target of its own.
+// These live in tests/tracker/: under tests/ itself each would be a test target of its own.
 #[path = "tracker/redraft.rs"]
 mod redraft;
+#[path = "tracker/reply.rs"]
+mod reply;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -85,6 +87,22 @@ fn start_drafted() -> (tempfile::TempDir, PathBuf, PathBuf, String, PathBuf) {
         .unwrap();
     let [file] = emls(&drafts).try_into().unwrap();
     (tmp, home, drafts, tag, file)
+}
+
+/// A private drafts folder in `tmp` whose manifest name holds a folder, so writing a draft
+/// there fails; also that folder, which the caller removes to let the next write through.
+fn blocked_drafts(tmp: &Path) -> (PathBuf, PathBuf) {
+    let output = tmp.join("new-drafts");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        fs::DirBuilder::new().mode(0o700).create(&output).unwrap();
+    }
+    #[cfg(not(unix))]
+    fs::create_dir(&output).unwrap();
+    let blocked = output.join(".ghostsoap-drafts");
+    fs::create_dir(&blocked).unwrap();
+    (output, blocked)
 }
 
 #[test]

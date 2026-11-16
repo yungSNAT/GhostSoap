@@ -68,22 +68,6 @@ fn a_manifest_error_leaves_no_unconfirmed_replacement_and_allows_retry() {
     assert_eq!(emls(&output).len(), 1);
 }
 
-/// A private drafts folder in `tmp` whose manifest name holds a folder, so writing a draft
-/// there fails; also that folder, which the caller removes to let the next write through.
-fn blocked_drafts(tmp: &Path) -> (PathBuf, PathBuf) {
-    let output = tmp.join("new-drafts");
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::DirBuilderExt;
-        fs::DirBuilder::new().mode(0o700).create(&output).unwrap();
-    }
-    #[cfg(not(unix))]
-    fs::create_dir(&output).unwrap();
-    let blocked = output.join(".ghostsoap-drafts");
-    fs::create_dir(&blocked).unwrap();
-    (output, blocked)
-}
-
 #[test]
 fn sent_refuses_a_letter_whose_draft_run_did_not_finish() {
     let (tmp, home, drafts, tag, _file) = start_drafted();

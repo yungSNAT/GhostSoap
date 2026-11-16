@@ -2,8 +2,8 @@
 
 > A free, local-first command-line tool that prepares Australian Privacy Act requests to
 > data brokers for you to send from your own mailbox. It makes no network connections. It
-> records each letter and the day you sent it, and does not yet record replies or show
-> deadlines.
+> records each letter, the day you sent it and each answer, and lists what to do next
+> with each request's dates.
 
 Status: milestone M2 with M3a under way, version 0.1.0, with no GitHub release or published
 package. Build from source with `cargo build --release`; `rust-toolchain.toml` pins the
