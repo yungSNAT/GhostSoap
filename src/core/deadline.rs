@@ -239,6 +239,14 @@ mod tests {
         );
         message.requests[0]
             .events
+            .push(answer(day(11, 11), Status::Escalated));
+        assert_eq!(
+            due_of(&message, Lever::App13Statement),
+            Due::Guide(day(12, 10)),
+            "a complaint about the refusal leaves it in effect"
+        );
+        message.requests[0]
+            .events
             .push(answer(day(11, 12), Status::Fulfilled));
         assert_eq!(
             due_of(&message, Lever::App13Statement),
