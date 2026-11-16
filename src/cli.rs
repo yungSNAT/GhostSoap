@@ -618,12 +618,33 @@ fn publish_drafts<'a>(
     dir: &Path,
     drafted: Vec<Drafted<'a>>,
     output: Output,
-    mut redraft: io::drafts::Redraft,
+    redraft: io::drafts::Redraft,
     state: &mut State,
 ) -> Result<Vec<Drafted<'a>>, String> {
+    let hand = |letter: &Drafted| hand_over(dir, letter, output);
+    publish_with(drafted, redraft, output.copy, state, hand)
+}
+
+/// `publish_drafts` with the step that hands each letter over passed in, so a test can make
+/// one fail part-way through a run.
+fn publish_with<'a>(
+    drafted: Vec<Drafted<'a>>,
+    mut redraft: io::drafts::Redraft,
+    copy: bool,
+    state: &mut State,
+    mut hand: impl FnMut(&Drafted) -> Result<(), String>,
+) -> Result<Vec<Drafted<'a>>, String> {
     redraft.unlock();
-    for letter in &drafted {
-        hand_over(dir, letter, output)?;
+    for (at, letter) in drafted.iter().enumerate() {
+        // The letters written before a failure are plaintext on disk (R1946).
+        hand(letter).map_err(|e| match at {
+            0 => e,
+            _ if copy => e,
+            _ => format!(
+                "{e}\nThe letters written before it are plaintext drafts. Once you no longer \
+                 need them, run `ghostsoap clean`."
+            ),
+        })?;
     }
     redraft.discard();
     for message in &mut state.messages {
@@ -1542,6 +1563,94 @@ mod tests {
         };
         write_draft(&drafts, entry, "GS-56789", &email, true).unwrap();
         assert!(drafts.join("australia-post-au-GS-56789.eml").is_file());
+    }
+
+    const RUN: [(&str, &str); 3] = [
+        ("australia-post-au", "GS-ABCDE"),
+        ("cotality-au", "GS-FGHJK"),
+        ("equifax-marketing-au", "GS-MNPQR"),
+    ];
+
+    /// A state holding `RUN`'s letters as drafted and not yet handed over.
+    fn unfinished_run() -> State {
+        let mut state = State::new(Profile {
+            full_name: "Lara Croft".to_owned(),
+            ..Profile::default()
+        });
+        for (id, tag) in RUN {
+            state.messages.push(tracker::Message {
+                tag: tag.to_owned(),
+                entry: id.to_owned(),
+                channel: ChannelKind::Email,
+                address: "privacy@example.invalid".to_owned(),
+                drafted: NaiveDate::from_ymd_opt(2026, 11, 17).unwrap(),
+                draft: None,
+                superseded: false,
+                unfinished: true,
+                sends: Vec::new(),
+                requests: vec![tracker::Request::new(Lever::App7Source)],
+            });
+        }
+        state
+    }
+
+    /// Publish `RUN`'s letters with a handover that fails on the `fails`th (none for 0), and
+    /// return the result and the tags handed over.
+    fn publish_failing(
+        state: &mut State,
+        fails: usize,
+        copy: bool,
+    ) -> (Result<(), String>, Vec<String>) {
+        let register = built_in_register().unwrap();
+        let letters = RUN.map(|(id, tag)| Drafted {
+            entry: &register.entries[id],
+            tag: tag.to_owned(),
+            letter: Letter {
+                kind: ChannelKind::Email,
+                to: "privacy@example.invalid".to_owned(),
+                subject: format!("Test letter {tag}"),
+                body: "Test body".to_owned(),
+            },
+            missing: Vec::new(),
+            dropped: Vec::new(),
+            replaces: None,
+        });
+        let mut handed = Vec::new();
+        let redraft = io::drafts::Redraft::default();
+        let result = publish_with(letters.into(), redraft, copy, state, |letter| {
+            handed.push(letter.tag.clone());
+            if handed.len() == fails {
+                Err(format!("cannot write {}", letter.tag))
+            } else {
+                Ok(())
+            }
+        });
+        (result.map(|_| ()), handed)
+    }
+
+    /// A run of 3 letters whose third handover fails (R3520), as a full folder or a file in
+    /// the way would make it, says the letters written before it need `clean` (R1946).
+    #[test]
+    fn a_run_that_fails_part_way_keeps_its_letters_unfinished_and_asks_for_clean() {
+        let unfinished = |state: &State| state.messages.iter().filter(|m| m.unfinished).count();
+        let mut state = unfinished_run();
+        let (failed, handed) = publish_failing(&mut state, 3, false);
+        assert_eq!(handed, RUN.map(|(_, tag)| tag));
+        assert_eq!(
+            failed.unwrap_err(),
+            "cannot write GS-MNPQR\nThe letters written before it are plaintext drafts. Once \
+             you no longer need them, run `ghostsoap clean`."
+        );
+        assert_eq!(unfinished(&state), 3);
+        // Nothing written before the failure, or nothing written at all: no reminder.
+        let (failed, _) = publish_failing(&mut state, 1, false);
+        assert_eq!(failed.unwrap_err(), "cannot write GS-ABCDE");
+        let (failed, _) = publish_failing(&mut state, 2, true);
+        assert_eq!(failed.unwrap_err(), "cannot write GS-FGHJK");
+        assert_eq!(unfinished(&state), 3);
+        let (done, handed) = publish_failing(&mut state, 0, false);
+        assert_eq!((done, handed.len()), (Ok(()), 3));
+        assert_eq!(unfinished(&state), 0);
     }
 
     #[test]
