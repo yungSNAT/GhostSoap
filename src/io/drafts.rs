@@ -673,7 +673,13 @@ mod tests {
         assert!(drafts.join("notes-GS-ABCDE.txt").exists());
         assert!(!drafts.join(MANIFEST).exists());
         assert!(!drafts.join(LOCK).exists());
-        assert_eq!(clean(&drafts, true).unwrap(), Cleaned::default());
+        // A file named like a draft that GhostSoap has no record of is reported, never deleted.
+        let reported = Cleaned {
+            unrecorded: vec!["notes-GS-ABCDE.txt".to_owned()],
+            ..Cleaned::default()
+        };
+        assert_eq!(cleaned.unrecorded, reported.unrecorded);
+        assert_eq!(clean(&drafts, true).unwrap(), reported);
     }
 
     #[test]
