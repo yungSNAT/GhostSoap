@@ -113,6 +113,32 @@ pub enum Command {
         #[arg(long)]
         passphrase_stdin: bool,
     },
+    /// Write your profile and every letter's record to a new plaintext file, so they
+    /// survive a lost device. Keep it private and delete it when you no longer need it.
+    Export {
+        /// The file to write; it must not exist yet. Defaults to
+        /// `ghostsoap-export-<date>.toml` in GhostSoap's data folder.
+        #[arg(long)]
+        out: Option<PathBuf>,
+        /// Read the passphrase from standard input instead of the terminal (for scripts).
+        #[arg(long)]
+        passphrase_stdin: bool,
+    },
+    /// Delete your profile, the record of your letters, exports in the data folder and the
+    /// drafts GhostSoap wrote, after listing them and asking you to confirm.
+    Forget {
+        /// Skip the passphrase; drafts written to folders named with `draft --out` are then
+        /// not looked for.
+        #[arg(long)]
+        no_passphrase: bool,
+        /// Delete without asking (for scripts).
+        #[arg(long)]
+        yes: bool,
+        /// Read the passphrase and the confirmation from standard input instead of the
+        /// terminal (for scripts).
+        #[arg(long)]
+        passphrase_stdin: bool,
+    },
     /// Delete the drafts GhostSoap wrote; other files in the folder are left alone.
     Clean {
         /// Drafts folder; defaults to `drafts` in GhostSoap's data folder.
@@ -355,6 +381,15 @@ pub fn run(cli: Cli) -> ExitCode {
             Output { copy, mailto },
             passphrase_stdin,
         ),
+        Some(Command::Export {
+            out,
+            passphrase_stdin,
+        }) => export(out, passphrase_stdin),
+        Some(Command::Forget {
+            no_passphrase,
+            yes,
+            passphrase_stdin,
+        }) => forget(no_passphrase, yes, passphrase_stdin),
         Some(Command::Clean { out }) => clean(out),
         Some(Command::Sent(args)) => sent(&args),
         Some(Command::Reply(args)) => reply(&args),
@@ -1366,10 +1401,149 @@ fn deadline_summary(deadline: Deadline) -> String {
     }
 }
 
+fn export(out: Option<PathBuf>, passphrase_stdin: bool) -> Result<(), String> {
+    let dir = state::data_dir().map_err(|e| e.to_string())?;
+    let date = today().to_string();
+    let path = out.unwrap_or_else(|| dir.join(format!("ghostsoap-export-{date}.toml")));
+    let passphrase = Input::new(passphrase_stdin)
+        .passphrase("Passphrase: ")
+        .map_err(|e| e.to_string())?;
+    state::export(&dir, passphrase, &path, &date).map_err(|e| e.to_string())?;
+    println!("Exported your profile and records to {}.", path.display());
+    let folder = path.parent().unwrap_or(Path::new("."));
+    warn_exposed(folder, ("the export's folder", "the plaintext export"));
+    eprintln!(
+        "warning: {} is plaintext: anyone who can open it can read your profile and every \
+         letter's record. Keep it private, and delete it when you no longer need it.",
+        path.display()
+    );
+    Ok(())
+}
+
 fn clean(out: Option<PathBuf>) -> Result<(), String> {
     let own_folder = out.is_none();
     let dir = drafts_dir(out.as_deref())?;
     let cleaned = io::drafts::clean(&dir, own_folder).map_err(|e| e.to_string())?;
+    report_cleaned(&dir, &cleaned);
+    Ok(())
+}
+
+/// Delete the state, exports in the data folder and the drafts GhostSoap wrote, once the
+/// user confirms the list. A path that cannot be deleted is reported and the rest go on.
+fn forget(no_passphrase: bool, yes: bool, passphrase_stdin: bool) -> Result<(), String> {
+    let dir = state::data_dir().map_err(|e| e.to_string())?;
+    let mut input = Input::new(passphrase_stdin);
+    let files = state::own_files(&dir).map_err(|e| e.to_string())?;
+    let mut folders = draft_folders(&dir, no_passphrase, &mut input)?;
+    folders.retain(|folder| folder.exists());
+    if files.is_empty() && folders.is_empty() {
+        println!("GhostSoap has nothing to delete in {}.", dir.display());
+        return Ok(());
+    }
+    let lock = state::lock(&dir).map_err(|e| e.to_string())?;
+    list_forgotten(&files, &folders, no_passphrase);
+    if !yes
+        && input
+            .line("Type forget to delete them: ")
+            .map_err(|e| e.to_string())?
+            != "forget"
+    {
+        return Err("nothing was deleted".to_owned());
+    }
+    let own = io::drafts::default_dir(&dir);
+    let mut failed = 0;
+    for file in &files {
+        let deleted = std::fs::remove_file(file).map(|()| println!("Deleted {}.", file.display()));
+        tally(file, deleted, &mut failed);
+    }
+    for folder in &folders {
+        let cleaned = refuse_link(folder).and_then(|()| io::drafts::clean(folder, *folder == own));
+        tally(
+            folder,
+            cleaned.map(|c| report_cleaned(folder, &c)),
+            &mut failed,
+        );
+    }
+    drop(lock);
+    // The data folder goes too unless it holds files GhostSoap did not write.
+    let _ = std::fs::remove_dir(&dir);
+    match failed {
+        0 => Ok(()),
+        n => Err(format!("{n} could not be deleted; see the errors above")),
+    }
+}
+
+/// Show what `forget` will delete, and what it cannot look for.
+fn list_forgotten(files: &[PathBuf], folders: &[PathBuf], no_passphrase: bool) {
+    println!("GhostSoap will delete:");
+    for file in files {
+        println!("    {}", file.display());
+    }
+    for folder in folders {
+        println!(
+            "    the drafts it wrote in {} that still hold what it wrote; other files stay",
+            io::exposure::display(folder)
+        );
+    }
+    if no_passphrase {
+        println!("Without the passphrase, folders named with `draft --out` are not looked in.");
+    }
+    println!(
+        "GhostSoap keeps nothing in the system keyring. Deleting does not erase: the disk may \
+         still hold what was deleted."
+    );
+}
+
+/// GhostSoap's own drafts folder, then each other folder the state records a draft in.
+fn draft_folders(
+    dir: &Path,
+    no_passphrase: bool,
+    input: &mut Input,
+) -> Result<Vec<PathBuf>, String> {
+    let own = io::drafts::default_dir(dir);
+    let mut seen = vec![io::exposure::resolve(&own)];
+    let mut folders = vec![own];
+    if no_passphrase || !state::state_path(dir).exists() {
+        return Ok(folders);
+    }
+    let passphrase = input
+        .passphrase("Passphrase: ")
+        .map_err(|e| e.to_string())?;
+    let state = state::load(dir, passphrase).map_err(|e| e.to_string())?;
+    for draft in state.messages.iter().filter_map(|m| m.draft.as_ref()) {
+        // A folder reached 2 ways, such as the drafts folder recorded with links resolved,
+        // is cleaned once.
+        let folder = PathBuf::from(&draft.folder);
+        let real = io::exposure::resolve(&folder);
+        if !seen.contains(&real) {
+            seen.push(real);
+            folders.push(folder);
+        }
+    }
+    Ok(folders)
+}
+
+/// A folder `forget` cleans must still be a folder: one replaced by a link (or, on Windows, a
+/// junction) since the state recorded it may lead anywhere, so it is left alone.
+fn refuse_link(folder: &Path) -> std::io::Result<()> {
+    if std::fs::symlink_metadata(folder)?.file_type().is_symlink() {
+        return Err(std::io::Error::other(
+            "it is now a link, so GhostSoap leaves it alone",
+        ));
+    }
+    Ok(())
+}
+
+/// Report a path `forget` could not delete, and count it.
+fn tally(path: &Path, result: std::io::Result<()>, failed: &mut usize) {
+    if let Err(e) = result {
+        *failed += 1;
+        eprintln!("error: cannot delete {}: {e}", path.display());
+    }
+}
+
+/// Print what `clean` did in `dir`.
+fn report_cleaned(dir: &Path, cleaned: &io::drafts::Cleaned) {
     println!("Deleted {} drafts from {}.", cleaned.deleted, dir.display());
     for name in &cleaned.kept {
         println!("kept    {name}: it no longer holds the letter GhostSoap wrote");
@@ -1383,7 +1557,6 @@ fn clean(out: Option<PathBuf>) -> Result<(), String> {
     for name in &cleaned.unrecorded {
         println!("check   {name}: GhostSoap has no record of writing it; delete it if unwanted");
     }
-    Ok(())
 }
 
 /// The folder `--out` names, else the default drafts folder in the data directory.

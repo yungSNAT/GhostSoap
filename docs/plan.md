@@ -222,7 +222,7 @@ ghostsoap export | forget            (M3a)
 
 ## 6a. Threat model and abuse
 
-The threat model is kept in [SECURITY.md](../SECURITY.md#threat-model), which states what GhostSoap does today (moved there on 8 November 2026). Planned responses not yet built: `ghostsoap export`, so a profile survives a lost device, and a passphrase cache in the system keyring, off by default.
+The threat model is kept in [SECURITY.md](../SECURITY.md#threat-model), which states what GhostSoap does today (moved there on 8 November 2026). `ghostsoap export`, so a profile survives a lost device, and `ghostsoap forget` were built on 17 November 2026. Planned and not yet built: a passphrase cache in the system keyring, off by default.
 
 ## 7. Hygiene checklist
 

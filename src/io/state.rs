@@ -8,7 +8,7 @@
 
 use std::env;
 use std::fs::{self, OpenOptions};
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
@@ -24,6 +24,8 @@ pub use crate::core::tracker::State;
 
 const STATE_FILE: &str = "state.age";
 const LOCK_FILE: &str = "state.lock";
+/// How an export begins, before its date.
+const EXPORT_HEADER: &str = "# GhostSoap export of ";
 /// The highest scrypt work factor (2^22) a state file may ask for: the reference age
 /// implementation's default, about 15 seconds and 4 GiB on a modern machine.
 const MAX_WORK_FACTOR: u8 = 22;
@@ -188,6 +190,97 @@ pub fn create(dir: &Path, state: &State, passphrase: SecretString) -> io::Result
         ));
     }
     write_atomic(dir, &bytes, || {})
+}
+
+/// The state as `export` writes it: the text the state file encrypts, after a comment line
+/// dated `date` saying it is plaintext. `decode` reads it back as the same state.
+fn export_text(state: &State, date: &str) -> io::Result<String> {
+    Ok(format!(
+        "{EXPORT_HEADER}{date}. This file is plaintext: it holds your profile and every \
+         letter's record. Keep it private and delete it when you no longer need it.\n{}",
+        encode(state)?
+    ))
+}
+
+/// Write the state, read with `passphrase`, to a new file at `path` as plaintext (mode 600
+/// on Unix). A file or link already at `path` is refused, never replaced.
+pub fn export(dir: &Path, passphrase: SecretString, path: &Path, date: &str) -> io::Result<()> {
+    let text = export_text(&load(dir, passphrase)?, date)?;
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+    let mut file = options.open(path).map_err(|e| match e.kind() {
+        io::ErrorKind::AlreadyExists => io::Error::new(
+            e.kind(),
+            format!("{} already exists; nothing was exported", path.display()),
+        ),
+        _ => e,
+    })?;
+    let written = file
+        .write_all(text.as_bytes())
+        .and_then(|()| file.sync_all());
+    drop(file);
+    written.map_err(|e| discard(path, &e))
+}
+
+/// The error for an export whose write failed, after deleting the plaintext it left, so
+/// none is left unreported.
+fn discard(path: &Path, error: &io::Error) -> io::Error {
+    let left = match fs::remove_file(path) {
+        Ok(()) => "was deleted".to_owned(),
+        Err(e) => format!("could not be deleted ({e}); it is plaintext, so delete it yourself"),
+    };
+    let export = path.display();
+    io::Error::new(
+        error.kind(),
+        format!("{error}; the part-written export at {export} {left}"),
+    )
+}
+
+/// Whether `path` is an export GhostSoap wrote under its default name: a regular file (never
+/// a link, pipe or folder), dated, and starting with the line `export` writes. Only that
+/// line's first bytes are read.
+fn is_export(path: &Path) -> bool {
+    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    let dated = name
+        .strip_prefix("ghostsoap-export-")
+        .and_then(|rest| rest.strip_suffix(".toml"))
+        .is_some_and(|date| chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").is_ok());
+    if !dated || !fs::symlink_metadata(path).is_ok_and(|meta| meta.is_file()) {
+        return false;
+    }
+    let mut start = Vec::new();
+    let header = EXPORT_HEADER.as_bytes();
+    fs::File::open(path)
+        .and_then(|file| file.take(header.len() as u64).read_to_end(&mut start))
+        .is_ok_and(|_| start == header)
+}
+
+/// The files in the data folder `forget` deletes: the state file, a temporary file an
+/// interrupted write left, and exports written under their default name. A folder that does
+/// not exist holds none.
+pub fn own_files(dir: &Path) -> io::Result<Vec<PathBuf>> {
+    let items = match fs::read_dir(dir) {
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        items => items?,
+    };
+    let state = state_path(dir);
+    let tmp = state.with_extension("age.tmp");
+    let mut files = Vec::new();
+    for item in items {
+        let path = item?.path();
+        if path == state || path == tmp || is_export(&path) {
+            files.push(path);
+        }
+    }
+    files.sort();
+    Ok(files)
+}
+
+/// Take the state's lock, so no other GhostSoap writes the state whilst it is held.
+pub(crate) fn lock(dir: &Path) -> io::Result<Lock> {
+    Lock::acquire(dir, LOCK_FILE)
 }
 
 /// Read and decrypt the state file. Nothing is written: a format 1 file stays as it is.
@@ -469,6 +562,74 @@ mod tests {
         recipient.set_work_factor(10);
         let bytes = age::encrypt(&recipient, text.as_bytes()).unwrap();
         fs::write(state_path(dir), bytes).unwrap();
+    }
+
+    /// Only a regular file is an export, and only its first bytes are read, so a pipe or a
+    /// link named like one never blocks `forget` and a large file is not read whole.
+    #[test]
+    fn only_a_regular_file_with_the_header_is_an_export() {
+        let tmp = tempfile::tempdir().unwrap();
+        let named = |n: &str| {
+            tmp.path()
+                .join(format!("ghostsoap-export-2026-11-{n}.toml"))
+        };
+        let export = named("17");
+        fs::write(&export, format!("{EXPORT_HEADER}2026-11-17. x")).unwrap();
+        assert!(is_export(&export));
+        let large = named("18");
+        let mut text = EXPORT_HEADER.to_owned();
+        text.push_str(&"x".repeat(1 << 20));
+        fs::write(&large, text).unwrap();
+        assert!(is_export(&large));
+        let folder = named("19");
+        fs::create_dir(&folder).unwrap();
+        assert!(!is_export(&folder));
+        #[cfg(unix)]
+        {
+            let link = named("20");
+            std::os::unix::fs::symlink(&export, &link).unwrap();
+            assert!(!is_export(&link), "a link is not followed");
+            let fifo = named("21");
+            let made = std::process::Command::new("mkfifo").arg(&fifo).status();
+            assert!(made.unwrap().success());
+            assert!(!is_export(&fifo), "a pipe is never opened");
+        }
+    }
+
+    #[test]
+    fn a_failed_export_deletes_its_plaintext_or_says_where_it_is() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("ghostsoap-export-2026-11-17.toml");
+        fs::write(&path, "# GhostSoap export of 2026-11-17. part").unwrap();
+        let error = discard(&path, &io::Error::other("disk full"));
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "disk full; the part-written export at {} was deleted",
+                path.display()
+            )
+        );
+        assert!(!path.exists());
+        // A folder cannot be deleted as a file, so the message says to delete it.
+        let error = discard(tmp.path(), &io::Error::other("disk full")).to_string();
+        assert!(
+            error.contains("it is plaintext, so delete it yourself"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn an_export_reads_back_as_the_state_it_was_made_from() {
+        let mut state = State::new(profile());
+        let mut letter = message("GS-7K3QX");
+        letter.requests = vec![
+            Request::new(Lever::S20rAccess),
+            Request::new(Lever::App7Source),
+        ];
+        state.messages.push(letter);
+        let text = export_text(&state, "2026-11-17").unwrap();
+        assert!(text.starts_with("# GhostSoap export of 2026-11-17. This file is plaintext"));
+        assert_eq!(decode(&text).unwrap(), state);
     }
 
     /// Format 2 as first merged (main at fffb4d1) wrote both fixed periods as `days`.
