@@ -235,6 +235,31 @@ fn every_status_and_reason_keeps_its_name_in_the_file() {
     }
 }
 
+/// Where a complaint went is kept by name; an `escalated` without one, as recorded before
+/// the field existed, still reads.
+#[test]
+fn a_complaint_keeps_where_it_went() {
+    let targets = [
+        (Target::Business, "business"),
+        (Target::Afca, "afca"),
+        (Target::Tio, "tio"),
+        (Target::Acma, "acma"),
+        (Target::Oaic, "oaic"),
+    ];
+    for (value, name) in targets {
+        let event = StatusEvent {
+            to: Some(value),
+            ..status(day(13), Status::Escalated)
+        };
+        let text = toml::to_string(&event).unwrap();
+        assert!(text.ends_with(&format!("to = \"{name}\"\n")), "{text}");
+        assert_eq!(toml::from_str::<StatusEvent>(&text).unwrap(), event);
+    }
+    let legacy = "on = \"2026-11-13\"\nstatus = \"escalated\"\n";
+    let event = toml::from_str::<StatusEvent>(legacy).unwrap();
+    assert_eq!(event, status(day(13), Status::Escalated));
+}
+
 #[test]
 fn a_file_with_a_field_or_name_this_version_does_not_know_is_refused() {
     assert!(toml::from_str::<State>(FORMAT_2).is_ok());

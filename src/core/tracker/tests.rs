@@ -49,6 +49,7 @@ fn status(on: NaiveDate, status: Status) -> StatusEvent {
         on,
         status,
         reason: None,
+        to: None,
         source: None,
         note: None,
     }
@@ -373,6 +374,14 @@ fn reasoned(to: Status) -> Event {
     })
 }
 
+/// A status that names where a complaint went.
+fn complained(answer: Status) -> Event {
+    Event::Status(StatusEvent {
+        to: Some(Target::Oaic),
+        ..status(day(12), answer)
+    })
+}
+
 #[test]
 fn problems_names_records_that_contradict_each_other() {
     let mut early = message("GS-7K3QX");
@@ -393,6 +402,10 @@ fn problems_names_records_that_contradict_each_other() {
         (
             with(vec![reasoned(Status::Fulfilled)]),
             "gives a reason for an answer that is not a refusal",
+        ),
+        (
+            with(vec![complained(Status::Acknowledged)]),
+            "names where a complaint went on a status that is not escalated",
         ),
         (
             with(vec![extension(14, 13)]),

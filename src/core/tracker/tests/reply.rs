@@ -9,6 +9,14 @@ use crate::core::deadline::Due;
 const BOTH: &[Lever] = &[];
 const SOURCE: &[Lever] = &[Lever::App7Source];
 
+/// A complaint to the business on `on`.
+fn complaint(on: NaiveDate) -> StatusEvent {
+    StatusEvent {
+        to: Some(Target::Business),
+        ..status(on, Status::Escalated)
+    }
+}
+
 fn statuses(message: &Message) -> Vec<Vec<Status>> {
     let request = |r: &Request| r.in_effect().statuses.iter().map(|s| s.status).collect();
     message.requests.iter().map(request).collect()
@@ -132,7 +140,7 @@ fn a_reply_must_follow_what_is_already_recorded() {
     let marketing = &[Lever::App7NoMarketing];
     let bounced = status(day(12), Status::Bounced);
     sent.record_status(marketing, bounced, today).unwrap();
-    let next = sent.record_status(marketing, status(day(13), Status::Escalated), today);
+    let next = sent.record_status(marketing, complaint(day(13)), today);
     assert!(
         next.unwrap_err().ends_with(
             "bounced, so it can only be given up (abandoned); draft it again to send it"
@@ -156,14 +164,18 @@ fn a_closed_or_abandoned_request_takes_no_new_status() {
         .unwrap();
     let before = sent.clone();
     let refused = [
-        (SOURCE, "closed", Status::Acknowledged),
-        (SOURCE, "closed", Status::Escalated),
-        (marketing, "abandoned", Status::Acknowledged),
-        (marketing, "abandoned", Status::Relisted),
+        (SOURCE, "closed", status(day(14), Status::Acknowledged)),
+        (SOURCE, "closed", complaint(day(14))),
+        (
+            marketing,
+            "abandoned",
+            status(day(14), Status::Acknowledged),
+        ),
+        (marketing, "abandoned", status(day(14), Status::Relisted)),
     ];
-    for (levers, finished, to) in refused {
+    for (levers, finished, event) in refused {
         let lever = levers[0].name();
-        let error = sent.record_status(levers, status(day(14), to), today);
+        let error = sent.record_status(levers, event, today);
         assert_eq!(
             error.unwrap_err(),
             format!(

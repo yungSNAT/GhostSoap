@@ -237,6 +237,10 @@ pub struct ReplyArgs {
     /// outside-jurisdiction, insufficient-verification or other.
     #[arg(long, value_parser = parse_reason, requires = "status")]
     reason: Option<tracker::Reason>,
+    /// Where you complained, with `escalated`: business, afca, tio, acma or oaic. --on gives
+    /// the day you complained.
+    #[arg(long, value_parser = parse_target, requires = "status")]
+    to: Option<tracker::Target>,
     /// A source of your information the answer names, in your own words (APP 7.6(e)).
     #[arg(long, requires = "status")]
     source: Option<String>,
@@ -315,6 +319,10 @@ fn parse_reason(name: &str) -> Result<tracker::Reason, String> {
         name,
         "not-direct-marketing, small-business, outside-jurisdiction, insufficient-verification or other",
     )
+}
+
+fn parse_target(name: &str) -> Result<tracker::Target, String> {
+    parse_named(name, "business, afca, tio, acma or oaic")
 }
 
 fn parse_withdrawn(name: &str) -> Result<tracker::Withdrawn, String> {
@@ -969,6 +977,7 @@ fn reply(args: &ReplyArgs) -> Result<(), String> {
                     on,
                     status,
                     reason: args.reason,
+                    to: args.to,
                     source: args.source.clone(),
                     note,
                 };
@@ -978,7 +987,11 @@ fn reply(args: &ReplyArgs) -> Result<(), String> {
                 } else {
                     String::new()
                 };
-                format!("{} {} on {on}{report}", recorded(new), named(status))
+                let to = args
+                    .to
+                    .map(|t| format!(" to {}", named(t)))
+                    .unwrap_or_default();
+                format!("{} {}{to} on {on}{report}", recorded(new), named(status))
             };
             Ok(format!(
                 "reply   {}  {}  {done}",

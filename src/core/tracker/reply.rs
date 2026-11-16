@@ -62,12 +62,7 @@ impl Message {
             }
             _ => {}
         }
-        if event.reason.is_some() && !is_refusal(event.status) {
-            return Err(
-                "a reason goes only with refused, refused-with-reasons or exempt-claimed"
-                    .to_owned(),
-            );
-        }
+        fits(&event)?;
         let targets = self.targets(levers)?;
         if event.source.is_some() && targets.len() != 1 {
             return Err(format!(
@@ -282,4 +277,24 @@ impl Request {
             _ => Action::Needed,
         }
     }
+}
+
+/// Whether the fields `event` carries go with its status: a reason only with a refusal, and
+/// where a complaint went with `escalated`, which needs it.
+fn fits(event: &StatusEvent) -> Result<(), String> {
+    if event.reason.is_some() && !is_refusal(event.status) {
+        return Err(
+            "a reason goes only with refused, refused-with-reasons or exempt-claimed".to_owned(),
+        );
+    }
+    match (event.status, event.to) {
+        (Status::Escalated, None) => {
+            return Err(
+                "say where you complained with --to business, afca, tio, acma or oaic".to_owned(),
+            );
+        }
+        (Status::Escalated, Some(_)) | (_, None) => {}
+        (_, Some(_)) => return Err("--to goes only with escalated".to_owned()),
+    }
+    Ok(())
 }

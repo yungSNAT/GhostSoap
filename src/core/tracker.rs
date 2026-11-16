@@ -131,6 +131,10 @@ pub struct StatusEvent {
     /// The ground the entity gave, where it is one of the listed ones; only with a refusal
     /// or a claim that the law does not apply.
     pub reason: Option<Reason>,
+    /// Where the user complained; only with `escalated`, which `reply` records with one. An
+    /// `escalated` recorded before this field existed has none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<Target>,
     /// An upstream source the answer names (APP 7.6(e)), in the user's words.
     pub source: Option<String>,
     pub note: Option<String>,
@@ -220,6 +224,23 @@ pub enum Reason {
     InsufficientVerification,
     /// Any other ground; the note says what.
     Other,
+}
+
+/// Where the user complained, from a fixed list in code, never from the register (plan
+/// section 12, decision 10).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Target {
+    /// The business itself, which the OAIC generally needs first (Privacy Act s 40(1A)).
+    Business,
+    /// The Australian Financial Complaints Authority.
+    Afca,
+    /// The Telecommunications Industry Ombudsman.
+    Tio,
+    /// The Australian Communications and Media Authority (Spam Act, Do Not Call Register).
+    Acma,
+    /// The Office of the Australian Information Commissioner.
+    Oaic,
 }
 
 /// A request's events that still count, oldest first.
@@ -435,6 +456,10 @@ impl Request {
                     }
                     if status.reason.is_some() && !is_refusal(status.status) {
                         problems.push("gives a reason for an answer that is not a refusal");
+                    }
+                    if status.to.is_some() && status.status != Status::Escalated {
+                        problems
+                            .push("names where a complaint went on a status that is not escalated");
                     }
                 }
                 Event::Extension(extension) if extension.until < extension.on => {
