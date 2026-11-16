@@ -429,6 +429,26 @@ mod tests {
         fs::write(state_path(dir), bytes).unwrap();
     }
 
+    /// Format 2 as first merged (main at fffb4d1) wrote both fixed periods as `days`.
+    #[test]
+    fn a_fixed_period_written_as_days_reads_as_the_kind_its_lever_has() {
+        let mut state = State::new(profile());
+        let mut letter = message("GS-7K3QX");
+        letter.requests = vec![
+            Request::new(Lever::S20rAccess),
+            Request::new(Lever::S20tCorrection),
+        ];
+        state.messages.push(letter);
+        let text = toml::to_string(&state).unwrap();
+        let first = text.replacen("days-after = 10", "days = 10", 1).replacen(
+            "days-starting = 30",
+            "days = 30",
+            1,
+        );
+        assert_eq!(first.matches("\ndays = ").count(), 2, "{first}");
+        assert_eq!(decode(&first).unwrap(), state);
+    }
+
     #[test]
     fn a_saved_state_asks_for_no_more_work_than_reading_accepts() {
         let bytes = encrypt(&State::new(profile()), secret("pass phrase")).unwrap();
