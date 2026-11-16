@@ -1434,7 +1434,7 @@ fn forget(no_passphrase: bool, yes: bool, passphrase_stdin: bool) -> Result<(), 
         tally(file, deleted, &mut failed);
     }
     for folder in &folders {
-        let cleaned = io::drafts::clean(folder, *folder == own);
+        let cleaned = refuse_link(folder).and_then(|()| io::drafts::clean(folder, *folder == own));
         tally(
             folder,
             cleaned.map(|c| report_cleaned(folder, &c)),
@@ -1477,7 +1477,9 @@ fn draft_folders(
     no_passphrase: bool,
     input: &mut Input,
 ) -> Result<Vec<PathBuf>, String> {
-    let mut folders = vec![io::drafts::default_dir(dir)];
+    let own = io::drafts::default_dir(dir);
+    let mut seen = vec![io::exposure::resolve(&own)];
+    let mut folders = vec![own];
     if no_passphrase || !state::state_path(dir).exists() {
         return Ok(folders);
     }
@@ -1490,11 +1492,23 @@ fn draft_folders(
         // is cleaned once.
         let folder = PathBuf::from(&draft.folder);
         let real = io::exposure::resolve(&folder);
-        if !folders.iter().any(|f| io::exposure::resolve(f) == real) {
+        if !seen.contains(&real) {
+            seen.push(real);
             folders.push(folder);
         }
     }
     Ok(folders)
+}
+
+/// A folder `forget` cleans must still be a folder: one replaced by a link (or, on Windows, a
+/// junction) since the state recorded it may lead anywhere, so it is left alone.
+fn refuse_link(folder: &Path) -> std::io::Result<()> {
+    if std::fs::symlink_metadata(folder)?.file_type().is_symlink() {
+        return Err(std::io::Error::other(
+            "it is now a link, so GhostSoap leaves it alone",
+        ));
+    }
+    Ok(())
 }
 
 /// Report a path `forget` could not delete, and count it.

@@ -24,6 +24,8 @@ pub use crate::core::tracker::State;
 
 const STATE_FILE: &str = "state.age";
 const LOCK_FILE: &str = "state.lock";
+/// How an export begins, before its date.
+const EXPORT_HEADER: &str = "# GhostSoap export of ";
 /// The highest scrypt work factor (2^22) a state file may ask for: the reference age
 /// implementation's default, about 15 seconds and 4 GiB on a modern machine.
 const MAX_WORK_FACTOR: u8 = 22;
@@ -194,7 +196,7 @@ pub fn create(dir: &Path, state: &State, passphrase: SecretString) -> io::Result
 /// dated `date` saying it is plaintext. `decode` reads it back as the same state.
 fn export_text(state: &State, date: &str) -> io::Result<String> {
     Ok(format!(
-        "# GhostSoap export of {date}. This file is plaintext: it holds your profile and every \
+        "{EXPORT_HEADER}{date}. This file is plaintext: it holds your profile and every \
          letter's record. Keep it private and delete it when you no longer need it.\n{}",
         encode(state)?
     ))
@@ -215,8 +217,36 @@ pub fn export(dir: &Path, passphrase: SecretString, path: &Path, date: &str) -> 
         ),
         _ => e,
     })?;
-    file.write_all(text.as_bytes())?;
-    file.sync_all()
+    let written = file
+        .write_all(text.as_bytes())
+        .and_then(|()| file.sync_all());
+    drop(file);
+    written.map_err(|e| discard(path, &e))
+}
+
+/// The error for an export whose write failed, after deleting the plaintext it left, so
+/// none is left unreported.
+fn discard(path: &Path, error: &io::Error) -> io::Error {
+    let left = match fs::remove_file(path) {
+        Ok(()) => "was deleted".to_owned(),
+        Err(e) => format!("could not be deleted ({e}); it is plaintext, so delete it yourself"),
+    };
+    let export = path.display();
+    io::Error::new(
+        error.kind(),
+        format!("{error}; the part-written export at {export} {left}"),
+    )
+}
+
+/// Whether `path` is an export GhostSoap wrote under its default name: dated, and starting
+/// with the line `export` writes.
+fn is_export(path: &Path) -> bool {
+    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    let dated = name
+        .strip_prefix("ghostsoap-export-")
+        .and_then(|rest| rest.strip_suffix(".toml"))
+        .is_some_and(|date| chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").is_ok());
+    dated && fs::read_to_string(path).is_ok_and(|text| text.starts_with(EXPORT_HEADER))
 }
 
 /// The files in the data folder `forget` deletes: the state file, a temporary file an
@@ -232,9 +262,7 @@ pub fn own_files(dir: &Path) -> io::Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     for item in items {
         let path = item?.path();
-        let name = path.file_name().unwrap_or_default().to_string_lossy();
-        let export = name.starts_with("ghostsoap-export-") && name.ends_with(".toml");
-        if export || path == state || path == tmp {
+        if path == state || path == tmp || is_export(&path) {
             files.push(path);
         }
     }
@@ -526,6 +554,28 @@ mod tests {
         recipient.set_work_factor(10);
         let bytes = age::encrypt(&recipient, text.as_bytes()).unwrap();
         fs::write(state_path(dir), bytes).unwrap();
+    }
+
+    #[test]
+    fn a_failed_export_deletes_its_plaintext_or_says_where_it_is() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("ghostsoap-export-2026-11-17.toml");
+        fs::write(&path, "# GhostSoap export of 2026-11-17. part").unwrap();
+        let error = discard(&path, &io::Error::other("disk full"));
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "disk full; the part-written export at {} was deleted",
+                path.display()
+            )
+        );
+        assert!(!path.exists());
+        // A folder cannot be deleted as a file, so the message says to delete it.
+        let error = discard(tmp.path(), &io::Error::other("disk full")).to_string();
+        assert!(
+            error.contains("it is plaintext, so delete it yourself"),
+            "{error}"
+        );
     }
 
     #[test]
