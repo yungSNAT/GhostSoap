@@ -1,0 +1,2 @@
+# A state file is ciphertext, so its bytes are never converted as line endings.
+*.age binary

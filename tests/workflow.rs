@@ -3,62 +3,14 @@
 
 //! The M2 commands end to end: init, plan, draft, clean and law.
 
+mod common;
+
 use std::fs;
 use std::io::Write;
 use std::path::Path;
-use std::process::{Command, Output, Stdio};
+use std::process::Output;
 
-const PASSPHRASE: &str = "present day, present time";
-
-/// Run ghostsoap with `GHOSTSOAP_HOME` set to `home` and `input` on standard input.
-fn ghostsoap(home: &Path, args: &[&str], input: &str) -> Output {
-    ghostsoap_with(home, args, input, &[])
-}
-
-/// As `ghostsoap`, with the environment variables `vars` also set for the child only.
-fn ghostsoap_with(home: &Path, args: &[&str], input: &str, vars: &[(&str, &Path)]) -> Output {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_ghostsoap"))
-        .args(args)
-        .env("GHOSTSOAP_HOME", home)
-        .envs(vars.iter().copied())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("run ghostsoap");
-    // A command that reads no input can exit before the write, closing the pipe; its output
-    // and exit status are what the tests check, so a broken pipe here is not a failure.
-    if let Err(e) = child.stdin.take().unwrap().write_all(input.as_bytes()) {
-        assert_eq!(
-            e.kind(),
-            std::io::ErrorKind::BrokenPipe,
-            "write to ghostsoap: {e}"
-        );
-    }
-    child.wait_with_output().unwrap()
-}
-
-fn text(bytes: &[u8]) -> String {
-    String::from_utf8_lossy(bytes).into_owned()
-}
-
-/// Answers to `init`: name, other names, email, phone, date of birth, address, previous
-/// addresses, postcode, then the passphrase twice.
-fn init_answers(passphrase: &str) -> String {
-    format!(
-        "Lara Croft\n\nlara@croft-manor.example\n0400 000 001\n1968-02-14\n\
-         1 Croft Manor Lane, Surrey Hills VIC 3127\n\n3127\n{passphrase}\n{passphrase}\n"
-    )
-}
-
-fn init(home: &Path) {
-    let out = ghostsoap(
-        home,
-        &["init", "--passphrase-stdin"],
-        &init_answers(PASSPHRASE),
-    );
-    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
-}
+use common::{PASSPHRASE, emls, ghostsoap, ghostsoap_with, init, init_answers, text};
 
 #[test]
 fn init_draft_and_clean() {
@@ -76,7 +28,9 @@ fn init_draft_and_clean() {
         &init_answers(PASSPHRASE),
     );
     assert_eq!(again.status.code(), Some(1));
-    assert!(text(&again.stderr).contains("a profile already exists"));
+    let refusal = text(&again.stderr);
+    assert!(refusal.contains("a profile already exists"));
+    assert!(refusal.contains("also deletes the record of your letters"));
 
     let args = [
         "draft",
@@ -112,15 +66,6 @@ fn init_draft_and_clean() {
     assert!(text(&out.stdout).contains("Deleted 1 drafts"));
     assert!(drafts.exists(), "a folder named with --out stays");
     assert_eq!(fs::read_dir(&drafts).unwrap().count(), 0);
-}
-
-/// The `.eml` drafts in `dir`.
-fn emls(dir: &Path) -> Vec<std::path::PathBuf> {
-    fs::read_dir(dir)
-        .unwrap()
-        .map(|f| f.unwrap().path())
-        .filter(|p| p.extension().is_some_and(|e| e == "eml"))
-        .collect()
 }
 
 /// Draft one letter to `out` with the environment variables `vars`; `extra` adds flags.
@@ -226,7 +171,11 @@ fn drafts_default_to_the_data_folder() {
         text(&out.stdout).contains("too long for a mailto: link"),
         "a 3-request letter is too long for a link"
     );
-    assert_eq!(emls(&home.join("drafts")).len(), 2);
+    assert_eq!(
+        emls(&home.join("drafts")).len(),
+        1,
+        "the second draft replaces the first, which was never recorded as sent"
+    );
     let out = ghostsoap(&home, &["clean"], "");
     assert_eq!(out.status.code(), Some(0));
     assert!(!home.join("drafts").exists());

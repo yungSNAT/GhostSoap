@@ -4,14 +4,15 @@
 //! The drafts folder: plaintext letters waiting to be sent (plan section 5).
 //!
 //! Each folder has a manifest, `.ghostsoap-drafts`, holding the latest record for each name.
-//! Before a draft is written its name is recorded as `pending <name>`; once the draft is in
-//! place, `<sha256> <name>` commits it. The manifest is only ever replaced whole, by renaming
+//! `<sha256> <name>` is saved before the complete draft is linked into place. Older
+//! `pending <name>` records remain readable. The manifest is only ever replaced whole, by renaming
 //! a complete new copy over it, so an interrupted update leaves the previous one and a link at
 //! its name is replaced rather than written through. `clean` deletes only committed drafts that
 //! still hold those bytes; a file put at a draft's name with exactly those bytes counts as that
 //! draft. A lock file serialises `write` and `clean` between GhostSoap processes; other
 //! programs changing the folder at the same moment are outside this guarantee.
 
+use std::collections::BTreeMap;
 use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -63,19 +64,18 @@ pub fn write(dir: &Path, name: &str, text: &str) -> io::Result<PathBuf> {
             format!("{} already exists", path.display()),
         ));
     }
-    add_record(dir, PENDING, name)?;
     let tmp = dir.join(format!(".{name}.{}.tmp", std::process::id()));
     let mut file = private_file(OpenOptions::new().write(true).create_new(true)).open(&tmp)?;
     // From here the temporary file is this call's own, so it may remove it.
     let published = file
         .write_all(text.as_bytes())
         .and_then(|()| file.sync_all())
+        .and_then(|()| add_record(dir, &sha256(text.as_bytes()), name))
         .and_then(|()| fs::hard_link(&tmp, &path));
     drop(file);
     let _ = fs::remove_file(&tmp);
     published?;
     sync_dir(dir)?;
-    add_record(dir, &sha256(text.as_bytes()), name)?;
     Ok(path)
 }
 
@@ -313,6 +313,193 @@ fn clean_with_lock(
         remove_if_empty(dir, |dir| fs::remove_dir(dir))?;
     }
     Ok(cleaned)
+}
+
+/// Check all earlier drafts before the first deletion in a redraft batch.
+pub(crate) fn can_remove(dir: &Path, name: &str) -> io::Result<bool> {
+    if !draft_present(&dir.join(name))? {
+        return Ok(true);
+    }
+    check_private(dir)?;
+    let _lock = Lock::acquire(dir, LOCK)?;
+    let records = read_manifest(dir)?;
+    Ok(draft_status(dir, name, &records)? != DraftStatus::Changed)
+}
+
+#[derive(PartialEq, Eq)]
+enum DraftStatus {
+    Missing,
+    Original,
+    Changed,
+}
+
+fn draft_present(path: &Path) -> io::Result<bool> {
+    match fs::symlink_metadata(path) {
+        Err(e)
+            if matches!(
+                e.kind(),
+                io::ErrorKind::NotFound | io::ErrorKind::NotADirectory
+            ) =>
+        {
+            Ok(false)
+        }
+        Err(e) => Err(e),
+        Ok(_) => Ok(true),
+    }
+}
+
+fn draft_status(dir: &Path, name: &str, records: &[Record]) -> io::Result<DraftStatus> {
+    let path = dir.join(name);
+    match fs::symlink_metadata(&path) {
+        Ok(meta) if !meta.is_file() => return Ok(DraftStatus::Changed),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(DraftStatus::Missing),
+        Err(e) => return Err(e),
+        Ok(_) => {}
+    }
+    let Some((digest, _)) = records
+        .iter()
+        .find(|(digest, file)| file == name && digest != PENDING)
+    else {
+        return Ok(DraftStatus::Changed);
+    };
+    match fs::read(&path) {
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(DraftStatus::Missing),
+        Err(e) => Err(e),
+        Ok(bytes) if sha256(&bytes) == *digest => Ok(DraftStatus::Original),
+        Ok(_) => Ok(DraftStatus::Changed),
+    }
+}
+
+/// An earlier draft held under a private temporary name until handover succeeds.
+#[derive(Debug)]
+struct StagedRemoval {
+    original: PathBuf,
+    backup: Option<PathBuf>,
+    committed: bool,
+}
+
+impl StagedRemoval {
+    fn commit(&mut self) {
+        self.committed = true;
+    }
+
+    fn discard(mut self) -> io::Result<()> {
+        debug_assert!(self.committed);
+        let backup = self.backup.take().expect("staged backup");
+        remove_if_present(&backup).map_err(|e| {
+            io::Error::new(
+                e.kind(),
+                format!(
+                    "could not remove the superseded draft at {}: {e}",
+                    backup.display()
+                ),
+            )
+        })
+    }
+}
+
+impl Drop for StagedRemoval {
+    fn drop(&mut self) {
+        let Some(backup) = &self.backup else { return };
+        if self.committed {
+            eprintln!(
+                "warning: earlier draft kept at {}; check this copy before removing it",
+                backup.display()
+            );
+            return;
+        }
+        // Restore without overwriting a file put at the original name meanwhile.
+        let restored = fs::hard_link(backup, &self.original).and_then(|()| fs::remove_file(backup));
+        if let Err(e) = restored {
+            eprintln!(
+                "warning: could not finish restoring {}; the earlier draft is at {}: {e}",
+                self.original.display(),
+                backup.display()
+            );
+        }
+    }
+}
+
+/// Holds the folder locks until the staged removals have committed or rolled back. In
+/// particular, `clean` cannot discard a temporarily missing draft's manifest record.
+#[derive(Default)]
+pub(crate) struct Redraft {
+    removals: Vec<StagedRemoval>,
+    locks: BTreeMap<PathBuf, Lock>,
+}
+
+impl Redraft {
+    pub(crate) fn stage(&mut self, dir: &Path, name: &str) -> io::Result<()> {
+        if !draft_present(&dir.join(name))? {
+            return Ok(());
+        }
+        if !self.locks.contains_key(dir) {
+            check_private(dir)?;
+            self.locks.insert(dir.to_owned(), Lock::acquire(dir, LOCK)?);
+        }
+        self.removals.extend(stage_remove(dir, name)?);
+        Ok(())
+    }
+
+    pub(crate) fn commit(&mut self) {
+        for removal in &mut self.removals {
+            removal.commit();
+        }
+    }
+
+    pub(crate) fn unlock(&mut self) {
+        self.locks.clear();
+    }
+
+    pub(crate) fn discard(self) {
+        for removal in self.removals {
+            if let Err(error) = removal.discard() {
+                eprintln!("warning: {error}");
+            }
+        }
+    }
+}
+
+/// Take a verified draft out of circulation before a redraft. Keep its manifest record
+/// until either the replacement write takes over the name or `clean` drops the missing entry.
+/// The caller holds the drafts lock.
+fn stage_remove(dir: &Path, name: &str) -> io::Result<Option<StagedRemoval>> {
+    stage_remove_with(dir, name, |path| fs::remove_file(path))
+}
+
+fn stage_remove_with(
+    dir: &Path,
+    name: &str,
+    remove: impl FnOnce(&Path) -> io::Result<()>,
+) -> io::Result<Option<StagedRemoval>> {
+    let path = dir.join(name);
+    let records = read_manifest(dir)?;
+    match draft_status(dir, name, &records)? {
+        DraftStatus::Missing => return Ok(None),
+        DraftStatus::Changed => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "the earlier draft changed during redraft",
+            ));
+        }
+        DraftStatus::Original => {}
+    }
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos());
+    let backup = dir.join(format!(".{name}.{}-{nanos}.tmp", std::process::id()));
+    fs::hard_link(&path, &backup)?;
+    if let Err(error) = remove(&path) {
+        let _ = fs::remove_file(&backup);
+        return Err(error);
+    }
+    let removal = StagedRemoval {
+        original: path,
+        backup: Some(backup),
+        committed: false,
+    };
+    sync_dir(dir)?;
+    Ok(Some(removal))
 }
 
 fn remove_if_empty(dir: &Path, remove: impl FnOnce(&Path) -> io::Result<()>) -> io::Result<()> {
@@ -667,6 +854,79 @@ mod tests {
         );
     }
 
+    #[test]
+    fn remove_deletes_one_draft_it_wrote_and_nothing_else() {
+        let dir = tempfile::tempdir().unwrap();
+        let drafts = dir.path().join("drafts");
+        let gone = write(&drafts, "a-GS-11111.eml", "first").unwrap();
+        let stays = write(&drafts, "b-GS-22222.eml", "second").unwrap();
+        let mut batch = Redraft::default();
+        batch.stage(&drafts, "a-GS-11111.eml").unwrap();
+        batch.commit();
+        batch.discard();
+        assert!(!gone.exists());
+        assert_eq!(fs::read_to_string(&stays).unwrap(), "second");
+        assert_eq!(
+            read_manifest(&drafts).unwrap().len(),
+            2,
+            "the stale record is safe to leave until the next write or clean"
+        );
+        assert!(stage_remove(&drafts, "a-GS-11111.eml").unwrap().is_none());
+        assert!(!drafts.join(LOCK).exists());
+        // The name can be written again, and `clean` still deletes what is left.
+        write(&drafts, "a-GS-11111.eml", "third").unwrap();
+        assert_eq!(clean(&drafts, true).unwrap().deleted, 2);
+    }
+
+    #[test]
+    fn remove_leaves_a_file_it_cannot_confirm_it_wrote() {
+        let dir = tempfile::tempdir().unwrap();
+        let drafts = dir.path().join("drafts");
+        let changed = write(&drafts, "a-GS-11111.eml", "letter").unwrap();
+        fs::write(&changed, "the user's edit").unwrap();
+        // A write that published but stopped before committing.
+        add_record(&drafts, PENDING, "b-GS-22222.eml").unwrap();
+        fs::write(drafts.join("b-GS-22222.eml"), "unconfirmed").unwrap();
+        // A file GhostSoap never recorded.
+        fs::write(drafts.join("c-GS-33333.eml"), "the user's own").unwrap();
+        for name in ["a-GS-11111.eml", "b-GS-22222.eml", "c-GS-33333.eml"] {
+            assert_eq!(
+                stage_remove(&drafts, name).unwrap_err().kind(),
+                io::ErrorKind::InvalidData,
+                "{name}"
+            );
+            assert!(drafts.join(name).exists(), "{name}");
+        }
+        let cleaned = clean(&drafts, false).unwrap();
+        assert_eq!(cleaned.kept, ["a-GS-11111.eml"], "clean still reports it");
+        assert_eq!(cleaned.unconfirmed, ["b-GS-22222.eml"]);
+    }
+
+    #[test]
+    fn remove_finds_nothing_where_no_draft_could_be() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("not-a-folder");
+        fs::write(&file, "the user's file").unwrap();
+        for folder in [dir.path().join("absent"), file.clone()] {
+            Redraft::default().stage(&folder, "a-GS-11111.eml").unwrap();
+        }
+        assert_eq!(fs::read_to_string(&file).unwrap(), "the user's file");
+        assert!(!dir.path().join("absent").exists(), "nothing is created");
+    }
+
+    #[test]
+    fn a_held_lock_stops_remove() {
+        let dir = tempfile::tempdir().unwrap();
+        let drafts = dir.path().join("drafts");
+        let path = write(&drafts, "a-GS-11111.eml", "x").unwrap();
+        fs::write(drafts.join(LOCK), "").unwrap();
+        let err = Redraft::default()
+            .stage(&drafts, "a-GS-11111.eml")
+            .unwrap_err();
+        assert!(err.to_string().contains("another GhostSoap"), "{err}");
+        assert!(path.exists());
+    }
+
     #[cfg(unix)]
     #[test]
     fn drafts_are_private_on_unix() {
@@ -705,5 +965,105 @@ mod tests {
         assert!(write(&drafts, "b-GS-22222.eml", "y").is_err());
         assert!(clean(&drafts, true).is_err());
         assert_eq!(fs::read_to_string(&canary).unwrap(), "unchanged");
+    }
+
+    #[test]
+    fn a_batch_stages_several_drafts_in_one_folder_under_one_lock() {
+        let dir = tempfile::tempdir().unwrap();
+        let drafts = dir.path().join("drafts");
+        let a = write(&drafts, "a-GS-11111.eml", "first").unwrap();
+        let b = write(&drafts, "b-GS-22222.eml", "second").unwrap();
+        let mut batch = Redraft::default();
+        batch.stage(&drafts, "a-GS-11111.eml").unwrap();
+        batch.stage(&drafts, "b-GS-22222.eml").unwrap();
+        assert_eq!(batch.locks.len(), 1);
+        batch.commit();
+        batch.unlock();
+        batch.discard();
+        assert!(!a.exists() && !b.exists());
+        assert!(!drafts.join(LOCK).exists());
+    }
+
+    #[test]
+    fn a_draft_that_cannot_be_removed_stays_where_it_was() {
+        let dir = tempfile::tempdir().unwrap();
+        let drafts = dir.path().join("drafts");
+        let path = write(&drafts, "a-GS-11111.eml", "letter").unwrap();
+        let err = stage_remove_with(&drafts, "a-GS-11111.eml", |_| {
+            Err(io::ErrorKind::PermissionDenied.into())
+        })
+        .unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::PermissionDenied);
+        assert_eq!(fs::read_to_string(&path).unwrap(), "letter");
+        let left: Vec<_> = fs::read_dir(&drafts)
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .filter(|n| n.to_string_lossy().ends_with(".tmp"))
+            .collect();
+        assert!(left.is_empty(), "the temporary copy is removed: {left:?}");
+    }
+
+    #[test]
+    fn staged_removals_report_what_they_could_not_finish() {
+        let dir = tempfile::tempdir().unwrap();
+        // A folder where the superseded copy should be: removing it fails.
+        let backup = dir.path().join("in-the-way");
+        fs::create_dir(&backup).unwrap();
+        fs::write(backup.join("keep"), "").unwrap();
+        let removal = StagedRemoval {
+            original: dir.path().join("a-GS-11111.eml"),
+            backup: Some(backup.clone()),
+            committed: true,
+        };
+        let err = removal.discard().unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("could not remove the superseded draft"),
+            "{err}"
+        );
+        let batch = Redraft {
+            removals: vec![StagedRemoval {
+                original: dir.path().join("a-GS-11111.eml"),
+                backup: Some(backup.clone()),
+                committed: true,
+            }],
+            locks: BTreeMap::new(),
+        };
+        batch.discard();
+        assert!(backup.join("keep").exists());
+
+        // A restore whose copy has gone warns and leaves the original name free.
+        let original = dir.path().join("b-GS-22222.eml");
+        drop(StagedRemoval {
+            original: original.clone(),
+            backup: Some(dir.path().join("gone")),
+            committed: false,
+        });
+        assert!(!original.exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn draft_checks_report_errors_other_than_a_missing_draft() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let drafts = dir.path().join("drafts");
+        let name = "a-GS-11111.eml";
+        let path = write(&drafts, name, "letter").unwrap();
+        // A name longer than the file system allows cannot be looked up at all.
+        let long = format!("{}-GS-11111.eml", "a".repeat(300));
+        let err = draft_present(&drafts.join(&long)).unwrap_err();
+        assert_ne!(err.kind(), io::ErrorKind::NotFound);
+        assert!(draft_status(&drafts, &long, &[]).is_err());
+
+        let records = read_manifest(&drafts).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
+        let readable = fs::read(&path).is_ok();
+        let status = (!readable).then(|| draft_status(&drafts, name, &records));
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        // Root reads any file, so the read cannot be made to fail this way.
+        let Some(status) = status else { return };
+        let kind = status.err().map(|e| e.kind());
+        assert_eq!(kind, Some(io::ErrorKind::PermissionDenied));
     }
 }

@@ -308,13 +308,32 @@ fn percent_encode(text: &str) -> String {
     out
 }
 
+/// Crockford base32: no I, L, O or U, so a tag read aloud or retyped is hard to get wrong.
+const TAG_ALPHABET: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
 /// A request tag such as `GS-7K3QX` from 64 random bits, in Crockford base32.
 pub fn tag(random: u64) -> String {
-    const ALPHABET: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
     let code: String = (0..5)
-        .map(|i| char::from(ALPHABET[((random >> (i * 5)) & 31) as usize]))
+        .map(|i| char::from(TAG_ALPHABET[((random >> (i * 5)) & 31) as usize]))
         .collect();
     format!("GS-{code}")
+}
+
+/// Whether `tag` is a tag as `tag` makes them.
+pub fn is_tag(tag: &str) -> bool {
+    tag.strip_prefix("GS-")
+        .is_some_and(|code| code.len() == 5 && code.bytes().all(|b| TAG_ALPHABET.contains(&b)))
+}
+
+/// The tag a user typed, as `tag` would have made it: brackets and case do not matter, and
+/// the letters Crockford base32 leaves out read as the digits they resemble.
+pub fn normalise_tag(typed: &str) -> String {
+    let typed = typed.trim().trim_start_matches('[').trim_end_matches(']');
+    let upper = typed.to_ascii_uppercase();
+    match upper.strip_prefix("GS-") {
+        Some(code) => format!("GS-{}", code.replace(['I', 'L'], "1").replace('O', "0")),
+        None => upper,
+    }
 }
 
 #[cfg(test)]
@@ -425,5 +444,34 @@ mod tests {
         assert_eq!(tag(0), "GS-00000");
         assert_eq!(tag(u64::MAX), "GS-ZZZZZ");
         assert_eq!(tag(1 | (31 << 20)), "GS-1000Z");
+    }
+
+    #[test]
+    fn a_typed_tag_reads_as_the_tag_in_the_subject_line() {
+        for typed in ["GS-7K3QX", "[GS-7K3QX]", " gs-7k3qx\n", "[gs-7k3qx"] {
+            assert_eq!(normalise_tag(typed), "GS-7K3QX", "{typed:?}");
+        }
+        assert_eq!(normalise_tag("gs-o1Li0"), "GS-01110");
+        assert_eq!(
+            normalise_tag("cotality"),
+            "COTALITY",
+            "not a tag, and left so"
+        );
+        for tag in ["GS-7K3QX", "GS-00000", "GS-ZZZZZ"] {
+            assert!(is_tag(tag), "{tag}");
+        }
+        for not in [
+            "GS-7K3Q",
+            "GS-7K3QXX",
+            "GS-7K3QI",
+            "GS-7K3QU",
+            "gs-7k3qx",
+            "7K3QX",
+            "XX-7K3QX",
+        ] {
+            assert!(!is_tag(not), "{not}");
+        }
+        assert!(is_tag(&normalise_tag("gs-7k3qi")), "I reads as 1");
+        assert!(!is_tag(&normalise_tag("gs-7k3qu")), "U resembles no digit");
     }
 }
