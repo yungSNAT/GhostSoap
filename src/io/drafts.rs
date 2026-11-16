@@ -37,6 +37,9 @@ pub struct Cleaned {
     pub unconfirmed: Vec<String>,
     /// Temporary files from a write that stopped part-way, left for the user to check.
     pub leftovers: Vec<String>,
+    /// Files named like a draft that the manifest does not list, such as a draft whose record
+    /// was lost: possibly a plaintext letter, so left for the user to check.
+    pub unrecorded: Vec<String>,
 }
 
 /// The default drafts folder: `drafts` in the data directory, which is private to the user on
@@ -296,7 +299,9 @@ fn clean_with_lock(
     let mut cleaned = Cleaned::default();
     // Records for files left in place stay in the manifest, so the next clean reports them.
     let mut remaining = Vec::new();
-    for (first, name) in read_manifest(dir)? {
+    let records = read_manifest(dir)?;
+    let listed: Vec<String> = records.iter().map(|(_, name)| name.clone()).collect();
+    for (first, name) in records {
         let path = dir.join(&name);
         if first == PENDING {
             if path.exists() {
@@ -319,17 +324,27 @@ fn clean_with_lock(
         }
     }
     save_manifest(dir, &remaining)?;
-    for item in fs::read_dir(dir)? {
-        let name = item?.file_name().to_string_lossy().into_owned();
-        if is_leftover(&name) {
-            cleaned.leftovers.push(name);
-        }
-    }
+    report_unlisted(dir, &listed, &mut cleaned)?;
     drop(lock);
     if remove_dir {
         remove_if_empty(dir, |dir| fs::remove_dir(dir))?;
     }
     Ok(cleaned)
+}
+
+/// Add to `cleaned` each file in `dir` that only an interrupted write leaves, and each file
+/// named like a draft that `listed`, the manifest's names, does not hold.
+fn report_unlisted(dir: &Path, listed: &[String], cleaned: &mut Cleaned) -> io::Result<()> {
+    for item in fs::read_dir(dir)? {
+        let name = item?.file_name().to_string_lossy().into_owned();
+        if is_leftover(&name) {
+            cleaned.leftovers.push(name);
+        } else if is_draft(&name) && !listed.contains(&name) {
+            cleaned.unrecorded.push(name);
+        }
+    }
+    cleaned.unrecorded.sort();
+    Ok(())
 }
 
 /// Check all earlier drafts before the first deletion in a redraft batch.
@@ -675,7 +690,13 @@ mod tests {
         assert!(drafts.join("notes-GS-ABCDE.txt").exists());
         assert!(!drafts.join(MANIFEST).exists());
         assert!(!drafts.join(LOCK).exists());
-        assert_eq!(clean(&drafts, true).unwrap(), Cleaned::default());
+        // A file named like a draft that GhostSoap has no record of is reported, never deleted.
+        let reported = Cleaned {
+            unrecorded: vec!["notes-GS-ABCDE.txt".to_owned()],
+            ..Cleaned::default()
+        };
+        assert_eq!(cleaned.unrecorded, reported.unrecorded);
+        assert_eq!(clean(&drafts, true).unwrap(), reported);
     }
 
     #[test]
@@ -695,6 +716,11 @@ mod tests {
         assert_eq!(fs::read_to_string(&path).unwrap(), "letter");
         assert_eq!(cleaned.unconfirmed, ["b-GS-33333.eml"]);
         assert!(drafts.join("b-GS-33333.eml").exists());
+        assert_eq!(
+            cleaned.unrecorded,
+            ["a-GS-22222.eml"],
+            "named like a draft, never written"
+        );
         let again = clean(&drafts, false).unwrap();
         assert_eq!(
             again.unconfirmed,

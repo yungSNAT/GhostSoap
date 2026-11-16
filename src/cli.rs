@@ -1045,6 +1045,9 @@ fn clean(out: Option<PathBuf>) -> Result<(), String> {
     for name in &cleaned.leftovers {
         println!("check   {name}: left by a write that stopped part-way; delete it if unwanted");
     }
+    for name in &cleaned.unrecorded {
+        println!("check   {name}: GhostSoap has no record of writing it; delete it if unwanted");
+    }
     Ok(())
 }
 
