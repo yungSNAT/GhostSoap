@@ -1,0 +1,30 @@
+id = "peopledatalabs-au"
+name = "People Data Labs"
+legal_entity = "People Data Labs, Inc."
+kinds = ["marketing-list"]
+priority = "standard"
+quality = "verified"
+verified_at = 2026-11-17
+sources = ["https://privacy.peopledatalabs.com/policies?name=privacy-policy", "https://privacy.peopledatalabs.com/policies?modal=select-requester", "https://www.peopledatalabs.com/do-not-sell-or-share", "https://docs.peopledatalabs.com/docs/countries"]
+identity_fields = ["email"]
+exemption_risk = "overseas"
+escalation = []
+effort = "easy"
+
+[[channels]]
+kind = "web-form"
+address = "https://privacy.peopledatalabs.com/policies?modal=select-requester"
+levers = []
+
+[manual_check]
+url = "https://privacy.peopledatalabs.com/policies?name=privacy-policy"
+
+[[evidence]]
+url = "https://www.peopledatalabs.com/do-not-sell-or-share"
+checked_at = 2026-11-17
+sha256 = "acee2726165b98065803d7c3fbe42f3d9769ce7db8ed7ed339565455548ab7e5"
+
+[[evidence]]
+url = "https://docs.peopledatalabs.com/docs/countries"
+checked_at = 2026-11-17
+sha256 = "d0509c75d2929c0f370fe16ac429b3157b6594791ba8af2d688e9bd531ce7f1e"

@@ -115,6 +115,7 @@ Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI
 | `nielsen-au` | Nielsen (Australia) | ad-tech |  | letter |
 | `optus-au` | Optus | telecommunications | `data-breaches`, `telecommunications` | letter |
 | `peoplebank-au` | Peoplebank | recruitment | `recruitment` | letter |
+| `peopledatalabs-au` | People Data Labs | marketing-list | `marketing` | its own web form |
 | `priceline-pulse-rewards-au` | Priceline Pulse Rewards | loyalty | `loyalty` | letter |
 | `programmed-au` | Programmed | recruitment | `recruitment` | letter |
 | `qantas-frequent-flyer-au` | Qantas Frequent Flyer | loyalty | `data-breaches`, `loyalty` | letter |

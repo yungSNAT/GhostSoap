@@ -359,6 +359,11 @@ fn marketing_pack_shows_the_contact_data_brokers_own_forms() {
             "https://contactout.com/optout",
         ),
         (
+            "peopledatalabs-au",
+            "https://privacy.peopledatalabs.com/policies?name=privacy-policy",
+            "https://privacy.peopledatalabs.com/policies?modal=select-requester",
+        ),
+        (
             "rocketreach-au",
             "https://rocketreach.co/privacy",
             "https://rocketreach.co/remove-profile",

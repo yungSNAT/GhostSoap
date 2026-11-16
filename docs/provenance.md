@@ -286,6 +286,20 @@ RocketReach's 2 evidence hashes were taken on 16 November 2026 by a script porte
 
 Evidence: 3 `[[evidence]]` hashes for `snovio-au`, taken on 16 November 2026 with the xtask's `evidence-hash` command; 2 fetches from the maintainer's network about 6 seconds apart and 2 from another network about 35 minutes earlier gave the same hashes for the 2 pages fetched on both, none shared. Not tracked: the 'Clear from list' form (no text without a browser).
 
+### People Data Labs (17 November 2026)
+
+People Data Labs, held back on 16 November, was checked again on 17 November 2026 (AEDT) by an AI agent working for the maintainer, from public pages only: no name or email was searched, no form submitted and no account created. No person has re-checked it. It became an overseas entry in the marketing pack: GhostSoap shows its own request form and sends no letter.
+
+| Entry | Lead | Verified from | Entity and base |
+|---|---|---|---|
+| `peopledatalabs-au` | Optery's Australian list | Privacy policy and Privacy Request Center on privacy.peopledatalabs.com, the 'Do Not Sell or Share' page and the 'Aggregations by Country' documentation page | The policy names People Data Labs, Inc. No ABN for 'People Data Labs' (56 matches on 16 November, none the broker) |
+
+- `peopledatalabs-au`: its 'Do Not Sell or Share' page says that form is for US opt-out requests and that 'To request access, deletion, correction, a copy of your information, or to exercise rights outside the United States, please use our Privacy Request Center'. That centre asks whether the request is for yourself or as an authorised agent, then whether you are a consumer, a current or former employee or contractor, or an applicant. A consumer can ask to access, correct, restrict, delete, not share or sell, or object to processing, and each request starts by verifying an email address; no step read before that asks for a country. The Privacy Center also says PDL makes 'requests for opt-out, data portability, correction, and deletion ... immediate and simple with web forms that are easy to access globally'. Australian coverage: the documentation page 'Aggregations by Country' gives 14,463,244 resume records for Australia. The policy also gives privacy@peopledatalabs.com, which the entry does not list because overseas entries get no letter.
+
+Evidence: 2 `[[evidence]]` hashes for `peopledatalabs-au` (the 'Do Not Sell or Share' page and the countries page), taken on 17 November 2026 by the script ported from the xtask's `evidence-hash` command; 2 fetches about 20 seconds apart gave the same hashes. Not tracked: the privacy policy and the Privacy Request Center, which give no text without a browser.
+
+Swordfish was read again on 17 November 2026: its privacy policy, opt-out and terms pages served only a bot check ('Checking for any bots'), to a browser and to Firecrawl, so it is still not added.
+
 ### Rejected candidates (M1)
 
 | Candidate | Reason |
