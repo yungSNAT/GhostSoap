@@ -294,7 +294,10 @@ fn clean_reports_a_draft_it_has_no_record_of_and_leaves_it() {
     assert!(stdout.contains("Deleted 1 drafts"), "{stdout}");
     let check = format!("check   {unrecorded}: GhostSoap has no record of writing it");
     assert!(stdout.contains(&check), "{stdout}");
-    assert_eq!(fs::read_to_string(dir.join(unrecorded)).unwrap(), "a letter");
+    assert_eq!(
+        fs::read_to_string(dir.join(unrecorded)).unwrap(),
+        "a letter"
+    );
 }
 
 #[test]
