@@ -1449,6 +1449,20 @@ mod tests {
         assert_eq!(tag, "GS-FGHJK");
     }
 
+    /// No register entry offers the Spam Act lever yet, so `status` meets its business days
+    /// only here.
+    #[test]
+    fn status_names_each_kind_of_deadline_and_dates_only_those_with_a_day() {
+        let day = NaiveDate::from_ymd_opt(2026, 11, 16).unwrap();
+        assert_eq!(due_text(Due::Statutory(day)), "  law's last day 2026-11-16");
+        assert_eq!(due_text(Due::Guide(day)), "  OAIC guide 2026-11-16");
+        assert!(due_text(Due::Unknown).contains("5 business days after sending"));
+        assert_eq!(due_text(Due::None), "");
+        assert_eq!(due_date(Due::Statutory(day)), Some(day));
+        assert_eq!(due_date(Due::Unknown), None);
+        assert_eq!(due_date(Due::None), None);
+    }
+
     #[test]
     fn named_windows_output_calls_for_a_folder_warning() {
         let mut output = Vec::new();
