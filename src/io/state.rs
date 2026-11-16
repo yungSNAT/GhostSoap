@@ -556,6 +556,38 @@ mod tests {
         fs::write(state_path(dir), bytes).unwrap();
     }
 
+    /// Only a regular file is an export, and only its first bytes are read, so a pipe or a
+    /// link named like one never blocks `forget` and a large file is not read whole.
+    #[test]
+    fn only_a_regular_file_with_the_header_is_an_export() {
+        let tmp = tempfile::tempdir().unwrap();
+        let named = |n: &str| {
+            tmp.path()
+                .join(format!("ghostsoap-export-2026-11-{n}.toml"))
+        };
+        let export = named("17");
+        fs::write(&export, format!("{EXPORT_HEADER}2026-11-17. x")).unwrap();
+        assert!(is_export(&export));
+        let large = named("18");
+        let mut text = EXPORT_HEADER.to_owned();
+        text.push_str(&"x".repeat(1 << 20));
+        fs::write(&large, text).unwrap();
+        assert!(is_export(&large));
+        let folder = named("19");
+        fs::create_dir(&folder).unwrap();
+        assert!(!is_export(&folder));
+        #[cfg(unix)]
+        {
+            let link = named("20");
+            std::os::unix::fs::symlink(&export, &link).unwrap();
+            assert!(!is_export(&link), "a link is not followed");
+            let fifo = named("21");
+            let made = std::process::Command::new("mkfifo").arg(&fifo).status();
+            assert!(made.unwrap().success());
+            assert!(!is_export(&fifo), "a pipe is never opened");
+        }
+    }
+
     #[test]
     fn a_failed_export_deletes_its_plaintext_or_says_where_it_is() {
         let tmp = tempfile::tempdir().unwrap();
