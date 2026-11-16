@@ -157,7 +157,7 @@ pub fn law(lever: Lever) -> Law {
             title: "Correct my credit information",
             provision: "Privacy Act s 20T(1), (2)",
             deadline: Deadline::DaysStarting(30),
-            deadline_text: "within 30 days from the day the request is made, or a longer period I agree to in writing (section 20T(2))",
+            deadline_text: "within the period of 30 days that starts on the day the request is made, or a longer period I agree to in writing (section 20T(2))",
             charge: "No charge may be made for the request or the correction (section 20T(5)).",
         },
         Lever::S20kBan => Law {
@@ -178,7 +178,7 @@ pub fn law(lever: Lever) -> Law {
             title: "Correct my credit information",
             provision: "Privacy Act s 21V(1), (2)",
             deadline: Deadline::DaysStarting(30),
-            deadline_text: "within 30 days from the day the request is made, or a longer period I agree to in writing (section 21V(2))",
+            deadline_text: "within the period of 30 days that starts on the day the request is made, or a longer period I agree to in writing (section 21V(2))",
             charge: "No charge may be made for the request or the correction (section 21V(5)).",
         },
         Lever::SpamUnsubscribe => Law {
