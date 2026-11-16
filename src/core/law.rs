@@ -38,8 +38,9 @@ pub const STATUS: [&str; 7] = [
     "OAIC complaints: as at February 2026 the OAIC said it was unlikely to substantially progress a new complaint for some 6 to 12 months after lodgement, unless it finds exceptional circumstances, and it need not investigate every complaint. Where a recognised external dispute resolution scheme covers the business, such as the TIO or AFCA, generally try that scheme first, but the OAIC may decide not to investigate a complaint made more than 12 months after you became aware of the act or practice (s 41(1)(c)).",
 ];
 
-/// When the entity must act. A request keeps the kind it was drafted under (state format 2),
-/// so a change to how a kind is written is a change of format.
+/// When the entity must act. A request keeps the deadline it was drafted under (state format
+/// 2), whose kind must be the one its lever's law gives, so a change to a lever's kind, or to
+/// how a kind is written, is a change of format.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum Deadline {
@@ -48,9 +49,8 @@ pub enum Deadline {
     DaysAfter(u16),
     /// A fixed number of days that starts on the day the request is made, which is counted
     /// (ss 20T(2)(a), 21V(2)(a); Acts Interpretation Act 1901 s 36(1) item 2). Format 2 as
-    /// first merged wrote both fixed periods as `days`, which reads as this kind;
-    /// `State::read_days` gives s 20R(3)'s back its own.
-    #[serde(alias = "days")]
+    /// first merged wrote both fixed periods as `days`; reading the state renames each to
+    /// its lever's kind.
     DaysStarting(u16),
     /// Business days in the place the message was sent to (Spam Act Sch 2 cl 6(2)).
     BusinessDays(u16),

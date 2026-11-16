@@ -155,25 +155,32 @@ fn a_closed_or_abandoned_request_takes_no_new_status() {
     sent.record_status(marketing, given_up.clone(), today)
         .unwrap();
     let before = sent.clone();
-    for (levers, finished) in [(SOURCE, "closed"), (marketing, "abandoned")] {
+    let refused = [
+        (SOURCE, "closed", Status::Acknowledged),
+        (SOURCE, "closed", Status::Escalated),
+        (marketing, "abandoned", Status::Acknowledged),
+        (marketing, "abandoned", Status::Relisted),
+    ];
+    for (levers, finished, to) in refused {
         let lever = levers[0].name();
-        for to in [Status::Acknowledged, Status::Relisted, Status::Escalated] {
-            let error = sent.record_status(levers, status(day(14), to), today);
-            assert_eq!(
-                error.unwrap_err(),
-                format!(
-                    "GS-7K3QX {lever} is {finished}; to record another status, withdraw that \
-                     one first (--withdraw status)"
-                )
-            );
-        }
+        let error = sent.record_status(levers, status(day(14), to), today);
+        assert_eq!(
+            error.unwrap_err(),
+            format!(
+                "GS-7K3QX {lever} is {finished}; to record another status, withdraw that one \
+                 first (--withdraw status)"
+            )
+        );
     }
     assert_eq!(sent, before);
     // A repeat records nothing, and the finishing status can still be withdrawn.
     assert_eq!(sent.record_status(SOURCE, closed, today), Ok(false));
     assert_eq!(sent.record_status(marketing, given_up, today), Ok(false));
-    sent.withdraw_event(SOURCE, Withdrawn::Status, None)
+    sent.withdraw_event(marketing, Withdrawn::Status, None)
         .unwrap();
+    let acknowledged = status(day(14), Status::Acknowledged);
+    assert_eq!(sent.record_status(marketing, acknowledged, today), Ok(true));
+    // Information on show again reopens a closed request.
     let relisted = status(day(14), Status::Relisted);
     assert_eq!(sent.record_status(SOURCE, relisted, today), Ok(true));
 }
