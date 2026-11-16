@@ -31,5 +31,5 @@ levers = ["app7-no-marketing", "app7-source", "app11-destroy", "app13", "app13-n
 
 [[evidence]]
 url = "https://www.macquarie.com/au/en/disclosures/privacy-and-cookies.html"
-checked_at = 2026-10-26
-sha256 = "fdc31e99c183bbb94fccf66247ea64dcdad805d75a2aa7f1ee73c8c99ae10cb3"
+checked_at = 2026-11-17
+sha256 = "4b26b0624b2e07713adb5ef509581956d437ba49da357cf9215208265714b883"

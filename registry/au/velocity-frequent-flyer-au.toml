@@ -27,8 +27,8 @@ levers = ["app7-no-marketing", "app7-no-facilitation", "app7-source", "app13", "
 
 [[evidence]]
 url = "https://www.velocityfrequentflyer.com/member-support/privacy/privacy-statement"
-checked_at = 2026-10-24
-sha256 = "db11297426625b60a24c291b81167691553bc08b3fd5376049ab681f715af316"
+checked_at = 2026-11-17
+sha256 = "7b2671dcf2bd704ebb26996d73503216c9c4282e44e4fe8bd51ff00a584293bd"
 
 [[evidence]]
 url = "https://www.virginaustralia.com/au/en/about-us/policies/privacy/privacy-policy/"

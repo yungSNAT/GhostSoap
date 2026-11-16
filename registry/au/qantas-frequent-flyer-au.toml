@@ -27,5 +27,5 @@ levers = ["app7-no-marketing", "app7-no-facilitation", "app7-source", "app11-des
 
 [[evidence]]
 url = "https://www.qantas.com/au/en/support/privacy-and-security.html"
-checked_at = 2026-10-24
-sha256 = "11f5276dcfed4873043dc13344f60ac3119567e601146b2bec20a81b36899019"
+checked_at = 2026-11-17
+sha256 = "6e696001cc9bb0f7593b7c7258b9353cda3a335636857bf06c948abfc9e1187b"
