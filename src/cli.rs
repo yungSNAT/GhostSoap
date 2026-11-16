@@ -307,6 +307,7 @@ pub enum RegistryCommand {
 }
 
 /// Run a parsed command line.
+#[allow(clippy::too_many_lines)] // one arm per command; splitting it would only scatter them
 pub fn run(cli: Cli) -> ExitCode {
     let result = match cli.command {
         None => Cli::command().print_help().map_err(|e| e.to_string()),
@@ -961,11 +962,7 @@ fn status(due_only: bool, passphrase_stdin: bool) -> Result<(), String> {
         Ok(state) => state,
         Err(e) => {
             println!("DEGRADED: {e}");
-            let unknown: Vec<String> = ACTIONS
-                .iter()
-                .map(|&a| format!("{} ?", action_name(a)))
-                .collect();
-            println!("{}", unknown.join("  "));
+            println!("{}", counts(|_| "?".to_owned()));
             return Err("the state could not be read, so this is not an all-clear".to_owned());
         }
     };
@@ -978,38 +975,18 @@ fn status(due_only: bool, passphrase_stdin: bool) -> Result<(), String> {
             rows.push((request.action(sent, due, today), due, message, request));
         }
     }
-    let counts: Vec<String> = ACTIONS
-        .iter()
-        .map(|&a| {
-            format!(
-                "{} {}",
-                action_name(a),
-                rows.iter().filter(|r| r.0 == a).count()
-            )
-        })
-        .collect();
-    println!("{}", counts.join("  "));
+    println!(
+        "{}",
+        counts(|a| rows.iter().filter(|r| r.0 == a).count().to_string())
+    );
     if due_only {
         rows.retain(|row| due_date(row.1).is_some());
         rows.sort_by_key(|row| due_date(row.1));
     } else {
         rows.sort_by_key(|row| row.0);
     }
-    for (action, due, message, request) in &rows {
-        let unfinished = if message.unfinished {
-            "  (its draft run did not finish: draft it again)"
-        } else {
-            ""
-        };
-        println!(
-            "{:<15}{}  {}  {}  {}{}{unfinished}",
-            action_name(*action),
-            message.tag,
-            message.entry,
-            request.lever.name(),
-            named(request.status(message.sent().is_some())),
-            due_text(*due),
-        );
+    for &(action, due, message, request) in &rows {
+        println!("{}", status_line(action, due, message, request));
     }
     if rows.iter().any(|row| matches!(row.1, Due::Statutory(_))) {
         println!(
@@ -1019,6 +996,38 @@ fn status(due_only: bool, passphrase_stdin: bool) -> Result<(), String> {
         );
     }
     Ok(())
+}
+
+/// The count line: each action state and what `count` gives for it.
+fn counts(count: impl Fn(tracker::Action) -> String) -> String {
+    let parts: Vec<String> = ACTIONS
+        .iter()
+        .map(|&a| format!("{} {}", action_name(a), count(a)))
+        .collect();
+    parts.join("  ")
+}
+
+/// One request as `status` lists it.
+fn status_line(
+    action: tracker::Action,
+    due: Due,
+    message: &Message,
+    request: &tracker::Request,
+) -> String {
+    let unfinished = if message.unfinished {
+        "  (its draft run did not finish: draft it again)"
+    } else {
+        ""
+    };
+    format!(
+        "{:<15}{}  {}  {}  {}{}{unfinished}",
+        action_name(action),
+        message.tag,
+        message.entry,
+        request.lever.name(),
+        named(request.status(message.sent().is_some())),
+        due_text(due),
+    )
 }
 
 /// Apply `sent`'s flags to one message and say what is now recorded.
