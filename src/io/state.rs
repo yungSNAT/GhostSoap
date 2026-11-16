@@ -22,6 +22,9 @@ pub use crate::core::tracker::State;
 
 const STATE_FILE: &str = "state.age";
 const LOCK_FILE: &str = "state.lock";
+/// The highest scrypt work factor (2^22) a state file may ask for: the reference age
+/// implementation's default, about 15 seconds and 4 GiB on a modern machine.
+const MAX_WORK_FACTOR: u8 = 22;
 
 /// State format 1, as M2 wrote it.
 #[derive(Deserialize)]
@@ -192,7 +195,10 @@ fn read(path: &Path, passphrase: SecretString) -> io::Result<State> {
         io::ErrorKind::NotFound => missing(path, e.kind()),
         _ => e,
     })?;
-    let identity = age::scrypt::Identity::new(passphrase);
+    let mut identity = age::scrypt::Identity::new(passphrase);
+    // age otherwise accepts 4 doublings above the work factor it times on this machine now,
+    // so a busy moment could refuse the state GhostSoap wrote here earlier.
+    identity.set_max_work_factor(MAX_WORK_FACTOR);
     let text = age::decrypt(&identity, &bytes).map_err(|e| match e {
         age::DecryptError::DecryptionFailed | age::DecryptError::NoMatchingKeys => {
             io::Error::new(io::ErrorKind::PermissionDenied, "wrong passphrase")
