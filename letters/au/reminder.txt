@@ -1,0 +1,19 @@
+version 1
+{{date}}
+
+The Privacy Officer
+{{legal_entity}}
+{{postal_address}}
+
+I wrote to you on {{sent}} with the requests below. I have not had a complete answer, so I am following them up.
+
+{{requests}}
+
+{{next}}
+
+Please reply in writing.
+
+Yours faithfully
+{{full_name}}
+
+Reference: {{tag}}

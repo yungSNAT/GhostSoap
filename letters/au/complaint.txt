@@ -1,0 +1,17 @@
+version 1
+{{date}}
+
+The Privacy Officer
+{{legal_entity}}
+{{postal_address}}
+
+This is a complaint under the Privacy Act 1988 (Cth) about how {{legal_entity}} has dealt with the requests I made in my letter of {{sent}}. I am making it to you first, as section 40(1A) of the Act generally expects before a complaint to the Information Commissioner.
+
+{{requests}}
+
+Please reply in writing within 30 days, saying what you will do about each request. If I am not satisfied with your response, I may complain to {{escalation}}.
+
+Yours faithfully
+{{full_name}}
+
+Reference: {{tag}}

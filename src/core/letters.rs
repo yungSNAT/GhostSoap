@@ -40,7 +40,7 @@ pub(crate) fn template(lever: Lever) -> &'static str {
 }
 
 /// Split a template into its version (first line, `version N`) and its text.
-fn parts(template: &str) -> (u32, &str) {
+pub(crate) fn parts(template: &str) -> (u32, &str) {
     let (first, text) = template.split_once('\n').unwrap_or((template, ""));
     let version = first
         .trim()
@@ -202,7 +202,7 @@ fn with_opt_out(levers: &[Lever]) -> Option<String> {
 
 /// Where the user can complain: the entry's Privacy Act targets about the Privacy Act
 /// requests and ACMA about an unsubscribe request, each named for its own matter.
-fn escalation(entry: &Entry, spam_only: bool, has_spam: bool) -> Option<String> {
+pub(crate) fn escalation(entry: &Entry, spam_only: bool, has_spam: bool) -> Option<String> {
     let name = |e: Escalation| match e {
         Escalation::Oaic => "the Office of the Australian Information Commissioner (OAIC)",
         Escalation::Afca => {
@@ -231,7 +231,7 @@ fn escalation(entry: &Entry, spam_only: bool, has_spam: bool) -> Option<String> 
 }
 
 /// Collapse runs of blank lines (left by dropped lines) and trim the ends.
-fn tidy(text: &str) -> String {
+pub(crate) fn tidy(text: &str) -> String {
     let mut out: Vec<&str> = Vec::new();
     for line in text.lines().map(str::trim_end) {
         if line.is_empty() && out.last().is_none_or(|l| l.is_empty()) {

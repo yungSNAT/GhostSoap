@@ -6,6 +6,7 @@
 pub mod check;
 pub mod deadline;
 pub mod embedded;
+pub mod followup;
 pub mod law;
 pub mod letters;
 pub mod plan;

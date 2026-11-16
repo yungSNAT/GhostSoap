@@ -15,6 +15,7 @@ use serde_json::{Value, json};
 use crate::core::check;
 use crate::core::deadline::{self, Due};
 use crate::core::embedded;
+use crate::core::followup;
 use crate::core::law::{self, Deadline};
 use crate::core::letters::{self, Letter, Request};
 use crate::core::plan::{self, Selection, Step};
@@ -139,6 +140,9 @@ pub enum Command {
         #[arg(long)]
         passphrase_stdin: bool,
     },
+    /// Write a reminder, or with --complaint the complaint to the business, for a letter you
+    /// sent. Nothing is recorded: once you send a complaint, record it with `reply`.
+    FollowUp(FollowUpArgs),
     /// Delete the drafts GhostSoap wrote; other files in the folder are left alone.
     Clean {
         /// Drafts folder; defaults to `drafts` in GhostSoap's data folder.
@@ -255,6 +259,28 @@ pub struct ReplyArgs {
     /// was wrong. It stays as history.
     #[arg(long, value_parser = parse_withdrawn, conflicts_with_all = ["status", "agreed_until", "on"])]
     withdraw: Option<tracker::Withdrawn>,
+    /// Read the passphrase from standard input instead of the terminal (for scripts).
+    #[arg(long)]
+    passphrase_stdin: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct FollowUpArgs {
+    /// The tag in the letter's subject line, such as GS-7K3QX.
+    tag: String,
+    /// The request to follow up; repeat for more. Every request the letter suits if left out.
+    #[arg(long, value_parser = parse_lever)]
+    lever: Vec<Lever>,
+    /// Write the complaint to the business that the OAIC generally needs first (Privacy Act
+    /// s 40(1A)) instead of a reminder.
+    #[arg(long)]
+    complaint: bool,
+    /// Drafts folder; defaults to `drafts` in GhostSoap's data folder.
+    #[arg(long, conflicts_with = "copy")]
+    out: Option<PathBuf>,
+    /// Print the letter's To, Subject and body instead of writing a file (for webmail).
+    #[arg(long)]
+    copy: bool,
     /// Read the passphrase from standard input instead of the terminal (for scripts).
     #[arg(long)]
     passphrase_stdin: bool,
@@ -398,6 +424,7 @@ pub fn run(cli: Cli) -> ExitCode {
             yes,
             passphrase_stdin,
         }) => forget(no_passphrase, yes, passphrase_stdin),
+        Some(Command::FollowUp(args)) => follow_up(&args),
         Some(Command::Clean { out }) => clean(out),
         Some(Command::Sent(args)) => sent(&args),
         Some(Command::Reply(args)) => reply(&args),
@@ -748,7 +775,7 @@ fn record_drafts<'a>(
             drafted: today,
             draft: folder.map(|folder| DraftFile {
                 folder: folder.to_owned(),
-                name: draft_name(plan.entry, &letter.tag, plan.channel.kind),
+                name: draft_name(&plan.entry.id, &letter.tag, plan.channel.kind),
             }),
             superseded: false,
             unfinished: true,
@@ -888,7 +915,8 @@ fn hand_over(dir: &Path, drafted: &Drafted, output: Output) -> Result<(), String
         print_copy(entry, letter);
         return Ok(());
     }
-    write_draft(dir, entry, tag, letter, output.mailto).map_err(|e| {
+    let name = draft_name(&entry.id, tag, letter.kind);
+    write_draft(dir, entry, &name, letter, output.mailto).map_err(|e| {
         format!(
             "{e}; {tag} and the other letters of this run are recorded as unfinished, so `sent` \
              refuses them until you draft them again. If GhostSoap cannot confirm a file it \
@@ -1002,6 +1030,58 @@ fn reply(args: &ReplyArgs) -> Result<(), String> {
         |line, _| Ok(line),
     )?;
     println!("{line}");
+    Ok(())
+}
+
+/// Write `args`'s reminder or complaint as a draft, or print it with --copy. It reads the
+/// state and records nothing.
+fn follow_up(args: &FollowUpArgs) -> Result<(), String> {
+    let dir = state::data_dir().map_err(|e| e.to_string())?;
+    let passphrase = Input::new(args.passphrase_stdin)
+        .passphrase("Passphrase: ")
+        .map_err(|e| e.to_string())?;
+    let state = state::load(&dir, passphrase).map_err(|e| e.to_string())?;
+    let tag = letters::normalise_tag(&args.tag);
+    let message = state.message(&tag).ok_or_else(|| {
+        format!("no letter is recorded under {tag}; the tag is in the letter's subject line")
+    })?;
+    let register = built_in_register()?;
+    let entry = register
+        .entries
+        .get(&message.entry)
+        .ok_or_else(|| format!("{} is no longer in the register", message.entry))?;
+    let kind = if args.complaint {
+        followup::Kind::Complaint
+    } else {
+        followup::Kind::Reminder
+    };
+    let today = today();
+    let letter = followup::compose(kind, entry, &state.profile, message, &args.lever, today)?;
+    if args.copy {
+        print_copy(entry, &letter);
+    } else {
+        let folder = drafts_dir(args.out.as_deref())?;
+        let output = Output {
+            copy: false,
+            mailto: false,
+        };
+        warn_about_out(&folder, args.out.is_some(), output);
+        let stem = format!("{}-{}-{}", entry.id, kind.name(), today.format("%Y%m%d"));
+        write_draft(
+            &folder,
+            entry,
+            &draft_name(&stem, &tag, letter.kind),
+            &letter,
+            false,
+        )?;
+        print_clean_reminder();
+    }
+    if kind == followup::Kind::Complaint {
+        println!(
+            "After you send it, record the complaint: ghostsoap reply {tag} escalated --to \
+             business --on <the day you sent it>"
+        );
+    }
     Ok(())
 }
 
@@ -1268,7 +1348,7 @@ fn unused_tag(used: &[String], candidate: impl Fn(u64) -> String) -> String {
 fn write_draft(
     dir: &Path,
     entry: &Entry,
-    tag: &str,
+    name: &str,
     letter: &Letter,
     mailto: bool,
 ) -> Result<(), String> {
@@ -1282,8 +1362,7 @@ fn write_draft(
         ChannelKind::Email => letters::eml(letter),
         _ => format!("{}\n", letter.body),
     };
-    let name = draft_name(entry, tag, letter.kind);
-    let path = io::drafts::write(dir, &name, &text).map_err(|e| e.to_string())?;
+    let path = io::drafts::write(dir, name, &text).map_err(|e| e.to_string())?;
     println!(
         "draft   {}  {how}: {}",
         entry.id,
@@ -1298,14 +1377,15 @@ fn write_draft(
     Ok(())
 }
 
-/// The file a draft is written to: an email as `.eml`, anything else as text.
-fn draft_name(entry: &Entry, tag: &str, kind: ChannelKind) -> String {
+/// The file a draft is written to, `<stem>-<tag>`: an email as `.eml`, anything else as
+/// text.
+fn draft_name(stem: &str, tag: &str, kind: ChannelKind) -> String {
     let extension = if kind == ChannelKind::Email {
         "eml"
     } else {
         "txt"
     };
-    format!("{}-{tag}.{extension}", entry.id)
+    format!("{stem}-{tag}.{extension}")
 }
 
 fn print_copy(entry: &Entry, letter: &Letter) {
@@ -1743,7 +1823,8 @@ mod tests {
             subject: "Test letter".to_owned(),
             body: "Test body".to_owned(),
         };
-        let err = write_draft(&drafts, entry, "GS-01234", &phone, false).unwrap_err();
+        let name = draft_name(&entry.id, "GS-01234", phone.kind);
+        let err = write_draft(&drafts, entry, &name, &phone, false).unwrap_err();
         assert_eq!(err, "plans never send letters by phone");
         assert!(!drafts.exists());
 
@@ -1761,7 +1842,8 @@ mod tests {
                 subject: "Test letter".to_owned(),
                 body: "Test body".to_owned(),
             };
-            write_draft(&drafts, entry, tag, &letter, true).unwrap();
+            let name = draft_name(&entry.id, tag, kind);
+            write_draft(&drafts, entry, &name, &letter, true).unwrap();
             let path = drafts.join(format!("australia-post-au-{tag}.txt"));
             assert_eq!(std::fs::read_to_string(path).unwrap(), "Test body\n");
         }
@@ -1770,7 +1852,8 @@ mod tests {
             to: "privacy@example.invalid".to_owned(),
             ..phone
         };
-        write_draft(&drafts, entry, "GS-56789", &email, true).unwrap();
+        let name = draft_name(&entry.id, "GS-56789", email.kind);
+        write_draft(&drafts, entry, &name, &email, true).unwrap();
         assert!(drafts.join("australia-post-au-GS-56789.eml").is_file());
     }
 

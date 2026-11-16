@@ -183,6 +183,59 @@ fn escalated_records_where_and_the_day_the_user_complained() {
 }
 
 #[test]
+fn follow_up_writes_a_reminder_or_complaint_as_a_draft_and_records_nothing() {
+    let (_tmp, home, drafts, tag, file) = start_drafted();
+    let out = drafts.to_str().unwrap();
+    let error = refused(&run(&home, &["follow-up", &tag, "--out", out]));
+    assert!(error.contains("is not recorded as sent"), "{error}");
+    done(&run(&home, &["sent", &tag]));
+    let before = state_bytes(&home);
+
+    let stdout = done(&run(&home, &["follow-up", &tag, "--out", out]));
+    let date = today().format("%Y%m%d");
+    let reminder = drafts.join(format!("cotality-au-reminder-{date}-{tag}.eml"));
+    assert!(stdout.contains(&reminder.file_name().unwrap().to_string_lossy().into_owned()));
+    let text = fs::read_to_string(&reminder).unwrap();
+    assert!(text.contains(&format!("Subject: Follow-up: Privacy Act request [{tag}]")));
+    assert!(text.contains("please answer by"), "{text}");
+    let again = refused(&run(&home, &["follow-up", &tag, "--out", out]));
+    assert!(again.contains("already exists"), "{again}");
+
+    let error = refused(&run(
+        &home,
+        &["follow-up", &tag, "--complaint", "--out", out],
+    ));
+    assert!(
+        error.contains("has no request a complaint suits"),
+        "{error}"
+    );
+    done(&run(&home, &["reply", &tag, "refused"]));
+    let copy = ["follow-up", &tag, "--complaint", "--copy"];
+    let stdout = done(&run(&home, &copy));
+    assert!(stdout.contains(&format!("Subject: Complaint: Privacy Act request [{tag}]")));
+    assert!(stdout.contains("You refused it."), "{stdout}");
+    assert!(stdout.contains(&format!(
+        "ghostsoap reply {tag} escalated --to business --on"
+    )));
+    let error = refused(&run(&home, &["follow-up", "GS-AAAAA"]));
+    assert!(
+        error.contains("no letter is recorded under GS-AAAAA"),
+        "{error}"
+    );
+
+    let after_reply = state_bytes(&home);
+    assert_ne!(before, after_reply, "only reply changed the state");
+    done(&run(
+        &home,
+        &["follow-up", &tag, "--complaint", "--out", out],
+    ));
+    assert_eq!(state_bytes(&home), after_reply, "follow-up records nothing");
+    let stdout = done(&ghostsoap(&home, &["clean", "--out", out], ""));
+    assert!(stdout.starts_with("Deleted 3 drafts"), "{stdout}");
+    assert!(!reminder.exists() && !file.exists());
+}
+
+#[test]
 fn a_status_that_cannot_read_the_state_is_degraded_not_empty() {
     let (_tmp, home, _drafts, _tag, _file) = start_drafted();
     let out = ghostsoap(
