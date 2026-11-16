@@ -153,6 +153,58 @@ fn a_complaint_names_what_went_wrong_and_when_the_commissioner_can_be_asked_firs
 }
 
 #[test]
+fn an_undated_request_gets_a_plain_reminder_and_each_answer_its_own_complaint() {
+    let mut entry = equifax();
+    entry.escalation = vec![register::Escalation::Acma];
+    let message = sent(&[Lever::App12, Lever::App13NotifyRecipients]);
+    let letter = compose(
+        Kind::Reminder,
+        &entry,
+        &profile(),
+        &message,
+        &[],
+        day(11, 17),
+    );
+    let body = letter.unwrap().body.replace('\n', " ");
+    assert!(
+        body.contains("I have not yet had your answer. Please answer."),
+        "{body}"
+    );
+    assert!(
+        body.contains("my next step is a complaint to you. "),
+        "no Privacy Act place to name: {body}"
+    );
+
+    let complaints = [
+        (
+            None,
+            "the period the OAIC's APP guidelines give as generally reasonable ended on 31 October 2026.",
+        ),
+        (Some(Status::Partial), "You dealt with only part of it."),
+        (
+            Some(Status::ChargeQuoted),
+            "You asked for a charge before acting on it.",
+        ),
+        (
+            Some(Status::IdRequested),
+            "You asked for proof of identity before acting on it.",
+        ),
+        (
+            Some(Status::ExemptClaimed),
+            "You said the law does not apply to you.",
+        ),
+    ];
+    for (status, expected) in complaints {
+        let mut message = sent(&[Lever::App12]);
+        if let Some(status) = status {
+            answer(&mut message, 0, status);
+        }
+        let body = write(Kind::Complaint, &message, &[], day(11, 17));
+        assert!(body.contains(expected), "{expected}: {body}");
+    }
+}
+
+#[test]
 fn a_follow_up_refuses_what_it_cannot_write() {
     let mut message = sent(&[Lever::App12]);
     let refused = |message: &Message, kind, levers: &[Lever], today| {
