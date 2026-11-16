@@ -569,3 +569,27 @@ fn forget_without_the_passphrase_deletes_the_state_and_says_what_it_skipped() {
     assert_eq!(nothing.status.code(), Some(0));
     assert!(text(&nothing.stdout).contains("nothing to delete"));
 }
+
+#[cfg(unix)]
+#[test]
+fn forget_reports_a_folder_it_cannot_clean_and_deletes_the_rest() {
+    use std::os::unix::fs::PermissionsExt;
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    let out = tmp.path().join("out");
+    init(&home);
+    assert_eq!(draft_to(&home, &out, &[], &[]).status.code(), Some(0));
+    fs::set_permissions(&out, fs::Permissions::from_mode(0o500)).unwrap();
+    let pass = format!("{PASSPHRASE}\n");
+    let forgot = ghostsoap(&home, &["forget", "--passphrase-stdin", "--yes"], &pass);
+    fs::set_permissions(&out, fs::Permissions::from_mode(0o700)).unwrap();
+    assert_eq!(forgot.status.code(), Some(1));
+    let errors = text(&forgot.stderr);
+    assert!(
+        errors.contains(&format!("error: cannot delete {}", out.display())),
+        "{errors}"
+    );
+    assert!(errors.contains("1 could not be deleted"), "{errors}");
+    assert!(!home.join("state.age").exists());
+    assert_eq!(emls(&out).len(), 1);
+}
