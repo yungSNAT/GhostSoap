@@ -472,12 +472,15 @@ fn draft(
         let detail = selection.detail.as_deref();
         let destination = folder.as_deref().map_or(dir.as_path(), Path::new);
         // The state records every letter before one is written or shown, so a letter the
-        // user can send always has a record for `sent` to find.
+        // user can send always has a record for `sent` to find. Each is marked unfinished
+        // until all are handed over, so a run that fails or stops leaves `sent` refusing them.
         let drafted = update_state(
             passphrase_stdin,
             |state| record_drafts(state, &planned, detail, folder.as_deref(), today()),
             |(_, redraft)| redraft.commit(),
-            |(drafted, redraft)| publish_drafts(destination, drafted, output, redraft),
+            |(drafted, redraft), state| {
+                publish_drafts(destination, drafted, output, redraft, state)
+            },
         )?;
         let tags: Vec<&str> = drafted.iter().map(|d| d.tag.as_str()).collect();
         println!(
@@ -497,12 +500,18 @@ fn publish_drafts<'a>(
     drafted: Vec<Drafted<'a>>,
     output: Output,
     mut redraft: io::drafts::Redraft,
+    state: &mut State,
 ) -> Result<Vec<Drafted<'a>>, String> {
     redraft.unlock();
     for letter in &drafted {
         hand_over(dir, letter, output)?;
     }
     redraft.discard();
+    for message in &mut state.messages {
+        if drafted.iter().any(|letter| letter.tag == message.tag) {
+            message.unfinished = false;
+        }
+    }
     Ok(drafted)
 }
 
@@ -559,6 +568,7 @@ fn record_drafts<'a>(
                 name: draft_name(plan.entry, &letter.tag, plan.channel.kind),
             }),
             superseded: false,
+            unfinished: true,
             sends: Vec::new(),
             requests: plan
                 .levers
@@ -697,8 +707,9 @@ fn hand_over(dir: &Path, drafted: &Drafted, output: Output) -> Result<(), String
     }
     write_draft(dir, entry, tag, letter, output.mailto).map_err(|e| {
         format!(
-            "{e}; {tag} is recorded as drafted. Check whether the letter was written before \
-             retrying. If GhostSoap cannot confirm a file it left, move that file yourself first"
+            "{e}; {tag} and the other letters of this run are recorded as unfinished, so `sent` \
+             refuses them until you draft them again. If GhostSoap cannot confirm a file it \
+             left, move that file yourself first"
         )
     })
 }
@@ -744,7 +755,7 @@ fn sent(args: &SentArgs) -> Result<(), String> {
             Ok(lines)
         },
         |_| {},
-        Ok,
+        |lines, _| Ok(lines),
     )?;
     for line in lines {
         println!("{line}");
@@ -836,7 +847,7 @@ fn update_state<T, U>(
     passphrase_stdin: bool,
     change: impl FnOnce(&mut State) -> Result<T, String>,
     committed: impl FnOnce(&mut T),
-    after_save: impl FnOnce(T) -> Result<U, String>,
+    after_save: impl FnOnce(T, &mut State) -> Result<U, String>,
 ) -> Result<U, String> {
     let dir = state::data_dir().map_err(|e| e.to_string())?;
     warn_exposed(&dir, DATA_FOLDER);

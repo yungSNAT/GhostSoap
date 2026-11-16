@@ -162,18 +162,20 @@ pub fn update<T>(
     passphrase: SecretString,
     change: impl FnOnce(&mut State) -> Result<T, String>,
 ) -> io::Result<T> {
-    update_then(dir, passphrase, change, |_| {}, Ok)
+    update_then(dir, passphrase, change, |_| {}, |value, _| Ok(value))
 }
 
 /// Commit a state change before handing over its result, whilst still excluding other writers.
 /// `committed` runs at the atomic replacement, even if the subsequent directory flush
-/// fails. An error in `after_save` leaves the committed state in place.
+/// fails. `after_save` may change the state again, such as to record that the handover
+/// finished; that change is saved only if `after_save` succeeds. An error in `after_save`
+/// leaves the committed state in place.
 pub(crate) fn update_then<T, U>(
     dir: &Path,
     passphrase: SecretString,
     change: impl FnOnce(&mut State) -> Result<T, String>,
     committed: impl FnOnce(&mut T),
-    after_save: impl FnOnce(T) -> Result<U, String>,
+    after_save: impl FnOnce(T, &mut State) -> Result<U, String>,
 ) -> io::Result<U> {
     let path = state_path(dir);
     // The lock lives in the data folder; without one there is no state to change.
@@ -185,11 +187,24 @@ pub(crate) fn update_then<T, U>(
     let mut state = before.clone();
     let mut value = change(&mut state).map_err(io::Error::other)?;
     if state != before {
-        write_atomic(dir, &encrypt(&state, passphrase)?, || committed(&mut value))?;
+        let bytes = encrypt(&state, passphrase.clone())?;
+        write_atomic(dir, &bytes, || committed(&mut value))?;
     } else {
         committed(&mut value);
     }
-    after_save(value).map_err(io::Error::other)
+    let saved = state.clone();
+    let result = after_save(value, &mut state).map_err(io::Error::other)?;
+    if state != saved {
+        let finished =
+            encrypt(&state, passphrase).and_then(|bytes| write_atomic(dir, &bytes, || {}));
+        finished.map_err(|e| {
+            io::Error::new(
+                e.kind(),
+                format!("could not record that the handover finished: {e}"),
+            )
+        })?;
+    }
+    Ok(result)
 }
 
 fn missing(path: &Path, kind: io::ErrorKind) -> io::Error {
@@ -393,6 +408,7 @@ mod tests {
             drafted: NaiveDate::from_ymd_opt(2026, 11, 10).unwrap(),
             draft: None,
             superseded: false,
+            unfinished: false,
             sends: Vec::new(),
             requests: vec![Request::new(Lever::App7Source)],
         }
@@ -473,7 +489,7 @@ mod tests {
             m2(),
             add("GS-7K3QX"),
             |_| {},
-            |()| {
+            |(), _| {
                 let state = load(dir.path(), m2()).unwrap();
                 assert!(state.message("GS-7K3QX").is_some());
                 let competing = update(dir.path(), m2(), add("GS-00AZ9")).unwrap_err();
@@ -483,6 +499,49 @@ mod tests {
         )
         .unwrap();
         update(dir.path(), m2(), add("GS-00AZ9")).unwrap();
+    }
+
+    #[test]
+    fn what_the_handover_changes_is_saved_only_once_it_succeeds() {
+        let dir = m2_home();
+        let unfinished = || load(dir.path(), m2()).unwrap().messages[0].unfinished;
+        let start = |state: &mut State| {
+            let mut message = message("GS-7K3QX");
+            message.unfinished = true;
+            state.messages.push(message);
+            Ok(())
+        };
+        let finish = |state: &mut State| state.messages[0].unfinished = false;
+        let failed = |(), state: &mut State| {
+            finish(state);
+            Err::<(), _>("the handover failed".to_owned())
+        };
+        let err = update_then(dir.path(), m2(), start, |_| {}, failed).unwrap_err();
+        assert_eq!(err.to_string(), "the handover failed");
+        assert!(unfinished(), "the first change stays saved, and only that");
+
+        // A folder sits where the second save is first written.
+        let tmp = state_path(dir.path()).with_extension("age.tmp");
+        let blocked = |(), state: &mut State| {
+            finish(state);
+            fs::create_dir(&tmp).unwrap();
+            Ok(())
+        };
+        let err = update_then(dir.path(), m2(), |_| Ok(()), |_| {}, blocked).unwrap_err();
+        let said = err.to_string();
+        assert!(
+            said.starts_with("could not record that the handover finished: "),
+            "{said}"
+        );
+        assert!(unfinished());
+        fs::remove_dir(&tmp).unwrap();
+
+        let finished = |(), state: &mut State| {
+            finish(state);
+            Ok(())
+        };
+        update_then(dir.path(), m2(), |_| Ok(()), |_| {}, finished).unwrap();
+        assert!(!unfinished());
     }
 
     #[test]

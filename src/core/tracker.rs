@@ -48,6 +48,11 @@ pub struct Message {
     /// The draft has been replaced under a new tag and remains as history.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub superseded: bool,
+    /// Saved by `draft` before it writes or shows the letter, and cleared once every letter
+    /// of that run is handed over. A message still marked was drafted by a run that failed
+    /// or stopped, so the letter the user holds under its tag may be an earlier one.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub unfinished: bool,
     /// What the user recorded about sending, oldest first; empty until they run `sent`. The
     /// last record decides: the message is sent as that record says, or not sent if it
     /// withdraws the one before. Earlier records stay as history.
@@ -298,6 +303,12 @@ impl Message {
         today: NaiveDate,
     ) -> Result<bool, String> {
         let tag = &self.tag;
+        if self.unfinished {
+            return Err(format!(
+                "the draft run that recorded {tag} did not finish, so the letter you hold under \
+                 that tag may not be the one recorded; draft it again and send that letter"
+            ));
+        }
         if send.on > today {
             return Err(format!("{} is in the future", send.on));
         }
@@ -538,6 +549,7 @@ mod tests {
             drafted: day(10),
             draft: None,
             superseded: false,
+            unfinished: false,
             sends: Vec::new(),
             requests: vec![
                 request(Lever::App7NoMarketing, 1, guide),
