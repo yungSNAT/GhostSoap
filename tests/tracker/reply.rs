@@ -150,3 +150,18 @@ fn a_status_that_cannot_read_the_state_is_degraded_not_empty() {
     let error = refused(&out);
     assert!(error.contains("error: the state could not be read, so this is not an all-clear"));
 }
+
+#[test]
+fn a_bounced_letter_offers_a_register_report_without_personal_details() {
+    let (_tmp, home, _drafts, tag, _file) = start_drafted();
+    done(&run(&home, &["sent", &tag]));
+    let stdout = done(&run(&home, &["reply", &tag, "bounced"]));
+    let link = "https://github.com/yungSNAT/GhostSoap/issues/new?title=Bounced%3A%20cotality-au%20by%20email&body=";
+    assert!(stdout.contains(link), "{stdout}");
+    let report = stdout.lines().find(|l| l.contains(link)).unwrap();
+    for detail in ["Lara", "croft-manor", "0400", "3127"] {
+        assert!(!report.contains(detail), "{report}");
+    }
+    let again = done(&run(&home, &["reply", &tag, "bounced"]));
+    assert!(!again.contains("issues/new"), "{again}");
+}
