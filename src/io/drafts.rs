@@ -1059,12 +1059,10 @@ mod tests {
         let records = read_manifest(&drafts).unwrap();
         fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
         let readable = fs::read(&path).is_ok();
-        let status = draft_status(&drafts, name, &records);
+        let status = (!readable).then(|| draft_status(&drafts, name, &records));
         fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
         // Root reads any file, so the read cannot be made to fail this way.
-        let Err(err) = status else {
-            return assert!(readable);
-        };
-        assert_eq!(err.kind(), io::ErrorKind::PermissionDenied);
+        let Some(status) = status else { return };
+        assert_eq!(status.unwrap_err().kind(), io::ErrorKind::PermissionDenied);
     }
 }
