@@ -136,6 +136,53 @@ fn a_credit_correction_shows_the_law_date_and_an_agreed_longer_period_moves_it()
 }
 
 #[test]
+fn escalated_records_where_and_the_day_the_user_complained() {
+    let (tmp, home, _drafts, tag, _file) = start_drafted();
+    done(&run(&home, &["sent", &tag]));
+    let today = today().to_string();
+    let error = refused(&run(&home, &["reply", &tag, "escalated"]));
+    assert!(
+        error.contains("say where you complained with --to"),
+        "{error}"
+    );
+    let error = refused(&run(
+        &home,
+        &["reply", &tag, "acknowledged", "--to", "oaic"],
+    ));
+    assert!(error.contains("--to goes only with escalated"), "{error}");
+    let unknown = run(&home, &["reply", &tag, "escalated", "--to", "ombudsman"]);
+    assert_eq!(unknown.status.code(), Some(2));
+    assert!(text(&unknown.stderr).contains("business, afca, tio, acma or oaic"));
+
+    let complaint = [
+        "reply",
+        &tag,
+        "escalated",
+        "--to",
+        "business",
+        "--on",
+        &today,
+    ];
+    let line = |what: &str| format!("reply   {tag}  cotality-au  {what}\n");
+    let recorded = format!("recorded escalated to business on {today}");
+    assert_eq!(done(&run(&home, &complaint)), line(&recorded));
+    assert_eq!(
+        done(&run(&home, &complaint)),
+        line(&format!("already {recorded}"))
+    );
+
+    // The day and the place survive a reload, and a withdrawal leaves them as history.
+    let export = tmp.path().join("export.toml");
+    done(&run(&home, &["export", "--out", export.to_str().unwrap()]));
+    let saved = fs::read_to_string(&export).unwrap();
+    assert!(saved.contains("status = \"escalated\""), "{saved}");
+    assert!(saved.contains("to = \"business\""), "{saved}");
+    done(&run(&home, &["reply", &tag, "--withdraw", "status"]));
+    let stdout = done(&run(&home, &["status"]));
+    assert!(!stdout.contains("escalated"), "{stdout}");
+}
+
+#[test]
 fn a_status_that_cannot_read_the_state_is_degraded_not_empty() {
     let (_tmp, home, _drafts, _tag, _file) = start_drafted();
     let out = ghostsoap(
