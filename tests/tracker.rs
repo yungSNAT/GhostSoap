@@ -313,11 +313,29 @@ fn blocked_drafts(tmp: &Path) -> (PathBuf, PathBuf) {
 
 #[test]
 fn sent_refuses_a_letter_whose_draft_run_did_not_finish() {
-    let (tmp, home, _drafts, tag, _file) = start_drafted();
+    let (tmp, home, drafts, tag, _file) = start_drafted();
     let (output, blocked) = blocked_drafts(tmp.path());
     // The redraft takes over the tag, then stops before its letter is written; the user may
     // still hold the earlier letter under that tag, which asked for other things.
     refused(&draft_cotality(&home, &output, &["--lever", "app7-source"]));
+    // `clean` names the earlier letter's recovery copy and leaves it.
+    let [copy] = fs::read_dir(&drafts)
+        .unwrap()
+        .map(|f| f.unwrap().file_name().into_string().unwrap())
+        .filter(|name| name.ends_with(".tmp"))
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
+    let cleaned = done(&ghostsoap(
+        &home,
+        &["clean", "--out", drafts.to_str().unwrap()],
+        "",
+    ));
+    assert!(
+        cleaned.contains(&format!("check   {copy}: left by a write")),
+        "{cleaned}"
+    );
+    assert!(drafts.join(&copy).exists());
     let before = state_bytes(&home);
     let error = refused(&run(&home, &["sent", &tag]));
     assert!(
