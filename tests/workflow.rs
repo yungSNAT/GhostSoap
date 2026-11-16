@@ -435,3 +435,75 @@ fn law_lists_every_lever_with_its_sources() {
         assert!(stdout.contains(line), "missing {line:?}");
     }
 }
+
+#[test]
+fn export_writes_the_state_as_plaintext_once_and_never_over_a_file() {
+    let tmp = tempfile::tempdir().unwrap();
+    init(tmp.path());
+    let out = tmp.path().join("export.toml");
+    let path = out.to_str().unwrap();
+    let input = format!("{PASSPHRASE}\n");
+    let export = || {
+        let args = ["export", "--out", path, "--passphrase-stdin"];
+        ghostsoap(tmp.path(), &args, &input)
+    };
+    let first = export();
+    assert_eq!(first.status.code(), Some(0), "{}", text(&first.stderr));
+    assert!(text(&first.stderr).contains(&format!("warning: {path} is plaintext")));
+    let exported = fs::read_to_string(&out).unwrap();
+    assert!(exported.starts_with("# GhostSoap export of "), "{exported}");
+    assert!(exported.contains("\nformat = 2\n"), "{exported}");
+    assert!(exported.contains("Lara Croft"), "{exported}");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = fs::metadata(&out).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
+    }
+    let again = export();
+    assert_eq!(again.status.code(), Some(1));
+    assert!(
+        text(&again.stderr).contains("already exists"),
+        "{}",
+        text(&again.stderr)
+    );
+    assert_eq!(fs::read_to_string(&out).unwrap(), exported);
+    let nowhere = tmp.path().join("no such folder").join("export.toml");
+    let args = [
+        "export",
+        "--out",
+        nowhere.to_str().unwrap(),
+        "--passphrase-stdin",
+    ];
+    let failed = ghostsoap(tmp.path(), &args, &input);
+    assert_eq!(failed.status.code(), Some(1), "{}", text(&failed.stderr));
+    assert!(!nowhere.exists());
+    let default = ghostsoap(tmp.path(), &["export", "--passphrase-stdin"], &input);
+    assert_eq!(default.status.code(), Some(0), "{}", text(&default.stderr));
+    let named = |e: &fs::DirEntry| {
+        e.file_name()
+            .to_string_lossy()
+            .starts_with("ghostsoap-export-")
+    };
+    let entries = fs::read_dir(tmp.path()).unwrap().map(Result::unwrap);
+    assert_eq!(entries.filter(named).count(), 1);
+}
+
+#[cfg(unix)]
+#[test]
+fn export_refuses_a_link_at_its_destination() {
+    let tmp = tempfile::tempdir().unwrap();
+    init(tmp.path());
+    let target = tmp.path().join("elsewhere.toml");
+    let link = tmp.path().join("export.toml");
+    std::os::unix::fs::symlink(&target, &link).unwrap();
+    let args = [
+        "export",
+        "--out",
+        link.to_str().unwrap(),
+        "--passphrase-stdin",
+    ];
+    let out = ghostsoap(tmp.path(), &args, &format!("{PASSPHRASE}\n"));
+    assert_eq!(out.status.code(), Some(1), "{}", text(&out.stderr));
+    assert!(!target.exists());
+}
