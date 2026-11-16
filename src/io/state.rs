@@ -206,6 +206,13 @@ fn export_text(state: &State, date: &str) -> io::Result<String> {
 /// on Unix). A file or link already at `path` is refused, never replaced.
 pub fn export(dir: &Path, passphrase: SecretString, path: &Path, date: &str) -> io::Result<()> {
     let text = export_text(&load(dir, passphrase)?, date)?;
+    write_new(path, &text, "export")
+}
+
+/// Write `text` to a new file at `path` (mode 600 on Unix), the `what` a command makes. A
+/// file or link already at `path` is refused, never replaced, and a failed write deletes
+/// what it left or says where it is.
+pub fn write_new(path: &Path, text: &str, what: &str) -> io::Result<()> {
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
     #[cfg(unix)]
@@ -213,7 +220,7 @@ pub fn export(dir: &Path, passphrase: SecretString, path: &Path, date: &str) -> 
     let mut file = options.open(path).map_err(|e| match e.kind() {
         io::ErrorKind::AlreadyExists => io::Error::new(
             e.kind(),
-            format!("{} already exists; nothing was exported", path.display()),
+            format!("{} already exists; no {what} was written", path.display()),
         ),
         _ => e,
     })?;
@@ -221,20 +228,20 @@ pub fn export(dir: &Path, passphrase: SecretString, path: &Path, date: &str) -> 
         .write_all(text.as_bytes())
         .and_then(|()| file.sync_all());
     drop(file);
-    written.map_err(|e| discard(path, &e))
+    written.map_err(|e| discard(path, what, &e))
 }
 
-/// The error for an export whose write failed, after deleting the plaintext it left, so
-/// none is left unreported.
-fn discard(path: &Path, error: &io::Error) -> io::Error {
+/// The error for a `what` whose write failed, after deleting the plaintext it left, so none
+/// is left unreported.
+fn discard(path: &Path, what: &str, error: &io::Error) -> io::Error {
     let left = match fs::remove_file(path) {
         Ok(()) => "was deleted".to_owned(),
         Err(e) => format!("could not be deleted ({e}); it is plaintext, so delete it yourself"),
     };
-    let export = path.display();
+    let file = path.display();
     io::Error::new(
         error.kind(),
-        format!("{error}; the part-written export at {export} {left}"),
+        format!("{error}; the part-written {what} at {file} {left}"),
     )
 }
 
@@ -601,7 +608,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join("ghostsoap-export-2026-11-17.toml");
         fs::write(&path, "# GhostSoap export of 2026-11-17. part").unwrap();
-        let error = discard(&path, &io::Error::other("disk full"));
+        let error = discard(&path, "export", &io::Error::other("disk full"));
         assert_eq!(
             error.to_string(),
             format!(
@@ -611,7 +618,7 @@ mod tests {
         );
         assert!(!path.exists());
         // A folder cannot be deleted as a file, so the message says to delete it.
-        let error = discard(tmp.path(), &io::Error::other("disk full")).to_string();
+        let error = discard(tmp.path(), "export", &io::Error::other("disk full")).to_string();
         assert!(
             error.contains("it is plaintext, so delete it yourself"),
             "{error}"

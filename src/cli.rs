@@ -12,6 +12,7 @@ use chrono::NaiveDate;
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use serde_json::{Value, json};
 
+use crate::core::calendar;
 use crate::core::check;
 use crate::core::deadline::{self, Due};
 use crate::core::embedded;
@@ -163,6 +164,11 @@ pub enum Command {
         /// List only requests with a date, soonest first.
         #[arg(long)]
         due: bool,
+        /// Also write each open request's date to a new calendar file (iCalendar) at this
+        /// path; it must not exist yet. It holds tags, businesses, requests and dates, not
+        /// your details.
+        #[arg(long)]
+        ics: Option<PathBuf>,
         /// Read the passphrase from standard input instead of the terminal (for scripts).
         #[arg(long)]
         passphrase_stdin: bool,
@@ -395,8 +401,9 @@ pub fn run(cli: Cli) -> ExitCode {
         Some(Command::Reply(args)) => reply(&args),
         Some(Command::Status {
             due,
+            ics,
             passphrase_stdin,
-        }) => status(due, passphrase_stdin),
+        }) => status(due, ics.as_deref(), passphrase_stdin),
         Some(Command::Law { json }) => {
             if json {
                 show_law_json();
@@ -1056,7 +1063,7 @@ fn due_text(due: Due) -> String {
 /// List every request that is not history, by action state and then in the order drafted,
 /// or with `due_only` only those with a date, soonest first. A state that cannot be read is
 /// reported as DEGRADED with unknown counts, never as nothing to do.
-fn status(due_only: bool, passphrase_stdin: bool) -> Result<(), String> {
+fn status(due_only: bool, ics: Option<&Path>, passphrase_stdin: bool) -> Result<(), String> {
     let loaded = state::data_dir().and_then(|dir| {
         let passphrase = Input::new(passphrase_stdin).passphrase("Passphrase: ")?;
         state::load(&dir, passphrase)
@@ -1098,6 +1105,37 @@ fn status(due_only: bool, passphrase_stdin: bool) -> Result<(), String> {
              Interpretation Act 1901 s 36(2))."
         );
     }
+    ics.map_or(Ok(()), |path| write_calendar(path, &rows))
+}
+
+/// Write the dates of `rows` still open (overdue, action needed or waiting) to a new
+/// calendar file at `path`, and say what it shares.
+fn write_calendar(
+    path: &Path,
+    rows: &[(tracker::Action, Due, &Message, &tracker::Request)],
+) -> Result<(), String> {
+    use tracker::Action::{Needed, Overdue, Waiting};
+    let items: Vec<calendar::Item> = rows
+        .iter()
+        .filter(|row| matches!(row.0, Overdue | Needed | Waiting) && due_date(row.1).is_some())
+        .map(|&(_, due, message, request)| calendar::Item {
+            tag: &message.tag,
+            entry: &message.entry,
+            lever: request.lever.name(),
+            due,
+        })
+        .collect();
+    let stamp = chrono::Utc::now().naive_utc();
+    let text = calendar::ics(&items, stamp, env!("CARGO_PKG_VERSION"));
+    state::write_new(path, &text, "calendar file").map_err(|e| e.to_string())?;
+    let dates = if items.len() == 1 { "date" } else { "dates" };
+    println!("Wrote {} {dates} to {}.", items.len(), path.display());
+    let folder = path.parent().unwrap_or(Path::new("."));
+    warn_exposed(folder, ("the calendar file's folder", "the calendar file"));
+    eprintln!(
+        "note: the calendar file names the businesses you wrote to and when; importing it \
+         into an online calendar shares that with the calendar's provider."
+    );
     Ok(())
 }
 
