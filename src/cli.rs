@@ -938,7 +938,12 @@ fn reply(args: &ReplyArgs) -> Result<(), String> {
                     note,
                 };
                 let new = message.record_status(&args.lever, event, today)?;
-                format!("{} {} on {on}", recorded(new), named(status))
+                let report = if new && status == tracker::Status::Bounced {
+                    bounce_report(&message.entry, message.channel)
+                } else {
+                    String::new()
+                };
+                format!("{} {} on {on}{report}", recorded(new), named(status))
             };
             Ok(format!(
                 "reply   {}  {}  {done}",
@@ -950,6 +955,24 @@ fn reply(args: &ReplyArgs) -> Result<(), String> {
     )?;
     println!("{line}");
     Ok(())
+}
+
+/// A link that opens a register issue about a bounced address, holding only the entry and
+/// the channel, never the user's details. Nothing is sent: the user decides whether to file it.
+fn bounce_report(entry: &str, channel: ChannelKind) -> String {
+    let title = format!("Bounced: {entry} by {}", channel.label());
+    let body = format!(
+        "A letter GhostSoap prepared for `{entry}` by {} came back undelivered, so the \
+         register's address may be out of date.",
+        channel.label()
+    );
+    format!(
+        "\nThe register's address may be out of date. To tell its maintainers, open this \
+         public issue and remove anything about you before submitting:\n\
+         https://github.com/yungSNAT/GhostSoap/issues/new?title={}&body={}",
+        letters::percent_encode(&title),
+        letters::percent_encode(&body)
+    )
 }
 
 fn recorded(new: bool) -> &'static str {
