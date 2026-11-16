@@ -1,0 +1,35 @@
+id = "snovio-au"
+name = "Snov.io"
+legal_entity = "Snovio Inc."
+kinds = ["marketing-list"]
+priority = "standard"
+quality = "verified"
+verified_at = 2026-11-16
+sources = ["https://snov.io/privacy-policy", "https://app.snov.io/clear-email", "https://snov.io/email-finder", "https://snov.io/companies/commbank.com.au"]
+identity_fields = ["email"]
+exemption_risk = "overseas"
+escalation = []
+effort = "easy"
+
+[[channels]]
+kind = "web-form"
+address = "https://app.snov.io/clear-email"
+levers = []
+
+[manual_check]
+url = "https://snov.io/privacy-policy"
+
+[[evidence]]
+url = "https://snov.io/privacy-policy"
+checked_at = 2026-11-16
+sha256 = "4b0d222dab1431533e04d8615bbbe37df01b9dfabef434ef2d1391fe44d41611"
+
+[[evidence]]
+url = "https://snov.io/email-finder"
+checked_at = 2026-11-16
+sha256 = "10c9e9e6c86f53d3a336b9a2551ceab21dc5c4a3318a1d39098cc2e6e3332b6c"
+
+[[evidence]]
+url = "https://snov.io/companies/commbank.com.au"
+checked_at = 2026-11-16
+sha256 = "40fa0d8dddda878c8816f8fd3d9d28b29cbf879e418bc1bef7042370ec57b592"
