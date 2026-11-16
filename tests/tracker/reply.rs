@@ -136,6 +136,74 @@ fn a_credit_correction_shows_the_law_date_and_an_agreed_longer_period_moves_it()
 }
 
 #[test]
+fn status_ics_writes_each_dated_request_once_without_personal_details_and_never_over_a_file() {
+    use ghostsoap::core::deadline::past_weekend;
+
+    let (tmp, home, drafts) = start();
+    let detail = "The default listed for 2024 is not mine.";
+    let correction = [
+        "draft",
+        "--entry",
+        "equifax-au",
+        "--lever",
+        "s20t-correction",
+        "--detail",
+        detail,
+        "--out",
+        drafts.to_str().unwrap(),
+    ];
+    let [tag] = tags(&done(&run(&home, &correction))).try_into().unwrap();
+    done(&run(&home, &["sent", &tag]));
+    // A letter not yet sent has no date, so it is not in the calendar.
+    done(&draft_cotality(&home, &drafts, &[]));
+    let law = past_weekend(today() + Days::new(29));
+
+    let ics = tmp.path().join("ghostsoap.ics");
+    let args = ["status", "--ics", ics.to_str().unwrap()];
+    let stdout = done(&run(&home, &args));
+    assert!(
+        stdout.ends_with(&format!("Wrote 1 date to {}.\n", ics.display())),
+        "{stdout}"
+    );
+    let calendar = fs::read_to_string(&ics).unwrap();
+    assert!(calendar.starts_with("BEGIN:VCALENDAR\r\nVERSION:2.0\r\n"));
+    assert_eq!(calendar.matches("BEGIN:VEVENT").count(), 1, "{calendar}");
+    for line in [
+        format!("UID:{tag}-s20t-correction@ghostsoap.invalid"),
+        format!("DTSTART;VALUE=DATE:{}", law.format("%Y%m%d")),
+    ] {
+        assert!(
+            calendar.contains(&format!("{line}\r\n")),
+            "{line}: {calendar}"
+        );
+    }
+    for personal in [
+        "Lara",
+        "Croft",
+        "croft-manor",
+        "0400",
+        "1968",
+        "3127",
+        detail,
+    ] {
+        assert!(!calendar.contains(personal), "{personal}: {calendar}");
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = fs::metadata(&ics).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
+    }
+
+    let error = refused(&run(&home, &args));
+    assert!(
+        error.contains("already exists; no calendar file was written"),
+        "{error}"
+    );
+    assert_eq!(fs::read_to_string(&ics).unwrap(), calendar);
+}
+
+#[test]
 fn a_status_that_cannot_read_the_state_is_degraded_not_empty() {
     let (_tmp, home, _drafts, _tag, _file) = start_drafted();
     let out = ghostsoap(
