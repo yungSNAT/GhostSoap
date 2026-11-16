@@ -10,6 +10,7 @@
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
+use crate::core::deadline::{self, Due};
 use crate::core::law::{self, Deadline};
 use crate::core::letters;
 use crate::core::profile::Profile;
@@ -369,6 +370,167 @@ impl Message {
         Ok(())
     }
 
+    /// The requests `levers` names, each once, or every request when it names none.
+    fn targets(&self, levers: &[Lever]) -> Result<Vec<usize>, String> {
+        if levers.is_empty() {
+            return Ok((0..self.requests.len()).collect());
+        }
+        let mut targets = Vec::new();
+        for lever in levers {
+            let at = self.requests.iter().position(|r| r.lever == *lever);
+            let at = at.ok_or_else(|| format!("{} holds no {} request", self.tag, lever.name()))?;
+            if !targets.contains(&at) {
+                targets.push(at);
+            }
+        }
+        Ok(targets)
+    }
+
+    /// Record an answer, or a step the user took, on the requests `levers` names, or on
+    /// every request: all of them or none. `Ok(false)` means it was already the latest
+    /// status in effect on each, so nothing changed. `today` stops a date in the future.
+    pub fn record_status(
+        &mut self,
+        levers: &[Lever],
+        event: StatusEvent,
+        today: NaiveDate,
+    ) -> Result<bool, String> {
+        let tag = &self.tag;
+        if event.on > today {
+            return Err(format!("{} is in the future", event.on));
+        }
+        match self.sent() {
+            None if event.status != Status::Abandoned => {
+                return Err(format!(
+                    "{tag} is not recorded as sent, so it can only be given up (abandoned); \
+                     record sending it first with `ghostsoap sent {tag}`"
+                ));
+            }
+            Some(send) if event.on < send.on => {
+                return Err(format!("{tag} was sent on {}, after {}", send.on, event.on));
+            }
+            None if event.on < self.drafted => {
+                return Err(format!(
+                    "{tag} was drafted on {}, after {}",
+                    self.drafted, event.on
+                ));
+            }
+            _ => {}
+        }
+        if event.reason.is_some() && !is_refusal(event.status) {
+            return Err(
+                "a reason goes only with refused, refused-with-reasons or exempt-claimed"
+                    .to_owned(),
+            );
+        }
+        let targets = self.targets(levers)?;
+        if event.source.is_some() && targets.len() != 1 {
+            return Err(format!(
+                "{tag} holds more than one request; name the one the source was given for with --lever"
+            ));
+        }
+        let mut new = Vec::new();
+        for at in targets {
+            let request = &self.requests[at];
+            let lever = request.lever.name();
+            if request
+                .allows(&event)
+                .map_err(|why| format!("{tag} {lever} {why}"))?
+            {
+                new.push(at);
+            }
+        }
+        for &at in &new {
+            self.requests[at].events.push(Event::Status(event.clone()));
+        }
+        Ok(!new.is_empty())
+    }
+
+    /// Record a longer period the user agreed to in writing, which moves the statutory date
+    /// of the requests `levers` names, or of every request (ss 20T(2)(b), 21V(2)(b)).
+    /// `Ok(false)` means it was already the longer period in effect on each.
+    pub fn record_extension(
+        &mut self,
+        levers: &[Lever],
+        extension: Extension,
+        today: NaiveDate,
+    ) -> Result<bool, String> {
+        let tag = &self.tag;
+        if extension.on > today {
+            return Err(format!("{} is in the future", extension.on));
+        }
+        let send = self
+            .sent()
+            .ok_or_else(|| format!("{tag} is not recorded as sent"))?;
+        if extension.on < send.on {
+            return Err(format!(
+                "{tag} was sent on {}, after {}",
+                send.on, extension.on
+            ));
+        }
+        let mut new = Vec::new();
+        for at in self.targets(levers)? {
+            let request = &self.requests[at];
+            let lever = request.lever.name();
+            // Only ss 20T(2)(b) and 21V(2)(b) allow a longer period, and both count from
+            // the day the request is made.
+            let last = match request.deadline {
+                Deadline::DaysStarting(_) => deadline::last_day(request.deadline, send.on),
+                _ => None,
+            };
+            let Some(last) = last else {
+                return Err(format!(
+                    "{tag} {lever} has no period the law lets you agree to lengthen"
+                ));
+            };
+            if extension.until <= last {
+                return Err(format!(
+                    "{tag} {lever}: {} is not later than the law's last day, {last}",
+                    extension.until
+                ));
+            }
+            if request.in_effect().extensions.last() != Some(&&extension) {
+                new.push(at);
+            }
+        }
+        for &at in &new {
+            let event = Event::Extension(extension.clone());
+            self.requests[at].events.push(event);
+        }
+        Ok(!new.is_empty())
+    }
+
+    /// Record that the latest status, or the latest longer period, in effect on the requests
+    /// `levers` names, or on every request, was recorded wrongly. It stays as history.
+    pub fn withdraw_event(
+        &mut self,
+        levers: &[Lever],
+        of: Withdrawn,
+        note: Option<String>,
+    ) -> Result<(), String> {
+        let targets = self.targets(levers)?;
+        for &at in &targets {
+            let request = &self.requests[at];
+            let kept = request.in_effect();
+            let (none, what) = match of {
+                Withdrawn::Status => (kept.statuses.is_empty(), "answer"),
+                Withdrawn::Extension => (kept.extensions.is_empty(), "longer period"),
+            };
+            if none {
+                let lever = request.lever.name();
+                return Err(format!("{} {lever} has no {what} to withdraw", self.tag));
+            }
+        }
+        for at in targets {
+            let withdrawal = Withdrawal {
+                of,
+                note: note.clone(),
+            };
+            self.requests[at].events.push(Event::Withdrawal(withdrawal));
+        }
+        Ok(())
+    }
+
     /// The earliest day an event in effect on any request is dated.
     fn first_date_in_effect(&self) -> Option<NaiveDate> {
         let dates = self.requests.iter().map(|r| r.in_effect().first_date());
@@ -406,7 +568,105 @@ impl Message {
     }
 }
 
+/// A refusal, or a claim that the law does not apply: the statuses a reason goes with.
+fn is_refusal(status: Status) -> bool {
+    matches!(
+        status,
+        Status::RefusedWithReasons | Status::Refused | Status::ExemptClaimed
+    )
+}
+
+/// An answer from the entity, as `closed` needs and `abandoned` must not have.
+fn is_answer(status: Status) -> bool {
+    !matches!(
+        status,
+        Status::Drafted
+            | Status::Sent
+            | Status::Bounced
+            | Status::Escalated
+            | Status::Closed
+            | Status::Abandoned
+    )
+}
+
+/// What the user should do about a request now, in the order `status` lists them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Action {
+    /// Sent or acknowledged, and its statutory date or OAIC guide date has passed.
+    Overdue,
+    /// The user must send, answer, complain or close it.
+    Needed,
+    Waiting,
+    Done,
+    Abandoned,
+}
+
 impl Request {
+    /// The request's status: the latest status in effect, else `sent` or `drafted` from
+    /// whether its message is recorded as sent.
+    pub fn status(&self, sent: bool) -> Status {
+        match self.in_effect().statuses.last() {
+            Some(latest) => latest.status,
+            None if sent => Status::Sent,
+            None => Status::Drafted,
+        }
+    }
+
+    /// Whether `event` may be recorded next. `Ok(false)` means it is already the latest
+    /// status in effect, so it is recorded once. The reason reads after the tag and lever.
+    fn allows(&self, event: &StatusEvent) -> Result<bool, String> {
+        let kept = self.in_effect();
+        let latest = kept.statuses.last().copied();
+        if latest == Some(event) {
+            return Ok(false);
+        }
+        if let Some(latest) = latest
+            && event.on < latest.on
+        {
+            return Err(format!(
+                "has an answer recorded on {}, after {}",
+                latest.on, event.on
+            ));
+        }
+        let had = |statuses: &[Status]| kept.statuses.iter().any(|s| statuses.contains(&s.status));
+        let answered = kept.statuses.iter().any(|s| is_answer(s.status));
+        let bounced = latest.is_some_and(|l| l.status == Status::Bounced);
+        let why = match event.status {
+            _ if bounced && event.status != Status::Abandoned => {
+                "bounced, so it can only be given up (abandoned); draft it again to send it"
+            }
+            Status::Closed if !answered => "has no answer to close it with; record it as abandoned",
+            Status::Abandoned if answered => "has an answer, so record it as closed",
+            Status::Relisted if !had(&[Status::Fulfilled, Status::Suppressed, Status::Partial]) => {
+                "was never recorded as acted on, so it cannot be relisted"
+            }
+            _ => return Ok(true),
+        };
+        Err(why.to_owned())
+    }
+
+    /// Which action state the request is in on `today`, with `due` its deadline.
+    pub fn action(&self, sent: bool, due: Due, today: NaiveDate) -> Action {
+        let status = self.status(sent);
+        let passed = match due {
+            Due::Statutory(day) | Due::Guide(day) => day < today,
+            Due::Unknown | Due::None => false,
+        };
+        // Only the 3 stop-using requests ask for exactly what `suppressed` reports.
+        let stop_using = matches!(
+            self.lever,
+            Lever::App7NoMarketing | Lever::App7NoFacilitation | Lever::SpamUnsubscribe
+        );
+        match status {
+            Status::Sent | Status::Acknowledged if passed => Action::Overdue,
+            Status::Sent | Status::Acknowledged | Status::Escalated => Action::Waiting,
+            Status::Fulfilled | Status::NoRecord | Status::Closed => Action::Done,
+            Status::Suppressed if stop_using => Action::Done,
+            Status::Abandoned => Action::Abandoned,
+            _ => Action::Needed,
+        }
+    }
+
     /// What is wrong with this request's events, given the message's record of sending in
     /// effect. Each reads after the tag and lever.
     fn problems(&self, sent: Option<Send>) -> Vec<&'static str> {
@@ -417,11 +677,7 @@ impl Request {
                     if matches!(status.status, Status::Drafted | Status::Sent) {
                         problems.push("has an event that sets drafted or sent");
                     }
-                    let refusal = matches!(
-                        status.status,
-                        Status::RefusedWithReasons | Status::Refused | Status::ExemptClaimed
-                    );
-                    if status.reason.is_some() && !refusal {
+                    if status.reason.is_some() && !is_refusal(status.status) {
                         problems.push("gives a reason for an answer that is not a refusal");
                     }
                 }
@@ -641,7 +897,7 @@ lever = "s20t-correction"
 letter_version = 2
 
 [messages.requests.deadline]
-days = 30
+days-starting = 30
 
 [[messages.requests.events]]
 kind = "status"
@@ -739,7 +995,7 @@ guide_days = 30
     /// The state `FORMAT_2` holds.
     fn every_record() -> State {
         let mut full = sent_twice();
-        let mut correction = request(Lever::S20tCorrection, 2, Deadline::Days(30));
+        let mut correction = request(Lever::S20tCorrection, 2, Deadline::DaysStarting(30));
         correction.events = vec![
             answer(day(13), Status::Acknowledged),
             Event::Extension(Extension {
@@ -862,7 +1118,10 @@ guide_days = 30
                 "channel = \"post\"",
                 "channel = \"post\"\nstatus = \"sent\"",
             ),
-            ("days = 30", "days = 30\nbusiness-days = 5"),
+            (
+                "days-starting = 30",
+                "days-starting = 30\nbusiness-days = 5",
+            ),
             ("guide_days = 30", "guide_days = 30\nweeks = 4"),
             ("kind = \"withdrawal\"", "kind = \"retraction\""),
             ("of = \"status\"", "of = \"send\""),
@@ -885,7 +1144,10 @@ guide_days = 30
             assert_eq!(request.letter_version, letters::letter_version(lever));
             assert!(request.events.is_empty());
         }
-        assert_eq!(Request::new(Lever::S20rAccess).deadline, Deadline::Days(10));
+        assert_eq!(
+            Request::new(Lever::S20rAccess).deadline,
+            Deadline::DaysAfter(10)
+        );
     }
 
     #[test]
@@ -895,7 +1157,7 @@ guide_days = 30
             until: day(until),
             note: None,
         };
-        let mut request = request(Lever::S20tCorrection, 1, Deadline::Days(30));
+        let mut request = request(Lever::S20tCorrection, 1, Deadline::DaysStarting(30));
         assert!(request.in_effect().is_empty());
         request.events = vec![
             answer(day(12), Status::Acknowledged),
@@ -1217,6 +1479,255 @@ guide_days = 30
             ]),
         ] {
             assert_eq!(state(vec![message]).problems(), [""; 0]);
+        }
+    }
+
+    const BOTH: &[Lever] = &[];
+    const SOURCE: &[Lever] = &[Lever::App7Source];
+
+    fn statuses(message: &Message) -> Vec<Vec<Status>> {
+        let request = |r: &Request| r.in_effect().statuses.iter().map(|s| s.status).collect();
+        message.requests.iter().map(request).collect()
+    }
+
+    #[test]
+    fn a_reply_needs_a_letter_sent_and_a_day_that_fits() {
+        let today = day(20);
+        let mut unsent = message("GS-7K3QX");
+        let error = unsent
+            .record_status(BOTH, status(day(12), Status::Refused), today)
+            .unwrap_err();
+        assert!(error.contains("GS-7K3QX is not recorded as sent, so it can only be given up"));
+        let early = unsent.record_status(BOTH, status(day(9), Status::Abandoned), today);
+        assert_eq!(
+            early.unwrap_err(),
+            "GS-7K3QX was drafted on 2026-11-10, after 2026-11-09"
+        );
+        let given_up = status(day(10), Status::Abandoned);
+        assert_eq!(unsent.record_status(BOTH, given_up, today), Ok(true));
+
+        let mut sent = sent_message("GS-7K3QX");
+        let before = sent.clone();
+        let refused = [
+            (
+                status(day(21), Status::Acknowledged),
+                "2026-11-21 is in the future",
+            ),
+            (
+                status(day(10), Status::Acknowledged),
+                "GS-7K3QX was sent on 2026-11-11, after 2026-11-10",
+            ),
+            (
+                StatusEvent {
+                    reason: Some(Reason::Other),
+                    ..status(day(12), Status::Fulfilled)
+                },
+                "a reason goes only with refused, refused-with-reasons or exempt-claimed",
+            ),
+            (
+                StatusEvent {
+                    source: Some("a list broker".to_owned()),
+                    ..status(day(12), Status::Fulfilled)
+                },
+                "GS-7K3QX holds more than one request; name the one the source was given for \
+                 with --lever",
+            ),
+        ];
+        for (event, why) in refused {
+            assert_eq!(sent.record_status(BOTH, event, today).unwrap_err(), why);
+        }
+        let app12 = &[Lever::App12];
+        let missing = sent.record_status(app12, status(day(12), Status::Fulfilled), today);
+        assert_eq!(missing.unwrap_err(), "GS-7K3QX holds no app12 request");
+        assert_eq!(sent, before, "nothing was recorded");
+    }
+
+    #[test]
+    fn a_reply_is_recorded_once_on_each_request_it_names() {
+        let today = day(20);
+        let mut sent = sent_message("GS-7K3QX");
+        let acknowledged = status(day(12), Status::Acknowledged);
+        assert_eq!(
+            sent.record_status(BOTH, acknowledged.clone(), today),
+            Ok(true)
+        );
+        assert_eq!(sent.record_status(BOTH, acknowledged, today), Ok(false));
+        let twice = [Lever::App7Source, Lever::App7Source];
+        let sourced = StatusEvent {
+            source: Some("a list broker".to_owned()),
+            ..status(day(13), Status::Fulfilled)
+        };
+        assert_eq!(sent.record_status(&twice, sourced, today), Ok(true));
+        assert_eq!(
+            statuses(&sent),
+            [
+                vec![Status::Acknowledged],
+                vec![Status::Acknowledged, Status::Fulfilled]
+            ]
+        );
+        let earlier = sent.record_status(SOURCE, status(day(12), Status::Refused), today);
+        assert_eq!(
+            earlier.unwrap_err(),
+            "GS-7K3QX app7-source has an answer recorded on 2026-11-13, after 2026-11-12"
+        );
+    }
+
+    #[test]
+    fn a_reply_must_follow_what_is_already_recorded() {
+        let today = day(20);
+        let mut sent = sent_message("GS-7K3QX");
+        for (to, why) in [
+            (
+                Status::Closed,
+                "has no answer to close it with; record it as abandoned",
+            ),
+            (
+                Status::Relisted,
+                "was never recorded as acted on, so it cannot be relisted",
+            ),
+        ] {
+            let error = sent.record_status(SOURCE, status(day(12), to), today);
+            assert_eq!(error.unwrap_err(), format!("GS-7K3QX app7-source {why}"));
+        }
+        let partial = status(day(12), Status::Partial);
+        sent.record_status(SOURCE, partial, today).unwrap();
+        // All or none: the other request refuses, so this one records nothing either.
+        let before = sent.clone();
+        let relisted = status(day(13), Status::Relisted);
+        assert!(sent.record_status(BOTH, relisted.clone(), today).is_err());
+        assert_eq!(sent, before);
+        assert_eq!(sent.record_status(SOURCE, relisted, today), Ok(true));
+        let given_up = sent.record_status(SOURCE, status(day(14), Status::Abandoned), today);
+        assert_eq!(
+            given_up.unwrap_err(),
+            "GS-7K3QX app7-source has an answer, so record it as closed"
+        );
+        let closed = status(day(14), Status::Closed);
+        assert_eq!(sent.record_status(SOURCE, closed, today), Ok(true));
+
+        let marketing = &[Lever::App7NoMarketing];
+        let bounced = status(day(12), Status::Bounced);
+        sent.record_status(marketing, bounced, today).unwrap();
+        let next = sent.record_status(marketing, status(day(13), Status::Escalated), today);
+        assert!(next.unwrap_err().ends_with(
+            "bounced, so it can only be given up (abandoned); draft it again to send it"
+        ));
+        let given_up = status(day(13), Status::Abandoned);
+        assert_eq!(sent.record_status(marketing, given_up, today), Ok(true));
+    }
+
+    #[test]
+    fn a_longer_period_needs_a_credit_correction_and_a_later_day() {
+        let today = day(20);
+        let agreed = |on: NaiveDate, until: NaiveDate| Extension {
+            on,
+            until,
+            note: None,
+        };
+        let december = |day: u32| NaiveDate::from_ymd_opt(2026, 12, day).unwrap();
+        let mut unsent = message("GS-7K3QX");
+        unsent.requests = vec![Request::new(Lever::S20tCorrection)];
+        let error = unsent.record_extension(BOTH, agreed(day(12), december(24)), today);
+        assert_eq!(error.unwrap_err(), "GS-7K3QX is not recorded as sent");
+        let mut sent = unsent.clone();
+        sent.sends = vec![SendRecord::Sent(email(day(11)))];
+        let future = sent.record_extension(BOTH, agreed(day(21), december(24)), today);
+        assert_eq!(future.unwrap_err(), "2026-11-21 is in the future");
+        let early = sent.record_extension(BOTH, agreed(day(10), december(24)), today);
+        assert_eq!(
+            early.unwrap_err(),
+            "GS-7K3QX was sent on 2026-11-11, after 2026-11-10"
+        );
+        // 30 days starting on 11 November end on 10 December.
+        let short = sent.record_extension(BOTH, agreed(day(12), december(10)), today);
+        assert_eq!(
+            short.unwrap_err(),
+            "GS-7K3QX s20t-correction: 2026-12-10 is not later than the law's last day, \
+             2026-12-10"
+        );
+        let longer = agreed(day(12), december(24));
+        assert_eq!(sent.record_extension(BOTH, longer.clone(), today), Ok(true));
+        assert_eq!(sent.record_extension(BOTH, longer, today), Ok(false));
+
+        let mut marketing = sent_message("GS-7K3QX");
+        let error = marketing.record_extension(SOURCE, agreed(day(12), december(24)), today);
+        assert_eq!(
+            error.unwrap_err(),
+            "GS-7K3QX app7-source has no period the law lets you agree to lengthen"
+        );
+    }
+
+    #[test]
+    fn a_withdrawal_needs_something_in_effect_to_withdraw() {
+        let mut sent = sent_message("GS-7K3QX");
+        for (of, what) in [
+            (Withdrawn::Status, "answer"),
+            (Withdrawn::Extension, "longer period"),
+        ] {
+            let error = sent.withdraw_event(SOURCE, of, None).unwrap_err();
+            assert_eq!(
+                error,
+                format!("GS-7K3QX app7-source has no {what} to withdraw")
+            );
+        }
+        let refused = status(day(12), Status::Refused);
+        sent.record_status(SOURCE, refused, day(20)).unwrap();
+        sent.withdraw_event(SOURCE, Withdrawn::Status, note("misread"))
+            .unwrap();
+        assert_eq!(statuses(&sent), [Vec::<Status>::new(), Vec::new()]);
+        assert_eq!(
+            sent.requests[1].events.len(),
+            2,
+            "the record stays as history"
+        );
+    }
+
+    #[test]
+    fn each_status_falls_in_one_action_state() {
+        let today = day(20);
+        let passed = Due::Guide(day(19));
+        let ahead = Due::Statutory(day(21));
+        let request = |lever: Lever, latest: Option<Status>| {
+            let mut request = Request::new(lever);
+            request.events.extend(latest.map(|s| answer(day(12), s)));
+            request
+        };
+        let action = |lever, latest, due| request(lever, latest).action(true, due, today);
+        let unsent = request(Lever::App12, None).action(false, passed, today);
+        assert_eq!(unsent, Action::Needed);
+        assert_eq!(action(Lever::App12, None, passed), Action::Overdue);
+        let late = Due::Statutory(day(19));
+        let acknowledged = Some(Status::Acknowledged);
+        assert_eq!(action(Lever::App12, acknowledged, late), Action::Overdue);
+        for waiting in [ahead, Due::Unknown, Due::None] {
+            assert_eq!(action(Lever::App12, None, waiting), Action::Waiting);
+        }
+        let escalated = Some(Status::Escalated);
+        assert_eq!(action(Lever::App12, escalated, passed), Action::Waiting);
+        for done in [Status::Fulfilled, Status::NoRecord, Status::Closed] {
+            assert_eq!(action(Lever::App12, Some(done), passed), Action::Done);
+        }
+        let abandoned = Some(Status::Abandoned);
+        assert_eq!(action(Lever::App12, abandoned, passed), Action::Abandoned);
+        for needed in [
+            Status::IdRequested,
+            Status::Refused,
+            Status::Bounced,
+            Status::Relisted,
+        ] {
+            assert_eq!(action(Lever::App12, Some(needed), passed), Action::Needed);
+        }
+        let suppressed = Some(Status::Suppressed);
+        assert_eq!(
+            action(Lever::App11Destroy, suppressed, ahead),
+            Action::Needed
+        );
+        for stop in [
+            Lever::App7NoMarketing,
+            Lever::App7NoFacilitation,
+            Lever::SpamUnsubscribe,
+        ] {
+            assert_eq!(action(stop, suppressed, ahead), Action::Done);
         }
     }
 }

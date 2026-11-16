@@ -4,6 +4,7 @@
 //! Pure logic over values: no files, network or terminal.
 
 pub mod check;
+pub mod deadline;
 pub mod embedded;
 pub mod law;
 pub mod letters;

@@ -13,6 +13,7 @@ use clap::{Args, CommandFactory, Parser, Subcommand};
 use serde_json::{Value, json};
 
 use crate::core::check;
+use crate::core::deadline::{self, Due};
 use crate::core::embedded;
 use crate::core::law::{self, Deadline};
 use crate::core::letters::{self, Letter, Request};
@@ -99,6 +100,23 @@ pub enum Command {
     /// Repeating the same record changes nothing. To change a recorded day or channel, add
     /// --correct: the earlier record is kept as history and the new one takes effect.
     Sent(SentArgs),
+    /// Record an answer to a letter you sent, or a step you took, such as a complaint.
+    ///
+    /// It applies to every request in the letter unless --lever names some. A mistake is
+    /// put right with --withdraw, which keeps the wrong record as history.
+    Reply(ReplyArgs),
+    /// List your requests by what to do next, overdue first, with their dates.
+    ///
+    /// A statutory date is moved past a weekend (Acts Interpretation Act 1901 s 36(2)); a
+    /// public holiday where the business acts moves it further, which GhostSoap does not know.
+    Status {
+        /// List only requests with a date, soonest first.
+        #[arg(long)]
+        due: bool,
+        /// Read the passphrase from standard input instead of the terminal (for scripts).
+        #[arg(long)]
+        passphrase_stdin: bool,
+    },
     /// Show the law table: each lever's legal basis, deadline and charge rule.
     Law {
         /// Print JSON for scripts and AI agents.
@@ -151,6 +169,44 @@ pub struct SentArgs {
 }
 
 #[derive(Debug, Args)]
+pub struct ReplyArgs {
+    /// The tag in the letter's subject line, such as GS-7K3QX.
+    tag: String,
+    /// What happened: acknowledged, id-requested, charge-quoted, fulfilled, partial,
+    /// suppressed, no-record, refused-with-reasons, refused, exempt-claimed, bounced,
+    /// relisted, escalated, closed (finished, with an answer) or abandoned (given up).
+    #[arg(value_parser = parse_status, required_unless_present_any = ["agreed_until", "withdraw"])]
+    status: Option<tracker::Status>,
+    /// The request it applies to; repeat for more. All of the letter's requests if left out.
+    #[arg(long, value_parser = parse_lever)]
+    lever: Vec<Lever>,
+    /// The day it happened, as YYYY-MM-DD; today if left out.
+    #[arg(long, value_parser = parse_date)]
+    on: Option<NaiveDate>,
+    /// The ground given for a refusal: not-direct-marketing, small-business,
+    /// outside-jurisdiction, insufficient-verification or other.
+    #[arg(long, value_parser = parse_reason, requires = "status")]
+    reason: Option<tracker::Reason>,
+    /// A source of your information the answer names, in your own words (APP 7.6(e)).
+    #[arg(long, requires = "status")]
+    source: Option<String>,
+    /// Your own words, kept with the record.
+    #[arg(long)]
+    note: Option<String>,
+    /// The last day of a longer period you agreed to in writing for a credit correction
+    /// (Privacy Act ss 20T(2)(b), 21V(2)(b)).
+    #[arg(long, value_parser = parse_date, conflicts_with = "status")]
+    agreed_until: Option<NaiveDate>,
+    /// Take back the latest answer (`status`) or longer period (`extension`) recorded: it
+    /// was wrong. It stays as history.
+    #[arg(long, value_parser = parse_withdrawn, conflicts_with_all = ["status", "agreed_until", "on"])]
+    withdraw: Option<tracker::Withdrawn>,
+    /// Read the passphrase from standard input instead of the terminal (for scripts).
+    #[arg(long)]
+    passphrase_stdin: bool,
+}
+
+#[derive(Debug, Args)]
 pub struct SelectionArgs {
     /// A pack of entities, such as `start-here`; repeat for more.
     #[arg(long)]
@@ -188,6 +244,39 @@ fn parse_lever(name: &str) -> Result<Lever, String> {
 fn parse_date(text: &str) -> Result<NaiveDate, String> {
     NaiveDate::parse_from_str(text, "%Y-%m-%d")
         .map_err(|_| "use a date such as 2026-11-30".to_owned())
+}
+
+/// A name as the state file writes it, such as `refused-with-reasons`.
+fn parse_named<T: serde::de::DeserializeOwned>(name: &str, names: &str) -> Result<T, String> {
+    serde_json::from_value(json!(name)).map_err(|_| format!("use {names}"))
+}
+
+fn parse_status(name: &str) -> Result<tracker::Status, String> {
+    parse_named(name, "a status `ghostsoap reply --help` lists").and_then(|status| match status {
+        tracker::Status::Drafted | tracker::Status::Sent => {
+            Err("`draft` and `sent` record those".to_owned())
+        }
+        status => Ok(status),
+    })
+}
+
+fn parse_reason(name: &str) -> Result<tracker::Reason, String> {
+    parse_named(
+        name,
+        "not-direct-marketing, small-business, outside-jurisdiction, insufficient-verification or other",
+    )
+}
+
+fn parse_withdrawn(name: &str) -> Result<tracker::Withdrawn, String> {
+    parse_named(name, "status or extension")
+}
+
+/// The name the state file gives `value`, such as `refused-with-reasons`.
+fn named(value: impl serde::Serialize) -> String {
+    serde_json::to_value(value)
+        .ok()
+        .and_then(|v| v.as_str().map(str::to_owned))
+        .expect("a unit variant serialises as its name")
 }
 
 fn parse_channel(name: &str) -> Result<ChannelKind, String> {
@@ -243,6 +332,11 @@ pub fn run(cli: Cli) -> ExitCode {
         ),
         Some(Command::Clean { out }) => clean(out),
         Some(Command::Sent(args)) => sent(&args),
+        Some(Command::Reply(args)) => reply(&args),
+        Some(Command::Status {
+            due,
+            passphrase_stdin,
+        }) => status(due, passphrase_stdin),
         Some(Command::Law { json }) => {
             if json {
                 show_law_json();
@@ -743,14 +837,12 @@ fn sent(args: &SentArgs) -> Result<(), String> {
         |state| {
             let mut lines = Vec::new();
             for typed in &args.tags {
-                let tag = letters::normalise_tag(typed);
-                let message = state.message_mut(&tag).ok_or_else(|| {
-                    format!(
-                        "no letter is recorded under {tag}; the tag is in the letter's subject line"
-                    )
-                })?;
+                let message = message_for(state, typed)?;
                 let recorded = record_sending(message, args, today)?;
-                lines.push(format!("sent    {tag}  {}  {recorded}", message.entry));
+                lines.push(format!(
+                    "sent    {}  {}  {recorded}",
+                    message.tag, message.entry
+                ));
             }
             Ok(lines)
         },
@@ -759,6 +851,172 @@ fn sent(args: &SentArgs) -> Result<(), String> {
     )?;
     for line in lines {
         println!("{line}");
+    }
+    Ok(())
+}
+
+/// The message under the tag `typed`, as the user typed it.
+fn message_for<'a>(state: &'a mut State, typed: &str) -> Result<&'a mut Message, String> {
+    let tag = letters::normalise_tag(typed);
+    state.message_mut(&tag).ok_or_else(|| {
+        format!("no letter is recorded under {tag}; the tag is in the letter's subject line")
+    })
+}
+
+fn reply(args: &ReplyArgs) -> Result<(), String> {
+    let today = today();
+    let on = args.on.unwrap_or(today);
+    let line = update_state(
+        args.passphrase_stdin,
+        |state| {
+            let message = message_for(state, &args.tag)?;
+            let note = args.note.clone();
+            let done = if let Some(of) = args.withdraw {
+                message.withdraw_event(&args.lever, of, note)?;
+                let what = match of {
+                    tracker::Withdrawn::Status => "answer",
+                    tracker::Withdrawn::Extension => "longer period",
+                };
+                format!("the latest {what} is withdrawn")
+            } else if let Some(until) = args.agreed_until {
+                let extension = tracker::Extension { on, until, note };
+                let new = message.record_extension(&args.lever, extension, today)?;
+                format!("{} a longer period to {until}", recorded(new))
+            } else {
+                let status = args.status.expect("clap requires a status");
+                let event = tracker::StatusEvent {
+                    on,
+                    status,
+                    reason: args.reason,
+                    source: args.source.clone(),
+                    note,
+                };
+                let new = message.record_status(&args.lever, event, today)?;
+                format!("{} {} on {on}", recorded(new), named(status))
+            };
+            Ok(format!(
+                "reply   {}  {}  {done}",
+                message.tag, message.entry
+            ))
+        },
+        |_| {},
+        |line, _| Ok(line),
+    )?;
+    println!("{line}");
+    Ok(())
+}
+
+fn recorded(new: bool) -> &'static str {
+    if new { "recorded" } else { "already recorded" }
+}
+
+/// What `status` calls each action state.
+fn action_name(action: tracker::Action) -> &'static str {
+    match action {
+        tracker::Action::Overdue => "overdue",
+        tracker::Action::Needed => "action needed",
+        tracker::Action::Waiting => "waiting",
+        tracker::Action::Done => "done",
+        tracker::Action::Abandoned => "abandoned",
+    }
+}
+
+const ACTIONS: [tracker::Action; 5] = [
+    tracker::Action::Overdue,
+    tracker::Action::Needed,
+    tracker::Action::Waiting,
+    tracker::Action::Done,
+    tracker::Action::Abandoned,
+];
+
+/// The date a deadline gives, if any.
+fn due_date(due: Due) -> Option<NaiveDate> {
+    match due {
+        Due::Statutory(day) | Due::Guide(day) => Some(day),
+        Due::Unknown | Due::None => None,
+    }
+}
+
+/// What `status` says about a deadline.
+fn due_text(due: Due) -> String {
+    match due {
+        Due::Statutory(day) => format!("  law's last day {day}"),
+        Due::Guide(day) => format!("  OAIC guide {day}"),
+        Due::Unknown => {
+            "  takes effect 5 business days after sending, counted where it was sent".to_owned()
+        }
+        Due::None => String::new(),
+    }
+}
+
+/// List every request that is not history, by action state and then in the order drafted,
+/// or with `due_only` only those with a date, soonest first. A state that cannot be read is
+/// reported as DEGRADED with unknown counts, never as nothing to do.
+fn status(due_only: bool, passphrase_stdin: bool) -> Result<(), String> {
+    let loaded = state::data_dir().and_then(|dir| {
+        let passphrase = Input::new(passphrase_stdin).passphrase("Passphrase: ")?;
+        state::load(&dir, passphrase)
+    });
+    let state = match loaded {
+        Ok(state) => state,
+        Err(e) => {
+            println!("DEGRADED: {e}");
+            let unknown: Vec<String> = ACTIONS
+                .iter()
+                .map(|&a| format!("{} ?", action_name(a)))
+                .collect();
+            println!("{}", unknown.join("  "));
+            return Err("the state could not be read, so this is not an all-clear".to_owned());
+        }
+    };
+    let today = today();
+    let mut rows = Vec::new();
+    for message in state.messages.iter().filter(|m| !m.superseded) {
+        let sent = message.sent().is_some();
+        for request in &message.requests {
+            let due = deadline::due(message, request);
+            rows.push((request.action(sent, due, today), due, message, request));
+        }
+    }
+    let counts: Vec<String> = ACTIONS
+        .iter()
+        .map(|&a| {
+            format!(
+                "{} {}",
+                action_name(a),
+                rows.iter().filter(|r| r.0 == a).count()
+            )
+        })
+        .collect();
+    println!("{}", counts.join("  "));
+    if due_only {
+        rows.retain(|row| due_date(row.1).is_some());
+        rows.sort_by_key(|row| due_date(row.1));
+    } else {
+        rows.sort_by_key(|row| row.0);
+    }
+    for (action, due, message, request) in &rows {
+        let unfinished = if message.unfinished {
+            "  (its draft run did not finish: draft it again)"
+        } else {
+            ""
+        };
+        println!(
+            "{:<15}{}  {}  {}  {}{}{unfinished}",
+            action_name(*action),
+            message.tag,
+            message.entry,
+            request.lever.name(),
+            named(request.status(message.sent().is_some())),
+            due_text(*due),
+        );
+    }
+    if rows.iter().any(|row| matches!(row.1, Due::Statutory(_))) {
+        println!(
+            "A law's last day is moved past a weekend; a public holiday where the business acts \
+             moves it to the next working day, which GhostSoap does not know (Acts \
+             Interpretation Act 1901 s 36(2))."
+        );
     }
     Ok(())
 }
@@ -1021,7 +1279,7 @@ fn field_name(field: IdentityField) -> &'static str {
 
 fn deadline_summary(deadline: Deadline) -> String {
     match deadline {
-        Deadline::Days(n) => format!("{n} days"),
+        Deadline::DaysAfter(n) | Deadline::DaysStarting(n) => format!("{n} days"),
         Deadline::BusinessDays(n) => format!("{n} business days"),
         Deadline::Reasonable {
             guide_days: Some(n),

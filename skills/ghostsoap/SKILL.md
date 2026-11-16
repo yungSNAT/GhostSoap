@@ -32,6 +32,8 @@ Give them these commands to run in their own terminal, on their own computer. Do
 ghostsoap init                     # creates their encrypted profile
 ghostsoap draft --pack start-here  # writes the letters and records each under its tag
 ghostsoap sent GS-7K3QX            # records a letter as sent, by the tag in its subject line
+ghostsoap reply GS-7K3QX refused   # records an answer; --lever names one request
+ghostsoap status                   # lists what to do next, overdue first, with dates
 ghostsoap clean                    # deletes the drafts once sent
 ```
 
