@@ -1245,11 +1245,7 @@ fn show_checklist(
 }
 
 /// The checklist's count line: how many items stand at each progress.
-fn checklist_counts(
-    items: &[checklist::Item],
-    marks: &[checklist::Mark],
-    today: Date,
-) -> String {
+fn checklist_counts(items: &[checklist::Item], marks: &[checklist::Mark], today: Date) -> String {
     let count = |wanted: fn(&checklist::Progress) -> bool| {
         items
             .iter()
