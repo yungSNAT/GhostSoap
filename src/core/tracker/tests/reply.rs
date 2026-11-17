@@ -188,12 +188,12 @@ fn a_closed_or_abandoned_request_takes_no_new_status() {
 #[test]
 fn a_longer_period_needs_a_credit_correction_and_a_later_day() {
     let today = day(20);
-    let agreed = |on: NaiveDate, until: NaiveDate| Extension {
+    let agreed = |on: Date, until: Date| Extension {
         on,
         until,
         note: None,
     };
-    let december = |day: u32| NaiveDate::from_ymd_opt(2026, 12, day).unwrap();
+    let december = |day: i8| jiff::civil::date(2026, 12, day);
     let mut unsent = message("GS-7K3QX");
     unsent.requests = vec![Request::new(Lever::S20tCorrection)];
     let error = unsent.record_extension(BOTH, agreed(day(12), december(24)), today);
@@ -228,7 +228,7 @@ fn a_longer_period_needs_a_credit_correction_and_a_later_day() {
 
 #[test]
 fn a_longer_period_must_end_after_the_last_day_moved_past_a_weekend() {
-    let december = |day: u32| NaiveDate::from_ymd_opt(2026, 12, day).unwrap();
+    let december = |day: i8| jiff::civil::date(2026, 12, day);
     let mut sent = message("GS-7K3QX");
     sent.requests = vec![Request::new(Lever::S20tCorrection)];
     // Sent on Friday 6 November: 30 days end on Saturday 5 December, moved to Monday 7.

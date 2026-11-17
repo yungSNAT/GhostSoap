@@ -4,8 +4,8 @@
 use super::*;
 use crate::core::embedded;
 
-fn day(month: u32, day: u32) -> NaiveDate {
-    NaiveDate::from_ymd_opt(2026, month, day).unwrap()
+fn day(month: i8, day: i8) -> Date {
+    jiff::civil::date(2026, month, day)
 }
 
 fn file(name: &str, text: &str) -> SourceFile {
@@ -31,7 +31,7 @@ fn items() -> Vec<Item> {
     .unwrap()
 }
 
-fn mark(item: &str, on: NaiveDate, mark: MarkKind) -> Mark {
+fn mark(item: &str, on: Date, mark: MarkKind) -> Mark {
     Mark {
         item: item.to_owned(),
         on,

@@ -154,7 +154,7 @@ fn every_record() -> State {
         answer(day(13), Status::Acknowledged),
         Event::Extension(Extension {
             on: day(14),
-            until: NaiveDate::from_ymd_opt(2026, 12, 20).unwrap(),
+            until: jiff::civil::date(2026, 12, 20),
             note: note("agreed by email"),
         }),
         Event::Withdrawal(Withdrawal {

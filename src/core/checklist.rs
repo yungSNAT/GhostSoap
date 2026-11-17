@@ -6,7 +6,8 @@
 
 use std::collections::BTreeSet;
 
-use chrono::{Months, NaiveDate};
+use jiff::ToSpan;
+use jiff::civil::Date;
 use serde::{Deserialize, Serialize};
 use toml::value::Datetime;
 
@@ -60,10 +61,10 @@ pub struct Link {
     /// The day the page was last read to confirm the item, a plain TOML date as the
     /// register writes its dates.
     #[serde(deserialize_with = "plain_date")]
-    pub checked: NaiveDate,
+    pub checked: Date,
 }
 
-fn plain_date<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<NaiveDate, D::Error> {
+fn plain_date<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Date, D::Error> {
     let value = Datetime::deserialize(deserializer)?;
     register::date_of(&value)
         .ok_or_else(|| serde::de::Error::custom("use a plain date such as 2026-11-17"))
@@ -75,7 +76,7 @@ fn plain_date<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Naive
 #[serde(deny_unknown_fields)]
 pub struct Mark {
     pub item: String,
-    pub on: NaiveDate,
+    pub on: Date,
     pub mark: MarkKind,
 }
 
@@ -90,9 +91,9 @@ pub enum MarkKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Progress {
     ToDo,
-    Done(NaiveDate),
+    Done(Date),
     /// Done, but its re-check interval has passed.
-    CheckAgain(NaiveDate),
+    CheckAgain(Date),
     NotForMe,
 }
 
@@ -174,7 +175,7 @@ fn check(items: &[Item]) -> Vec<String> {
 /// `<id>: <url> (checked <day>)`. M4's release gate: every link checked within the release
 /// month.
 pub fn unchecked_since(items: &[Item], month: &str) -> Result<Vec<String>, String> {
-    let first = NaiveDate::parse_from_str(&format!("{month}-01"), "%Y-%m-%d")
+    let first = Date::strptime("%Y-%m-%d", format!("{month}-01"))
         .map_err(|_| format!("{month} is not a month such as 2026-12"))?;
     Ok(items
         .iter()
@@ -185,7 +186,7 @@ pub fn unchecked_since(items: &[Item], month: &str) -> Result<Vec<String>, Strin
 }
 
 /// Where `item` stands, given the user's marks, on `today`.
-pub fn progress(item: &Item, marks: &[Mark], today: NaiveDate) -> Progress {
+pub fn progress(item: &Item, marks: &[Mark], today: Date) -> Progress {
     match marks.iter().find(|m| m.item == item.id) {
         None => Progress::ToDo,
         Some(Mark {
@@ -195,7 +196,7 @@ pub fn progress(item: &Item, marks: &[Mark], today: NaiveDate) -> Progress {
         Some(Mark { on, .. }) => {
             let due = item
                 .recheck_months
-                .and_then(|months| on.checked_add_months(Months::new(months)));
+                .and_then(|months| on.checked_add(i64::from(months).months()).ok());
             match due {
                 Some(due) if today >= due => Progress::CheckAgain(*on),
                 _ => Progress::Done(*on),
@@ -205,7 +206,7 @@ pub fn progress(item: &Item, marks: &[Mark], today: NaiveDate) -> Progress {
 }
 
 /// The item to do next: the first by rank to check again, else the first to do.
-pub fn next<'a>(items: &'a [Item], marks: &[Mark], today: NaiveDate) -> Option<&'a Item> {
+pub fn next<'a>(items: &'a [Item], marks: &[Mark], today: Date) -> Option<&'a Item> {
     let first = |wanted: fn(Progress) -> bool| {
         items
             .iter()
@@ -216,7 +217,7 @@ pub fn next<'a>(items: &'a [Item], marks: &[Mark], today: NaiveDate) -> Option<&
 
 /// Set the user's mark on `item`, replacing any earlier one; `None` clears it. Whether the
 /// marks changed.
-pub fn set_mark(marks: &mut Vec<Mark>, item: &str, mark: Option<(MarkKind, NaiveDate)>) -> bool {
+pub fn set_mark(marks: &mut Vec<Mark>, item: &str, mark: Option<(MarkKind, Date)>) -> bool {
     let before = marks.clone();
     marks.retain(|m| m.item != item);
     if let Some((mark, on)) = mark {

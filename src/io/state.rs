@@ -246,7 +246,7 @@ fn is_export(path: &Path) -> bool {
     let dated = name
         .strip_prefix("ghostsoap-export-")
         .and_then(|rest| rest.strip_suffix(".toml"))
-        .is_some_and(|date| chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").is_ok());
+        .is_some_and(|date| jiff::civil::Date::strptime("%Y-%m-%d", date).is_ok());
     if !dated || !fs::symlink_metadata(path).is_ok_and(|meta| meta.is_file()) {
         return false;
     }
@@ -471,8 +471,6 @@ fn rename_with_retry(mut rename: impl FnMut() -> io::Result<()>) -> io::Result<(
 
 #[cfg(test)]
 mod tests {
-    use chrono::NaiveDate;
-
     use super::*;
     use crate::core::register::{ChannelKind, Lever};
     use crate::core::tracker::{Message, Request};
@@ -540,7 +538,7 @@ mod tests {
             entry: "cotality-au".to_owned(),
             channel: ChannelKind::Email,
             address: "privacy@example.com.au".to_owned(),
-            drafted: NaiveDate::from_ymd_opt(2026, 11, 10).unwrap(),
+            drafted: jiff::civil::date(2026, 11, 10),
             draft: None,
             superseded: false,
             unfinished: false,
@@ -581,6 +579,9 @@ mod tests {
         text.push_str(&"x".repeat(1 << 20));
         fs::write(&large, text).unwrap();
         assert!(is_export(&large));
+        let undated = named("31");
+        fs::write(&undated, EXPORT_HEADER).unwrap();
+        assert!(!is_export(&undated), "30 November is the last day");
         let folder = named("19");
         fs::create_dir(&folder).unwrap();
         assert!(!is_export(&folder));

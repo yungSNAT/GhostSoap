@@ -212,7 +212,7 @@ ghostsoap export | forget            (M3a)
 
 ### Dependencies (initial)
 
-`clap`, `serde` with `derive`, `toml`, `serde_json`, `age`, `rpassword`, `keyring`, `chrono` (`default-features = false, features = ["clock", "std"]`, as the house ports use), `tempfile`. Later: `lettre`, an IMAP client chosen at M6. `serde` derive departs from the ports' `serde_json::Value` habit because the register and state have fixed schemas; the ports' reason (byte parity with Python) does not apply.
+`clap`, `serde` with `derive`, `toml`, `serde_json`, `age`, `rpassword`, `keyring`, `jiff` (replaced `chrono` on 18 November 2026, after RustSec listed chrono as unmaintained in RUSTSEC-2026-0543), `tempfile`. Later: `lettre`, an IMAP client chosen at M6. `serde` derive departs from the ports' `serde_json::Value` habit because the register and state have fixed schemas; the ports' reason (byte parity with Python) does not apply.
 
 ## 6. Register
 

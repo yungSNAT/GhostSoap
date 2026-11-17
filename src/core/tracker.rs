@@ -7,7 +7,7 @@
 //! request's status is its latest status event in effect, and a mistake is put right by a
 //! record that withdraws it, never by editing. No I/O.
 
-use chrono::NaiveDate;
+use jiff::civil::Date;
 use serde::{Deserialize, Serialize};
 
 use crate::core::checklist::Mark;
@@ -50,7 +50,7 @@ pub struct Message {
     pub channel: ChannelKind,
     /// That channel's address as the register gave it when the letter was drafted.
     pub address: String,
-    pub drafted: NaiveDate,
+    pub drafted: Date,
     /// Where the draft file went; absent for `draft --copy`, which writes none.
     pub draft: Option<DraftFile>,
     /// The draft has been replaced under a new tag and remains as history.
@@ -92,7 +92,7 @@ pub enum SendRecord {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Send {
-    pub on: NaiveDate,
+    pub on: Date,
     /// The channel actually used, which may differ from the one drafted for.
     pub channel: ChannelKind,
 }
@@ -129,7 +129,7 @@ pub enum Event {
 #[serde(deny_unknown_fields)]
 pub struct StatusEvent {
     /// The day it happened, as the user gave it.
-    pub on: NaiveDate,
+    pub on: Date,
     /// Never `drafted` or `sent`, which `draft` and `sent` set.
     pub status: Status,
     /// The ground the entity gave, where it is one of the listed ones; only with a refusal
@@ -144,10 +144,10 @@ pub struct StatusEvent {
 #[serde(deny_unknown_fields)]
 pub struct Extension {
     /// The day the user agreed.
-    pub on: NaiveDate,
+    pub on: Date,
     /// The last day of the longer period. The latest extension in effect is the one that
     /// counts, so a later one can shorten an earlier one.
-    pub until: NaiveDate,
+    pub until: Date,
     pub note: Option<String>,
 }
 
@@ -239,7 +239,7 @@ impl InEffect<'_> {
     }
 
     /// The earliest day any of them is dated.
-    fn first_date(&self) -> Option<NaiveDate> {
+    fn first_date(&self) -> Option<Date> {
         let statuses = self.statuses.iter().map(|s| s.on);
         statuses.chain(self.extensions.iter().map(|e| e.on)).min()
     }
@@ -304,12 +304,7 @@ impl Message {
     /// Record that the message was sent. `Ok(false)` means this record was already the one
     /// in effect, so nothing changed. A different record needs `correct`, and is then kept
     /// after the earlier one. `today` stops a date in the future.
-    pub fn record_sent(
-        &mut self,
-        send: Send,
-        correct: bool,
-        today: NaiveDate,
-    ) -> Result<bool, String> {
+    pub fn record_sent(&mut self, send: Send, correct: bool, today: Date) -> Result<bool, String> {
         let tag = &self.tag;
         if self.unfinished {
             return Err(format!(
@@ -378,7 +373,7 @@ impl Message {
     }
 
     /// The earliest day an event in effect on any request is dated.
-    fn first_date_in_effect(&self) -> Option<NaiveDate> {
+    fn first_date_in_effect(&self) -> Option<Date> {
         let dates = self.requests.iter().map(|r| r.in_effect().first_date());
         dates.flatten().min()
     }

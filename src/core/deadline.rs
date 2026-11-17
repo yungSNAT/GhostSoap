@@ -12,7 +12,8 @@
 //! holiday in the place the thing is to be done, which GhostSoap does not know, so only
 //! weekends move a date here, and every statutory date is shown with that limit.
 
-use chrono::{Datelike, Days, NaiveDate, Weekday};
+use jiff::ToSpan;
+use jiff::civil::{Date, Weekday};
 
 use crate::core::law::Deadline;
 use crate::core::register::Lever;
@@ -23,9 +24,9 @@ use crate::core::tracker::{Message, Request, Status};
 pub enum Due {
     /// The last day the law allows, moved past a weekend; a public holiday where the entity
     /// acts can move it further.
-    Statutory(NaiveDate),
+    Statutory(Date),
     /// The OAIC's general guide to a reasonable period. Passing it is not a breach.
-    Guide(NaiveDate),
+    Guide(Date),
     /// The law sets a period GhostSoap cannot date: the Spam Act's business days depend on
     /// public holidays where the message was sent.
     Unknown,
@@ -35,24 +36,25 @@ pub enum Due {
 
 /// The last day of a statutory period of `deadline` that runs from `start`, before s 36(2)
 /// moves it past a weekend or holiday; none for a deadline that is not a number of days.
-pub fn last_day(deadline: Deadline, start: NaiveDate) -> Option<NaiveDate> {
+pub fn last_day(deadline: Deadline, start: Date) -> Option<Date> {
     match deadline {
-        Deadline::DaysAfter(days) => start.checked_add_days(Days::new(days.into())),
-        Deadline::DaysStarting(days) => {
-            start.checked_add_days(Days::new(u64::from(days).saturating_sub(1)))
-        }
+        Deadline::DaysAfter(days) => start.checked_add(i64::from(days).days()).ok(),
+        Deadline::DaysStarting(days) => start
+            .checked_add(i64::from(days.saturating_sub(1)).days())
+            .ok(),
         _ => None,
     }
 }
 
-/// `day`, or the Monday after it if it is a Saturday or a Sunday (s 36(2)).
-pub fn past_weekend(day: NaiveDate) -> NaiveDate {
+/// `day`, or the Monday after it if it is a Saturday or a Sunday (s 36(2)). The last day
+/// a date can be, 9999-12-31, is a Friday, so the Monday always exists.
+pub fn past_weekend(day: Date) -> Date {
     let skip = match day.weekday() {
-        Weekday::Sat => 2,
-        Weekday::Sun => 1,
+        Weekday::Saturday => 2,
+        Weekday::Sunday => 1,
         _ => 0,
     };
-    day + Days::new(skip)
+    day + skip.days()
 }
 
 /// When `request`, one of `message`'s, is due. Its period starts on the send date in effect,
@@ -77,7 +79,9 @@ pub fn due(message: &Message, request: &Request) -> Due {
         }
         Deadline::Reasonable {
             guide_days: Some(days),
-        } => Due::Guide(start + Days::new(days.into())),
+        } => start
+            .checked_add(i64::from(days).days())
+            .map_or(Due::None, Due::Guide),
         Deadline::BusinessDays(_) => Due::Unknown,
         Deadline::Reasonable { guide_days: None } | Deadline::NotStated => Due::None,
     }
@@ -86,7 +90,7 @@ pub fn due(message: &Message, request: &Request) -> Due {
 /// The day of the latest refusal in effect on `message`'s APP 13 correction, unless a later
 /// status in effect there says it was made. A later step such as a complaint leaves the
 /// refusal standing.
-fn correction_refused(message: &Message) -> Option<NaiveDate> {
+fn correction_refused(message: &Message) -> Option<Date> {
     let correction = message.requests.iter().find(|r| r.lever == Lever::App13)?;
     let mut refused = None;
     for event in correction.in_effect().statuses {
@@ -105,11 +109,11 @@ mod tests {
     use crate::core::register::ChannelKind;
     use crate::core::tracker::{Event, Extension, Send, SendRecord, StatusEvent};
 
-    fn day(month: u32, day: u32) -> NaiveDate {
-        NaiveDate::from_ymd_opt(2026, month, day).unwrap()
+    fn day(month: i8, day: i8) -> Date {
+        jiff::civil::date(2026, month, day)
     }
 
-    fn answer(on: NaiveDate, status: Status) -> Event {
+    fn answer(on: Date, status: Status) -> Event {
         Event::Status(StatusEvent {
             on,
             status,
@@ -120,7 +124,7 @@ mod tests {
     }
 
     /// A letter drafted on 31 October carrying `levers`, sent on `sent` if given.
-    fn letter(levers: &[Lever], sent: Option<NaiveDate>) -> Message {
+    fn letter(levers: &[Lever], sent: Option<Date>) -> Message {
         Message {
             tag: "GS-7K3QX".to_owned(),
             entry: "equifax-au".to_owned(),
@@ -153,7 +157,7 @@ mod tests {
         // Monday 2 November: s 20R(3)'s 10 days begin after it (item 6) and end on
         // Thursday 12 November; s 20T(2)'s 30 days start on it (item 2) and end on Tuesday
         // 1 December.
-        assert_eq!(day(11, 2).weekday(), Weekday::Mon);
+        assert_eq!(day(11, 2).weekday(), Weekday::Monday);
         assert_eq!(
             last_day(Deadline::DaysAfter(10), day(11, 2)),
             Some(day(11, 12))
@@ -172,7 +176,7 @@ mod tests {
             assert_eq!(last_day(none, day(11, 2)), None, "{none:?}");
         }
         // A last day on a weekend moves to the Monday (s 36(2)); a weekday stays.
-        assert_eq!(day(11, 14).weekday(), Weekday::Sat);
+        assert_eq!(day(11, 14).weekday(), Weekday::Saturday);
         assert_eq!(past_weekend(day(11, 14)), day(11, 16));
         assert_eq!(past_weekend(day(11, 15)), day(11, 16));
         assert_eq!(past_weekend(day(11, 16)), day(11, 16));
@@ -223,11 +227,25 @@ mod tests {
             until: day(12, 19),
             note: None,
         }));
-        assert_eq!(day(12, 19).weekday(), Weekday::Sat);
+        assert_eq!(day(12, 19).weekday(), Weekday::Saturday);
         assert_eq!(
             due_of(&sent, Lever::S21vCorrection),
             Due::Statutory(day(12, 21))
         );
+    }
+
+    /// A period that would end after 9999-12-31, the last day a date can be, has no date.
+    #[test]
+    fn a_period_past_the_last_representable_day_has_no_date() {
+        let late = jiff::civil::date(9999, 12, 25);
+        assert_eq!(last_day(Deadline::DaysAfter(10), late), None);
+        assert_eq!(last_day(Deadline::DaysStarting(30), late), None);
+        let sent = letter(&[Lever::S20rAccess, Lever::App12], Some(late));
+        assert_eq!(due_of(&sent, Lever::S20rAccess), Due::None);
+        assert_eq!(due_of(&sent, Lever::App12), Due::None);
+        let last = jiff::civil::date(9999, 12, 31);
+        assert_eq!(last.weekday(), Weekday::Friday);
+        assert_eq!(past_weekend(last), last);
     }
 
     #[test]

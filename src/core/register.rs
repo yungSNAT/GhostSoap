@@ -5,7 +5,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use chrono::{Months, NaiveDate};
+use jiff::ToSpan;
+use jiff::civil::Date;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use toml::value::Datetime;
@@ -420,7 +421,7 @@ const ACCESS_LEVERS: [Lever; 3] = [Lever::App12, Lever::S20rAccess, Lever::S21tA
 /// Validate register entries and packs. `today` dates the staleness and future-date checks.
 /// Findings about packs name the file as `packs/<name>`; a finding with an empty file name
 /// is about the register as a whole.
-pub fn check(entries: &[SourceFile], packs: &[SourceFile], today: NaiveDate) -> Report {
+pub fn check(entries: &[SourceFile], packs: &[SourceFile], today: Date) -> Report {
     let mut report = Report::default();
     if entries.is_empty() {
         let message = "the register has no entry files".to_owned();
@@ -469,7 +470,7 @@ fn parse<T: DeserializeOwned>(text: &str, name: &str, report: &mut Report) -> Op
     }
 }
 
-fn check_entry(entry: &Entry, file: &str, today: NaiveDate, report: &mut Report) {
+fn check_entry(entry: &Entry, file: &str, today: Date, report: &mut Report) {
     let mut errors = Vec::new();
     check_id(&entry.id, file, &mut errors);
     if entry.name.trim().is_empty() || entry.legal_entity.trim().is_empty() {
@@ -631,7 +632,7 @@ fn check_channel_levers(entry: &Entry, errors: &mut Vec<String>) {
     }
 }
 
-fn check_evidence(entry: &Entry, today: NaiveDate, errors: &mut Vec<String>) {
+fn check_evidence(entry: &Entry, today: Date, errors: &mut Vec<String>) {
     let mut seen = BTreeSet::new();
     for evidence in &entry.evidence {
         let url = &evidence.url;
@@ -775,25 +776,28 @@ pub(crate) fn is_email(address: &str) -> bool {
 }
 
 /// A plain TOML date (no time or offset) as a calendar date.
-pub(crate) fn date_of(value: &Datetime) -> Option<NaiveDate> {
+pub(crate) fn date_of(value: &Datetime) -> Option<Date> {
     match (value.date, value.time, value.offset) {
-        (Some(d), None, None) => {
-            NaiveDate::from_ymd_opt(i32::from(d.year), u32::from(d.month), u32::from(d.day))
-        }
+        (Some(d), None, None) => Date::new(
+            i16::try_from(d.year).ok()?,
+            i8::try_from(d.month).ok()?,
+            i8::try_from(d.day).ok()?,
+        )
+        .ok(),
         _ => None,
     }
 }
 
 /// More than a day ahead. The day of grace covers entries dated in Australian time
 /// whilst CI runs in UTC.
-fn is_future(date: NaiveDate, today: NaiveDate) -> bool {
-    today.succ_opt().is_some_and(|tomorrow| date > tomorrow)
+fn is_future(date: Date, today: Date) -> bool {
+    today.tomorrow().is_ok_and(|tomorrow| date > tomorrow)
 }
 
-fn is_stale(verified: NaiveDate, today: NaiveDate) -> bool {
+fn is_stale(verified: Date, today: Date) -> bool {
     today
-        .checked_sub_months(Months::new(12))
-        .is_some_and(|cutoff| verified < cutoff)
+        .checked_sub(12.months())
+        .is_ok_and(|cutoff| verified < cutoff)
 }
 
 #[cfg(test)]
@@ -833,8 +837,8 @@ description = "Marketing lists"
 entries = ["example-au"]
 "#;
 
-    fn today() -> NaiveDate {
-        NaiveDate::from_ymd_opt(2026, 10, 24).unwrap()
+    fn today() -> Date {
+        jiff::civil::date(2026, 10, 24)
     }
 
     fn file(name: &str, text: &str) -> SourceFile {
@@ -1063,6 +1067,16 @@ entries = ["example-au"]
     fn rejects_an_empty_register() {
         let report = check(&[], &[], today());
         assert_error(&report, "no entry files");
+    }
+
+    /// 12 months before 29 February is 28 February, so a check made that day is not stale.
+    #[test]
+    fn twelve_months_before_a_leap_day_is_the_last_day_of_february() {
+        let leap = "2028-02-29".parse().unwrap();
+        assert!(!is_stale("2027-02-28".parse().unwrap(), leap));
+        assert!(is_stale("2027-02-27".parse().unwrap(), leap));
+        assert!(!is_future("2028-03-01".parse().unwrap(), leap));
+        assert!(is_future("2028-03-02".parse().unwrap(), leap));
     }
 
     #[test]
