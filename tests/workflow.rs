@@ -214,6 +214,40 @@ fn init_rejects_a_short_passphrase_and_bad_details() {
 }
 
 #[test]
+fn a_stdin_passphrase_keeps_its_edge_spaces_as_the_prompt_does() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    let spaced = format!("  {PASSPHRASE} ");
+    let trimmed_repeat = init_answers(&spaced).replace(
+        &format!("{spaced}\n{spaced}\n"),
+        &format!("{spaced}\n{PASSPHRASE}\n"),
+    );
+    let out = ghostsoap(&home, &["init", "--passphrase-stdin"], &trimmed_repeat);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(text(&out.stderr).contains("the passphrases do not match"));
+    assert!(!home.join("state.age").exists());
+    let out = ghostsoap(
+        &home,
+        &["init", "--passphrase-stdin"],
+        &init_answers(&spaced),
+    );
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    let status = |input: &str| ghostsoap(&home, &["status", "--passphrase-stdin"], input);
+    for ending in ["\n", "\r\n", ""] {
+        let out = status(&format!("{spaced}{ending}"));
+        assert_eq!(
+            out.status.code(),
+            Some(0),
+            "{ending:?}: {}",
+            text(&out.stderr)
+        );
+    }
+    let trimmed = status(&format!("{PASSPHRASE}\n"));
+    assert_eq!(trimmed.status.code(), Some(1));
+    assert!(text(&trimmed.stdout).starts_with("DEGRADED: wrong passphrase\n"));
+}
+
+#[test]
 fn drafting_with_an_incomplete_profile_reports_omitted_fields() {
     let tmp = tempfile::tempdir().unwrap();
     let home = tmp.path().join("home");
