@@ -1240,21 +1240,30 @@ fn show_checklist(
         );
     }
     if let Some(marks) = &marks {
-        let count = |wanted: fn(&checklist::Progress) -> bool| {
-            items
-                .iter()
-                .filter(|item| wanted(&checklist::progress(item, marks, today)))
-                .count()
-        };
-        println!(
-            "to do {}  check again {}  done {}  not for me {}",
-            count(|p| *p == checklist::Progress::ToDo),
-            count(|p| matches!(p, checklist::Progress::CheckAgain(_))),
-            count(|p| matches!(p, checklist::Progress::Done(_))),
-            count(|p| *p == checklist::Progress::NotForMe),
-        );
+        println!("{}", checklist_counts(items, marks, today));
     }
     Ok(())
+}
+
+/// The checklist's count line: how many items stand at each progress.
+fn checklist_counts(
+    items: &[checklist::Item],
+    marks: &[checklist::Mark],
+    today: NaiveDate,
+) -> String {
+    let count = |wanted: fn(&checklist::Progress) -> bool| {
+        items
+            .iter()
+            .filter(|item| wanted(&checklist::progress(item, marks, today)))
+            .count()
+    };
+    format!(
+        "to do {}  check again {}  done {}  not for me {}",
+        count(|p| *p == checklist::Progress::ToDo),
+        count(|p| matches!(p, checklist::Progress::CheckAgain(_))),
+        count(|p| matches!(p, checklist::Progress::Done(_))),
+        count(|p| *p == checklist::Progress::NotForMe),
+    )
 }
 
 /// One checklist item in full, as `checklist --next` shows it.

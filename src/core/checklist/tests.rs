@@ -48,7 +48,8 @@ fn the_shipped_checklist_parses() {
 
 #[test]
 fn items_sort_by_rank_and_take_their_id_from_the_file_name() {
-    let ids: Vec<&str> = items().iter().map(|i| i.id.as_str()).collect();
+    let items = items();
+    let ids: Vec<&str> = items.iter().map(|i| i.id.as_str()).collect();
     assert_eq!(ids, ["a", "b"]);
 }
 
