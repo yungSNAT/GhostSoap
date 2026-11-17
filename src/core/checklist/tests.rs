@@ -149,17 +149,16 @@ fn next_prefers_an_item_to_check_again_then_the_first_to_do() {
 #[test]
 fn a_mark_replaces_the_earlier_one_and_clearing_removes_it() {
     let mut marks = vec![mark("retired", day(1, 1), MarkKind::Done)];
-    assert!(set_mark(&mut marks, "a", Some((MarkKind::Done, day(1, 2)))));
-    assert!(!set_mark(
-        &mut marks,
-        "a",
-        Some((MarkKind::Done, day(1, 2)))
-    ));
-    assert!(set_mark(
-        &mut marks,
-        "a",
-        Some((MarkKind::NotForMe, day(1, 3)))
-    ));
+    set_mark(&mut marks, "a", Some((MarkKind::Done, day(1, 2))));
+    set_mark(&mut marks, "a", Some((MarkKind::Done, day(1, 2))));
+    assert_eq!(
+        marks,
+        [
+            mark("retired", day(1, 1), MarkKind::Done),
+            mark("a", day(1, 2), MarkKind::Done)
+        ]
+    );
+    set_mark(&mut marks, "a", Some((MarkKind::NotForMe, day(1, 3))));
     assert_eq!(
         marks,
         [
@@ -167,8 +166,8 @@ fn a_mark_replaces_the_earlier_one_and_clearing_removes_it() {
             mark("a", day(1, 3), MarkKind::NotForMe)
         ]
     );
-    assert!(set_mark(&mut marks, "a", None));
-    assert!(!set_mark(&mut marks, "a", None));
+    set_mark(&mut marks, "a", None);
+    set_mark(&mut marks, "a", None);
     assert_eq!(marks, [mark("retired", day(1, 1), MarkKind::Done)]);
 }
 

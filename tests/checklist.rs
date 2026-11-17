@@ -127,6 +127,49 @@ fn marks_are_kept_encrypted_and_shown_as_progress() {
     assert!(text(&out.stderr).contains("Progress is not shown"));
 }
 
+/// A mark survives the M2 state's migration, a letter recorded after it and `export`.
+#[test]
+fn marks_survive_the_m2_migration_other_changes_and_export() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    fs::create_dir(&home).unwrap();
+    fs::write(
+        home.join("state.age"),
+        include_bytes!("fixtures/state/format-1.age"),
+    )
+    .unwrap();
+    let marked = done(&with_passphrase(
+        &home,
+        &["checklist", "done", "do-not-call", "--on", "2026-01-02"],
+    ));
+    assert_eq!(marked, "do-not-call  done 2026-01-02\n");
+    let drafted = done(&with_passphrase(
+        &home,
+        &["draft", "--entry", "cotality-au", "--copy"],
+    ));
+    assert!(drafted.contains("Name: Lara Croft"), "the M2 profile stays");
+
+    let export = tmp.path().join("export.toml");
+    done(&with_passphrase(
+        &home,
+        &["export", "--out", export.to_str().unwrap()],
+    ));
+    let exported = fs::read_to_string(&export).unwrap();
+    for wanted in [
+        "item = \"do-not-call\"",
+        "on = \"2026-01-02\"",
+        "mark = \"done\"",
+        "entry = \"cotality-au\"",
+    ] {
+        assert!(
+            exported.contains(wanted),
+            "{wanted} missing from {exported}"
+        );
+    }
+    let list = done(&with_passphrase(&home, &["checklist"]));
+    assert!(list.contains(" done 2026-01-02 "), "{list}");
+}
+
 #[test]
 fn an_unknown_item_or_a_wrong_passphrase_is_refused() {
     let tmp = tempfile::tempdir().unwrap();

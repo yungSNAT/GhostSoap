@@ -215,10 +215,8 @@ pub fn next<'a>(items: &'a [Item], marks: &[Mark], today: Date) -> Option<&'a It
     first(|p| matches!(p, Progress::CheckAgain(_))).or_else(|| first(|p| p == Progress::ToDo))
 }
 
-/// Set the user's mark on `item`, replacing any earlier one; `None` clears it. Whether the
-/// marks changed.
-pub fn set_mark(marks: &mut Vec<Mark>, item: &str, mark: Option<(MarkKind, Date)>) -> bool {
-    let before = marks.clone();
+/// Set the user's mark on `item`, replacing any earlier one; `None` clears it.
+pub fn set_mark(marks: &mut Vec<Mark>, item: &str, mark: Option<(MarkKind, Date)>) {
     marks.retain(|m| m.item != item);
     if let Some((mark, on)) = mark {
         marks.push(Mark {
@@ -227,7 +225,6 @@ pub fn set_mark(marks: &mut Vec<Mark>, item: &str, mark: Option<(MarkKind, Date)
             mark,
         });
     }
-    *marks != before
 }
 
 #[cfg(test)]
