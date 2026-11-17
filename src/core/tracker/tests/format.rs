@@ -187,18 +187,23 @@ fn every_record() -> State {
     let mut copied = message("GS-00AZ9");
     copied.channel = ChannelKind::WebForm;
     copied.requests.truncate(1);
+    State {
+        checklist: marks(),
+        ..state(vec![full, copied])
+    }
+}
+
+/// The checklist marks `FORMAT_2` holds.
+fn marks() -> Vec<Mark> {
     let mark = |item: &str, on, mark| Mark {
         item: item.to_owned(),
         on: day(on),
         mark,
     };
-    State {
-        checklist: vec![
-            mark("breach-check", 12, MarkKind::Done),
-            mark("silent-elector", 13, MarkKind::NotForMe),
-        ],
-        ..state(vec![full, copied])
-    }
+    vec![
+        mark("breach-check", 12, MarkKind::Done),
+        mark("silent-elector", 13, MarkKind::NotForMe),
+    ]
 }
 
 #[test]

@@ -3,6 +3,7 @@
 
 //! The M4 checklist end to end: listing, `--next` and the marks kept in the state.
 
+#[allow(dead_code)] // the shared helpers include some only other test files use
 mod common;
 
 use std::fs;
