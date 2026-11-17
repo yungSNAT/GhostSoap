@@ -15,12 +15,13 @@ use std::path::{Path, PathBuf};
 use std::process::Output;
 
 use age::secrecy::SecretString;
-use chrono::{Days, Local, NaiveDate};
 use common::{PASSPHRASE, emls, ghostsoap, ghostsoap_with, init, text};
 use ghostsoap::core::law::Deadline;
 use ghostsoap::core::register::{ChannelKind, Lever};
 use ghostsoap::core::tracker::{Send, SendRecord, State};
 use ghostsoap::io::state;
+use jiff::ToSpan;
+use jiff::civil::Date;
 
 /// A state file written by `ghostsoap init` at M2 (format 1), under `PASSPHRASE`.
 const M2_FILE: &[u8] = include_bytes!("fixtures/state/format-1.age");
@@ -52,8 +53,8 @@ fn state_bytes(home: &Path) -> Vec<u8> {
     fs::read(home.join("state.age")).unwrap()
 }
 
-fn today() -> NaiveDate {
-    Local::now().date_naive()
+fn today() -> Date {
+    jiff::ZonedDateTime::now().date()
 }
 
 /// The tags `draft` tells the user to record, in the order it drafted them.
@@ -303,8 +304,8 @@ fn sent_refuses_what_it_cannot_record_and_then_records_nothing() {
     let (_tmp, home, _drafts, tag, _file) = start_drafted();
     let before = state_bytes(&home);
     let drafted = stored(&home).messages[0].drafted;
-    let day_before = (drafted - Days::new(1)).to_string();
-    let tomorrow = (today() + Days::new(1)).to_string();
+    let day_before = (drafted - 1.days()).to_string();
+    let tomorrow = (today() + 1.days()).to_string();
 
     // One tag of 2 is wrong, so neither is recorded.
     let error = refused(&run(&home, &["sent", &tag, "GS-00000"]));

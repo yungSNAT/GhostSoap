@@ -45,7 +45,7 @@ fn reply_records_answers_lever_by_lever_and_status_lists_them() {
     ));
     assert_eq!(stdout, line("the latest answer is withdrawn"));
 
-    let guide = today + Days::new(30);
+    let guide = today + 30.days();
     let stdout = done(&run(&home, &["status"]));
     assert_eq!(
         stdout,
@@ -97,7 +97,7 @@ fn a_credit_correction_shows_the_law_date_and_an_agreed_longer_period_moves_it()
     done(&run(&home, &["sent", &tag]));
     let today = today();
     // 30 days that start on the day it was sent (s 20T(2)(a)).
-    let law = past_weekend(today + Days::new(29));
+    let law = past_weekend(today + 29.days());
     let stdout = done(&run(&home, &["status", "--due"]));
     assert!(
         stdout.contains(&format!(
@@ -107,13 +107,13 @@ fn a_credit_correction_shows_the_law_date_and_an_agreed_longer_period_moves_it()
     );
     assert!(stdout.contains("(Acts Interpretation Act 1901 s 36(2))"));
 
-    let until = (today + Days::new(29)).to_string();
+    let until = (today + 29.days()).to_string();
     let error = refused(&run(&home, &["reply", &tag, "--agreed-until", &until]));
     assert!(
         error.contains("is not later than the law's last day"),
         "{error}"
     );
-    let later = today + Days::new(45);
+    let later = today + 45.days();
     let agreed = ["reply", &tag, "--agreed-until", &later.to_string()];
     let line =
         |what: &str| format!("reply   {tag}  equifax-au  {what} a longer period to {later}\n");

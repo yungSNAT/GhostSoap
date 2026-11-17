@@ -53,7 +53,7 @@ fn built_in_register_matches_the_files() {
 fn shipped_register_meets_its_targets() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("registry/au");
     let files = io::register::load(&dir).expect("read register");
-    let today = chrono::Local::now().date_naive();
+    let today = jiff::ZonedDateTime::now().date();
     let report = register::check(&files.entries, &files.packs, today);
     assert_eq!(report.errors(), 0, "{:?}", report.findings);
     assert!(report.entries >= 25, "{} entries", report.entries);

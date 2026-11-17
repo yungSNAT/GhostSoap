@@ -8,7 +8,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use chrono::NaiveDate;
 use ghostsoap::core::check::{check, refusal};
 use ghostsoap::core::embedded;
 use ghostsoap::core::letters::{self, Letter, Request};
@@ -71,7 +70,7 @@ fn compose(entry: &Entry, profile: &Profile, levers: &[Lever], channel: usize) -
         channel: &entry.channels[channel],
         levers,
         detail,
-        date: NaiveDate::from_ymd_opt(2026, 10, 25).unwrap(),
+        date: jiff::civil::date(2026, 10, 25),
         tag: "GS-TEST1",
     };
     letters::compose(entry, profile, &request).expect("compose")
@@ -107,6 +106,25 @@ fn every_lever_letter_matches_its_snapshot() {
     for lever in Lever::ALL {
         snapshot(lever.name(), &compose(&entry, &profile(), &[lever], 0));
     }
+}
+
+/// A letter's date names the month and drops a day's leading zero.
+#[test]
+fn a_letter_is_dated_with_the_day_month_name_and_year() {
+    let entry = entry();
+    let request = Request {
+        channel: &entry.channels[0],
+        levers: &[Lever::App12],
+        detail: None,
+        date: "2026-11-05".parse().unwrap(),
+        tag: "GS-TEST1",
+    };
+    let letter = letters::compose(&entry, &profile(), &request).expect("compose");
+    assert!(
+        letter.body.starts_with("5 November 2026\n"),
+        "{}",
+        letter.body
+    );
 }
 
 #[test]
