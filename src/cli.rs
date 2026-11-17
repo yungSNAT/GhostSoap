@@ -1693,6 +1693,38 @@ mod tests {
         assert_eq!(tag, "GS-FGHJK");
     }
 
+    /// `--on` and `--agreed-until` read a calendar day as year, month and day; a month or day
+    /// may drop its leading zero, and nothing may follow the day.
+    #[test]
+    fn a_date_option_reads_year_month_and_day() {
+        for (text, read) in [
+            ("2026-11-05", "2026-11-05"),
+            ("2026-1-5", "2026-01-05"),
+            ("2028-02-29", "2028-02-29"),
+            ("0099-11-05", "0099-11-05"),
+        ] {
+            assert_eq!(parse_date(text).unwrap().to_string(), read, "{text}");
+        }
+        for text in [
+            "",
+            "2026-02-29",
+            "2026-11-31",
+            "2026-13-01",
+            "2026-11-05x",
+            "2026-11-05 ",
+            "2026/11/05",
+            "20261105",
+            "2026-11-05T00:00",
+            "10000-01-01",
+        ] {
+            assert_eq!(
+                parse_date(text).unwrap_err(),
+                "use a date such as 2026-11-30",
+                "{text:?}"
+            );
+        }
+    }
+
     /// No register entry offers the Spam Act lever yet, so `status` meets its business days
     /// only here.
     #[test]

@@ -104,6 +104,25 @@ mod tests {
         assert!(p.problems().is_empty());
     }
 
+    /// A date of birth is year, month and day; a month or day may drop its leading zero.
+    #[test]
+    fn a_date_of_birth_is_a_calendar_day() {
+        for (date, ok) in [
+            ("1960-11-12", true),
+            ("1960-1-2", true),
+            ("1960-02-29", true),
+            ("1961-02-29", false),
+            ("1960-11-12 ", false),
+            ("19601112", false),
+        ] {
+            let p = Profile {
+                date_of_birth: Some(date.to_owned()),
+                ..profile()
+            };
+            assert_eq!(p.problems().is_empty(), ok, "{date:?}");
+        }
+    }
+
     #[test]
     fn rejects_bad_details() {
         let p = Profile {

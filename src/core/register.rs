@@ -1065,6 +1065,16 @@ entries = ["example-au"]
         assert_error(&report, "no entry files");
     }
 
+    /// 12 months before 29 February is 28 February, so a check made that day is not stale.
+    #[test]
+    fn twelve_months_before_a_leap_day_is_the_last_day_of_february() {
+        let leap = "2028-02-29".parse().unwrap();
+        assert!(!is_stale("2027-02-28".parse().unwrap(), leap));
+        assert!(is_stale("2027-02-27".parse().unwrap(), leap));
+        assert!(!is_future("2028-03-01".parse().unwrap(), leap));
+        assert!(is_future("2028-03-02".parse().unwrap(), leap));
+    }
+
     #[test]
     fn rejects_a_future_verified_at() {
         let report = check_one(|t| t.replace("2026-10-24", "2026-10-25"));

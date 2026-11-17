@@ -581,6 +581,9 @@ mod tests {
         text.push_str(&"x".repeat(1 << 20));
         fs::write(&large, text).unwrap();
         assert!(is_export(&large));
+        let undated = named("31");
+        fs::write(&undated, EXPORT_HEADER).unwrap();
+        assert!(!is_export(&undated), "30 November is the last day");
         let folder = named("19");
         fs::create_dir(&folder).unwrap();
         assert!(!is_export(&folder));
