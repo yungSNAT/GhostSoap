@@ -300,12 +300,7 @@ impl Message {
     /// Record that the message was sent. `Ok(false)` means this record was already the one
     /// in effect, so nothing changed. A different record needs `correct`, and is then kept
     /// after the earlier one. `today` stops a date in the future.
-    pub fn record_sent(
-        &mut self,
-        send: Send,
-        correct: bool,
-        today: Date,
-    ) -> Result<bool, String> {
+    pub fn record_sent(&mut self, send: Send, correct: bool, today: Date) -> Result<bool, String> {
         let tag = &self.tag;
         if self.unfinished {
             return Err(format!(

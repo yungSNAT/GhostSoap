@@ -8,12 +8,12 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use jiff::civil::Date;
 use ghostsoap::core::check::{check, refusal};
 use ghostsoap::core::embedded;
 use ghostsoap::core::letters::{self, Letter, Request};
 use ghostsoap::core::profile::Profile;
 use ghostsoap::core::register::{self, Entry, Lever};
+use jiff::civil::Date;
 
 /// An entry that accepts every lever by email and post, and asks only for name and email.
 const ENTRY: &str = r#"
@@ -121,7 +121,11 @@ fn a_letter_is_dated_with_the_day_month_name_and_year() {
         tag: "GS-TEST1",
     };
     let letter = letters::compose(&entry, &profile(), &request).expect("compose");
-    assert!(letter.body.starts_with("5 November 2026\n"), "{}", letter.body);
+    assert!(
+        letter.body.starts_with("5 November 2026\n"),
+        "{}",
+        letter.body
+    );
 }
 
 #[test]

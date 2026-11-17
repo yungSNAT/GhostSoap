@@ -5,7 +5,6 @@
 //! A register entry file, which pull requests add, through the register check and on to the
 //! letters a checked entry produces.
 
-use jiff::civil::Date;
 use ghostsoap::core::letters::{self, Request};
 use ghostsoap::core::profile::Profile;
 use ghostsoap::core::register::{ChannelKind, RegisterFiles, SourceFile, check, parse_register};

@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::SystemTime;
 
-use jiff::civil::Date;
 use clap::{Args, CommandFactory, Parser, Subcommand};
+use jiff::civil::Date;
 use serde_json::{Value, json};
 
 use crate::core::check;
@@ -292,8 +292,7 @@ fn parse_lever(name: &str) -> Result<Lever, String> {
 }
 
 fn parse_date(text: &str) -> Result<Date, String> {
-    Date::strptime("%Y-%m-%d", text)
-        .map_err(|_| "use a date such as 2026-11-30".to_owned())
+    Date::strptime("%Y-%m-%d", text).map_err(|_| "use a date such as 2026-11-30".to_owned())
 }
 
 /// A name as the state file writes it, such as `refused-with-reasons`.
@@ -1134,11 +1133,7 @@ fn status_line(
 }
 
 /// Apply `sent`'s flags to one message and say what is now recorded.
-fn record_sending(
-    message: &mut Message,
-    args: &SentArgs,
-    today: Date,
-) -> Result<String, String> {
+fn record_sending(message: &mut Message, args: &SentArgs, today: Date) -> Result<String, String> {
     if args.withdraw {
         message.withdraw_sent(args.note.clone())?;
         return Ok("no longer recorded as sent".to_owned());

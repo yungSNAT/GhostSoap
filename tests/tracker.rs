@@ -15,13 +15,13 @@ use std::path::{Path, PathBuf};
 use std::process::Output;
 
 use age::secrecy::SecretString;
-use jiff::ToSpan;
-use jiff::civil::Date;
 use common::{PASSPHRASE, emls, ghostsoap, ghostsoap_with, init, text};
 use ghostsoap::core::law::Deadline;
 use ghostsoap::core::register::{ChannelKind, Lever};
 use ghostsoap::core::tracker::{Send, SendRecord, State};
 use ghostsoap::io::state;
+use jiff::ToSpan;
+use jiff::civil::Date;
 
 /// A state file written by `ghostsoap init` at M2 (format 1), under `PASSPHRASE`.
 const M2_FILE: &[u8] = include_bytes!("fixtures/state/format-1.age");
