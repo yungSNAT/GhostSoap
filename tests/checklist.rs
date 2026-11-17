@@ -155,6 +155,13 @@ fn an_unknown_item_or_a_wrong_passphrase_is_refused() {
     );
     assert_eq!(out.status.code(), Some(1));
     assert!(text(&out.stderr).contains("error: wrong passphrase"));
+    let out = ghostsoap(
+        &home,
+        &["checklist", "done", "breach-check", "--passphrase-stdin"],
+        "not the passphrase\n",
+    );
+    assert_eq!(out.status.code(), Some(1));
+    assert!(text(&out.stderr).contains("error: wrong passphrase"));
     assert_eq!(fs::read(home.join("state.age")).unwrap(), before);
 }
 

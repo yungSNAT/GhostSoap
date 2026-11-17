@@ -1179,7 +1179,7 @@ fn checklist(args: &ChecklistArgs) -> Result<(), String> {
             }
             Ok(())
         },
-        |_| {},
+        |()| {},
         |(), state| {
             Ok(items
                 .iter()
