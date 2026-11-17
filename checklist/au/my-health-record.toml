@@ -1,6 +1,6 @@
 rank = 90
 title = "Set a record access code on your My Health Record"
-why = "Once you set a record access code, a healthcare provider organisation that has not accessed your record before cannot view it unless you give it the code. Organisations that have already accessed it keep access until you remove them."
+why = "Once you set a record access code, a healthcare provider organisation that has not accessed your record before cannot view it unless you give it the code. Organisations that have already accessed it keep access until you remove them, or until they have not accessed it for 3 years."
 steps = [
   "Sign in to myGov, open My Health Record from your linked services and choose Privacy & Access, then My Healthcare Organisations.",
   "Remove each organisation on the list you do not want to keep access: select Manage Access, remove it, then Save.",

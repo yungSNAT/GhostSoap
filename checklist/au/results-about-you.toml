@@ -7,11 +7,16 @@ steps = [
   "Turn on notifications to hear when a new result shows your details.",
   "Some of these features are still rolling out for adults in certain markets. If you do not want to sign in, Google's detailed removal request form is the other way to ask.",
 ]
-applies = "Everyone with a Google account"
+applies = "Adults with a Google account (Google began rolling it out in Australia on 7 May 2024)"
 effort = "minutes"
 recheck_months = 6
 
 [[links]]
 name = "Google: Find and remove personal info in Google Search results"
 url = "https://support.google.com/websearch/answer/12719076"
+checked = 2026-11-17
+
+[[links]]
+name = "Google Australia: A new Search tool to help Australians control their online presence"
+url = "https://blog.google/intl/en-au/products/explore-get-answers/results-about-you/"
 checked = 2026-11-17

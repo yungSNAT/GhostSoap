@@ -6,7 +6,7 @@ steps = [
   "Turn off geo-tagging in each platform's privacy settings, so others cannot see where your photos or videos were taken or your posts were made.",
   "Review your friend and follower lists, and be wary of accepting new ones.",
   "Limit what you post and share, and be wary when using tags or commenting on posts.",
-  "The eSafety Guide links each platform's own privacy settings and reporting tools.",
+  "The eSafety Guide links the privacy settings and reporting tools of common platforms.",
 ]
 applies = "Everyone with a social media account"
 effort = "an-hour"
