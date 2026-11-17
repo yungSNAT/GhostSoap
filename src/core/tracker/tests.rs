@@ -358,7 +358,7 @@ fn unsent(events: Vec<Event>) -> Message {
     }
 }
 
-fn extension(on: u32, until: u32) -> Event {
+fn extension(on: i8, until: i8) -> Event {
     Event::Extension(Extension {
         on: day(on),
         until: day(until),

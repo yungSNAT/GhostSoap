@@ -13,7 +13,6 @@ use ghostsoap::core::embedded;
 use ghostsoap::core::letters::{self, Letter, Request};
 use ghostsoap::core::profile::Profile;
 use ghostsoap::core::register::{self, Entry, Lever};
-use jiff::civil::Date;
 
 /// An entry that accepts every lever by email and post, and asks only for name and email.
 const ENTRY: &str = r#"

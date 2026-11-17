@@ -471,8 +471,6 @@ fn rename_with_retry(mut rename: impl FnMut() -> io::Result<()>) -> io::Result<(
 
 #[cfg(test)]
 mod tests {
-    use jiff::civil::Date;
-
     use super::*;
     use crate::core::register::{ChannelKind, Lever};
     use crate::core::tracker::{Message, Request};
