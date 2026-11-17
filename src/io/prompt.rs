@@ -27,12 +27,17 @@ impl Input {
         }
     }
 
-    /// One line of input after printing `prompt` to standard error.
+    /// One line of input after printing `prompt` to standard error, trimmed.
     pub fn line(&mut self, prompt: &str) -> io::Result<String> {
+        Ok(self.raw_line(prompt)?.trim().to_owned())
+    }
+
+    /// One line of input after printing `prompt`, with only its line ending removed.
+    fn raw_line(&mut self, prompt: &str) -> io::Result<String> {
         eprint!("{prompt}");
         io::stderr().flush()?;
         match self.lines.next() {
-            Some(line) => Ok(line?.trim().to_owned()),
+            Some(line) => line,
             None => Err(io::Error::new(io::ErrorKind::UnexpectedEof, "input ended")),
         }
     }
@@ -47,7 +52,7 @@ impl Input {
         read_terminal: impl FnOnce(&'a str) -> io::Result<String>,
     ) -> io::Result<SecretString> {
         let text = if self.passphrase_from_stdin {
-            self.line(prompt)?
+            self.raw_line(prompt)?
         } else {
             read_terminal(prompt)?
         };
