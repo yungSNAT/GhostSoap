@@ -234,6 +234,20 @@ mod tests {
         );
     }
 
+    /// A period that would end after 9999-12-31, the last day a date can be, has no date.
+    #[test]
+    fn a_period_past_the_last_representable_day_has_no_date() {
+        let late = jiff::civil::date(9999, 12, 25);
+        assert_eq!(last_day(Deadline::DaysAfter(10), late), None);
+        assert_eq!(last_day(Deadline::DaysStarting(30), late), None);
+        let sent = letter(&[Lever::S20rAccess, Lever::App12], Some(late));
+        assert_eq!(due_of(&sent, Lever::S20rAccess), Due::None);
+        assert_eq!(due_of(&sent, Lever::App12), Due::None);
+        let last = jiff::civil::date(9999, 12, 31);
+        assert_eq!(last.weekday(), Weekday::Friday);
+        assert_eq!(past_weekend(last), last);
+    }
+
     #[test]
     fn the_app13_statement_period_starts_at_a_refusal_of_the_correction() {
         let mut message = letter(&[Lever::App13, Lever::App13Statement], Some(day(11, 2)));
