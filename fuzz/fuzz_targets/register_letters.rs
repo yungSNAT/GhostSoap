@@ -5,7 +5,7 @@
 //! A register entry file, which pull requests add, through the register check and on to the
 //! letters a checked entry produces.
 
-use chrono::NaiveDate;
+use jiff::civil::Date;
 use ghostsoap::core::letters::{self, Request};
 use ghostsoap::core::profile::Profile;
 use ghostsoap::core::register::{ChannelKind, RegisterFiles, SourceFile, check, parse_register};
@@ -30,7 +30,7 @@ fuzz_target!(|data: &[u8]| {
     {
         file.name = format!("{id}.toml");
     }
-    let today = NaiveDate::from_ymd_opt(2026, 11, 2).unwrap();
+    let today = jiff::civil::date(2026, 11, 2);
     if check(std::slice::from_ref(&file), &[], today).errors() > 0 {
         return;
     }

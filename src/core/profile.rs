@@ -3,7 +3,7 @@
 
 //! The user's identity details. Document numbers are deliberately absent (plan section 5).
 
-use chrono::NaiveDate;
+use jiff::civil::Date;
 use serde::{Deserialize, Serialize};
 
 use crate::core::register::{IdentityField, is_email};
@@ -54,7 +54,7 @@ impl Profile {
             problems.push("email is not an email address".to_owned());
         }
         if let Some(date) = &self.date_of_birth
-            && NaiveDate::parse_from_str(date, "%Y-%m-%d").is_err()
+            && Date::strptime("%Y-%m-%d", date).is_err()
         {
             problems.push("date of birth is not a date such as 1980-01-31".to_owned());
         }

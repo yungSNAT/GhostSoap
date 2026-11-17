@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::SystemTime;
 
-use chrono::NaiveDate;
+use jiff::civil::Date;
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use serde_json::{Value, json};
 
@@ -198,7 +198,7 @@ pub struct SentArgs {
     tags: Vec<String>,
     /// The day you sent it, as YYYY-MM-DD; today if left out.
     #[arg(long, value_parser = parse_date)]
-    on: Option<NaiveDate>,
+    on: Option<Date>,
     /// The channel you used, if not the one the letter was drafted for: email, web-form,
     /// post or phone.
     #[arg(long, value_parser = parse_channel)]
@@ -232,7 +232,7 @@ pub struct ReplyArgs {
     lever: Vec<Lever>,
     /// The day it happened, as YYYY-MM-DD; today if left out.
     #[arg(long, value_parser = parse_date)]
-    on: Option<NaiveDate>,
+    on: Option<Date>,
     /// The ground given for a refusal: not-direct-marketing, small-business,
     /// outside-jurisdiction, insufficient-verification or other.
     #[arg(long, value_parser = parse_reason, requires = "status")]
@@ -246,7 +246,7 @@ pub struct ReplyArgs {
     /// The last day of a longer period you agreed to in writing for a credit correction
     /// (Privacy Act ss 20T(2)(b), 21V(2)(b)).
     #[arg(long, value_parser = parse_date, conflicts_with = "status")]
-    agreed_until: Option<NaiveDate>,
+    agreed_until: Option<Date>,
     /// Take back the latest answer (`status`) or longer period (`extension`) recorded: it
     /// was wrong. It stays as history.
     #[arg(long, value_parser = parse_withdrawn, conflicts_with_all = ["status", "agreed_until", "on"])]
@@ -291,8 +291,8 @@ fn parse_lever(name: &str) -> Result<Lever, String> {
     })
 }
 
-fn parse_date(text: &str) -> Result<NaiveDate, String> {
-    NaiveDate::parse_from_str(text, "%Y-%m-%d")
+fn parse_date(text: &str) -> Result<Date, String> {
+    Date::strptime("%Y-%m-%d", text)
         .map_err(|_| "use a date such as 2026-11-30".to_owned())
 }
 
@@ -717,7 +717,7 @@ fn record_drafts<'a>(
     planned: &[Planned<'a>],
     detail: Option<&str>,
     folder: Option<&str>,
-    today: NaiveDate,
+    today: Date,
 ) -> Result<(Vec<Drafted<'a>>, io::drafts::Redraft), String> {
     // Every letter is composed first: one that cannot be written changes nothing.
     let drafted = compose_drafts(state, planned, detail, today)?;
@@ -764,7 +764,7 @@ fn compose_drafts<'a>(
     state: &State,
     planned: &[Planned<'a>],
     detail: Option<&str>,
-    today: NaiveDate,
+    today: Date,
 ) -> Result<Vec<Drafted<'a>>, String> {
     let mut tags: Vec<String> = state.messages.iter().map(|m| m.tag.clone()).collect();
     // The tags this run's letters have taken over from earlier drafts.
@@ -907,8 +907,8 @@ fn draft_destination(dir: &Path) -> Result<String, String> {
         .ok_or_else(|| format!("{} is not a Unicode path", dir.display()))
 }
 
-fn today() -> NaiveDate {
-    chrono::Local::now().date_naive()
+fn today() -> Date {
+    jiff::ZonedDateTime::now().date()
 }
 
 fn sent(args: &SentArgs) -> Result<(), String> {
@@ -1034,7 +1034,7 @@ const ACTIONS: [tracker::Action; 5] = [
 ];
 
 /// The date a deadline gives, if any.
-fn due_date(due: Due) -> Option<NaiveDate> {
+fn due_date(due: Due) -> Option<Date> {
     match due {
         Due::Statutory(day) | Due::Guide(day) => Some(day),
         Due::Unknown | Due::None => None,
@@ -1137,7 +1137,7 @@ fn status_line(
 fn record_sending(
     message: &mut Message,
     args: &SentArgs,
-    today: NaiveDate,
+    today: Date,
 ) -> Result<String, String> {
     if args.withdraw {
         message.withdraw_sent(args.note.clone())?;
@@ -1652,8 +1652,7 @@ fn registry_command(path: Option<PathBuf>) -> ExitCode {
 }
 
 fn registry_check(files: &RegisterFiles, place_name: &str) -> ExitCode {
-    let today = chrono::Local::now().date_naive();
-    let report = register::check(&files.entries, &files.packs, today);
+    let report = register::check(&files.entries, &files.packs, today());
     for finding in &report.findings {
         let label = match finding.severity {
             Severity::Error => "error",
@@ -1729,7 +1728,7 @@ mod tests {
     /// only here.
     #[test]
     fn status_names_each_kind_of_deadline_and_dates_only_those_with_a_day() {
-        let day = NaiveDate::from_ymd_opt(2026, 11, 16).unwrap();
+        let day = jiff::civil::date(2026, 11, 16);
         assert_eq!(due_text(Due::Statutory(day)), "  law's last day 2026-11-16");
         assert_eq!(due_text(Due::Guide(day)), "  OAIC guide 2026-11-16");
         assert!(due_text(Due::Unknown).contains("5 business days after sending"));
@@ -1811,7 +1810,7 @@ mod tests {
                 entry: id.to_owned(),
                 channel: ChannelKind::Email,
                 address: "privacy@example.invalid".to_owned(),
-                drafted: NaiveDate::from_ymd_opt(2026, 11, 17).unwrap(),
+                drafted: jiff::civil::date(2026, 11, 17),
                 draft: None,
                 superseded: false,
                 unfinished: true,

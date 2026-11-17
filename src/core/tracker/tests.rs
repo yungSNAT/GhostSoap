@@ -9,8 +9,8 @@ use crate::core::{embedded, register};
 mod format;
 mod reply;
 
-fn day(day: u32) -> NaiveDate {
-    NaiveDate::from_ymd_opt(2026, 11, day).unwrap()
+fn day(day: i8) -> Date {
+    jiff::civil::date(2026, 11, day)
 }
 
 fn request(lever: Lever, letter_version: u32, deadline: Deadline) -> Request {
@@ -44,7 +44,7 @@ fn message(tag: &str) -> Message {
     }
 }
 
-fn status(on: NaiveDate, status: Status) -> StatusEvent {
+fn status(on: Date, status: Status) -> StatusEvent {
     StatusEvent {
         on,
         status,
@@ -54,7 +54,7 @@ fn status(on: NaiveDate, status: Status) -> StatusEvent {
     }
 }
 
-fn answer(on: NaiveDate, to: Status) -> Event {
+fn answer(on: Date, to: Status) -> Event {
     Event::Status(status(on, to))
 }
 
@@ -62,11 +62,11 @@ fn withdrawal(of: Withdrawn) -> Event {
     Event::Withdrawal(Withdrawal { of, note: None })
 }
 
-fn by(on: NaiveDate, channel: ChannelKind) -> Send {
+fn by(on: Date, channel: ChannelKind) -> Send {
     Send { on, channel }
 }
 
-fn email(on: NaiveDate) -> Send {
+fn email(on: Date) -> Send {
     by(on, ChannelKind::Email)
 }
 

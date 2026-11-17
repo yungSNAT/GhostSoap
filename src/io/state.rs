@@ -246,7 +246,7 @@ fn is_export(path: &Path) -> bool {
     let dated = name
         .strip_prefix("ghostsoap-export-")
         .and_then(|rest| rest.strip_suffix(".toml"))
-        .is_some_and(|date| chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").is_ok());
+        .is_some_and(|date| jiff::civil::Date::strptime("%Y-%m-%d", date).is_ok());
     if !dated || !fs::symlink_metadata(path).is_ok_and(|meta| meta.is_file()) {
         return false;
     }
@@ -471,7 +471,7 @@ fn rename_with_retry(mut rename: impl FnMut() -> io::Result<()>) -> io::Result<(
 
 #[cfg(test)]
 mod tests {
-    use chrono::NaiveDate;
+    use jiff::civil::Date;
 
     use super::*;
     use crate::core::register::{ChannelKind, Lever};
@@ -540,7 +540,7 @@ mod tests {
             entry: "cotality-au".to_owned(),
             channel: ChannelKind::Email,
             address: "privacy@example.com.au".to_owned(),
-            drafted: NaiveDate::from_ymd_opt(2026, 11, 10).unwrap(),
+            drafted: jiff::civil::date(2026, 11, 10),
             draft: None,
             superseded: false,
             unfinished: false,

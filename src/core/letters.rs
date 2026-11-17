@@ -6,7 +6,7 @@
 
 use std::collections::BTreeMap;
 
-use chrono::NaiveDate;
+use jiff::civil::Date;
 
 use crate::core::law::law;
 use crate::core::profile::Profile;
@@ -106,7 +106,7 @@ pub struct Request<'a> {
     pub channel: &'a Channel,
     pub levers: &'a [Lever],
     pub detail: Option<&'a str>,
-    pub date: NaiveDate,
+    pub date: Date,
     /// Such as `GS-7K3QX`.
     pub tag: &'a str,
 }
@@ -125,7 +125,7 @@ pub fn compose(entry: &Entry, profile: &Profile, request: &Request) -> Result<Le
     let postal =
         (request.channel.kind == ChannelKind::Post).then(|| request.channel.address.clone());
     values.extend([
-        ("date", Some(request.date.format("%-d %B %Y").to_string())),
+        ("date", Some(request.date.strftime("%-d %B %Y").to_string())),
         ("legal_entity", Some(entry.legal_entity.clone())),
         ("postal_address", postal),
         ("laws", Some(laws(spam_only, has_spam).to_owned())),

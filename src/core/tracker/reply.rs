@@ -4,7 +4,7 @@
 //! Answers, longer periods and withdrawals recorded on a sent message, and what each
 //! request asks of the user now.
 
-use chrono::NaiveDate;
+use jiff::civil::Date;
 
 use crate::core::deadline::{self, Due};
 use crate::core::law::Deadline;
@@ -38,7 +38,7 @@ impl Message {
         &mut self,
         levers: &[Lever],
         event: StatusEvent,
-        today: NaiveDate,
+        today: Date,
     ) -> Result<bool, String> {
         let tag = &self.tag;
         if event.on > today {
@@ -98,7 +98,7 @@ impl Message {
         &mut self,
         levers: &[Lever],
         extension: Extension,
-        today: NaiveDate,
+        today: Date,
     ) -> Result<bool, String> {
         let tag = &self.tag;
         if extension.on > today {
@@ -262,7 +262,7 @@ impl Request {
     }
 
     /// Which action state the request is in on `today`, with `due` its deadline.
-    pub fn action(&self, sent: bool, due: Due, today: NaiveDate) -> Action {
+    pub fn action(&self, sent: bool, due: Due, today: Date) -> Action {
         let status = self.status(sent);
         let passed = match due {
             Due::Statutory(day) | Due::Guide(day) => day < today,

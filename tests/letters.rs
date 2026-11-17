@@ -8,7 +8,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use chrono::NaiveDate;
+use jiff::civil::Date;
 use ghostsoap::core::check::{check, refusal};
 use ghostsoap::core::embedded;
 use ghostsoap::core::letters::{self, Letter, Request};
@@ -71,7 +71,7 @@ fn compose(entry: &Entry, profile: &Profile, levers: &[Lever], channel: usize) -
         channel: &entry.channels[channel],
         levers,
         detail,
-        date: NaiveDate::from_ymd_opt(2026, 10, 25).unwrap(),
+        date: jiff::civil::date(2026, 10, 25),
         tag: "GS-TEST1",
     };
     letters::compose(entry, profile, &request).expect("compose")
