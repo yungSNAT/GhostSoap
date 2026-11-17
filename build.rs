@@ -1,8 +1,9 @@
 // Copyright 2026 Ryan Duguid
 // SPDX-License-Identifier: FSL-1.1-ALv2
 
-//! Embeds the register in the binary: generates `include_str!` calls for every entry in
-//! `registry/au` and every pack in `registry/au/packs`, sorted by file name.
+//! Embeds the register and the checklist in the binary: generates `include_str!` calls for
+//! every entry in `registry/au`, every pack in `registry/au/packs` and every item in
+//! `checklist/au`, sorted by file name.
 
 use std::env;
 use std::fs;
@@ -34,11 +35,13 @@ fn table(name: &str, files: &[PathBuf]) -> String {
 }
 
 fn main() -> io::Result<()> {
-    let register =
-        Path::new(&env::var("CARGO_MANIFEST_DIR").expect("set by Cargo")).join("registry/au");
+    let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("set by Cargo"));
+    let register = root.join("registry/au");
     println!("cargo::rerun-if-changed=registry/au");
+    println!("cargo::rerun-if-changed=checklist/au");
     let code = table("ENTRIES", &toml_files(&register)?)
-        + &table("PACKS", &toml_files(&register.join("packs"))?);
+        + &table("PACKS", &toml_files(&register.join("packs"))?)
+        + &table("CHECKLIST", &toml_files(&root.join("checklist/au"))?);
     fs::write(
         Path::new(&env::var("OUT_DIR").expect("set by Cargo")).join("register.rs"),
         code,

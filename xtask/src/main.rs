@@ -26,6 +26,7 @@ use std::process::ExitCode;
 use std::time::Duration;
 
 use ghostsoap::core::register::{ChannelKind, Entry, SourceFile};
+use ghostsoap::core::{checklist, embedded};
 use sha2::{Digest, Sha256};
 
 /// Pages with less main text than this are bot checks or script-only shells.
@@ -700,6 +701,29 @@ fn report(changed: &[String], failing: &[String], channels: &[String], laws: &[S
     out
 }
 
+/// M4's release gate: fail if the checklist built into ghostsoap has a link last checked
+/// before `month` (`YYYY-MM`), the release month.
+fn checklist_checked(month: &str) -> ExitCode {
+    let unchecked = checklist::parse(&embedded::checklist())
+        .and_then(|items| checklist::unchecked_since(&items, month));
+    match unchecked {
+        Ok(links) if links.is_empty() => {
+            println!("every checklist link was checked in or after {month}");
+            ExitCode::SUCCESS
+        }
+        Ok(links) => {
+            for link in links {
+                eprintln!("not checked since {month} began: {link}");
+            }
+            ExitCode::FAILURE
+        }
+        Err(e) => {
+            eprintln!("error: {e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.split_first() {
@@ -716,12 +740,14 @@ fn main() -> ExitCode {
             emails_changed(Path::new(base), Path::new(head))
         }
         Some((command, [])) if command == "no-network" => no_network::run(),
+        Some((command, [month])) if command == "checklist-checked" => checklist_checked(month),
         _ => {
             eprintln!(
                 "usage: xtask evidence-hash <url>... \
                  | xtask evidence-drift [registry dir [page text dir]] \
                  | xtask email-changes <base registry dir> <head registry dir> \
-                 | xtask no-network"
+                 | xtask no-network \
+                 | xtask checklist-checked <YYYY-MM>"
             );
             ExitCode::from(2)
         }

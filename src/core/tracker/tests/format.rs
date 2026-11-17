@@ -4,6 +4,7 @@
 //! State format 2 as text: what is written, what is read and what is refused.
 
 use super::*;
+use crate::core::checklist::{Mark, MarkKind};
 
 /// Format 2 as it is written, holding every kind of record. A change here is a change
 /// to what existing state files mean, so it needs a new format number and a migration.
@@ -117,6 +118,16 @@ letter_version = 1
 
 [messages.requests.deadline.reasonable]
 guide_days = 30
+
+[[checklist]]
+item = "breach-check"
+on = "2026-11-12"
+mark = "done"
+
+[[checklist]]
+item = "silent-elector"
+on = "2026-11-13"
+mark = "not-for-me"
 "#;
 
 /// The first message `FORMAT_2` holds, before its requests are set.
@@ -176,7 +187,18 @@ fn every_record() -> State {
     let mut copied = message("GS-00AZ9");
     copied.channel = ChannelKind::WebForm;
     copied.requests.truncate(1);
-    state(vec![full, copied])
+    let mark = |item: &str, on, mark| Mark {
+        item: item.to_owned(),
+        on: day(on),
+        mark,
+    };
+    State {
+        checklist: vec![
+            mark("breach-check", 12, MarkKind::Done),
+            mark("silent-elector", 13, MarkKind::NotForMe),
+        ],
+        ..state(vec![full, copied])
+    }
 }
 
 #[test]
@@ -271,9 +293,21 @@ fn a_file_with_a_field_or_name_this_version_does_not_know_is_refused() {
         ("lever = \"app7-source\"", "lever = \"app99\""),
         ("channel = \"post\"", "channel = \"fax\""),
         ("deadline = \"not-stated\"", "deadline = \"none\""),
+        ("mark = \"done\"", "mark = \"done\"\nnote = \"x\""),
+        ("mark = \"not-for-me\"", "mark = \"skipped\""),
     ] {
         assert!(FORMAT_2.contains(known), "{known}");
         let changed = FORMAT_2.replacen(known, unknown, 1);
         assert!(toml::from_str::<State>(&changed).is_err(), "{unknown}");
     }
+}
+
+#[test]
+fn a_state_marking_one_checklist_item_twice_is_refused() {
+    let mut state = every_record();
+    state.checklist.push(state.checklist[0].clone());
+    assert_eq!(
+        state.problems(),
+        ["checklist item breach-check is marked twice"]
+    );
 }

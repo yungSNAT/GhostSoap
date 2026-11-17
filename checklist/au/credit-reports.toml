@@ -1,0 +1,17 @@
+rank = 20
+title = "Get your credit reports"
+why = "Your credit report lists credit recorded in your name, so it can show an application or account someone else made. Credit reporting bodies may hold different information about you, so read each one's report."
+steps = [
+  "Ask Equifax and Experian, the credit reporting bodies the OAIC names, for your credit report. Each must give it to you free once every 3 months.",
+  "You can also get a free copy if you were refused credit in the past 90 days or your credit information was corrected.",
+  "To ask in writing, draft the request with GhostSoap: ghostsoap plan --entry equifax-au --lever s20r-access (or experian-au).",
+  "If something is wrong, draft a correction request: ghostsoap plan --entry equifax-au --lever s20t-correction --detail \"what is wrong\".",
+]
+applies = "Everyone with credit, such as a phone plan, card or loan"
+effort = "an-hour"
+recheck_months = 12
+
+[[links]]
+name = "OAIC: Access your credit report"
+url = "https://www.oaic.gov.au/privacy/your-privacy-rights/credit-reporting/access-your-credit-report"
+checked = 2026-11-17

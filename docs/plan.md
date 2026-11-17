@@ -202,7 +202,8 @@ ghostsoap reply <tag> escalated --to <target> [--on]   record where and when you
 ghostsoap follow-up <tag> [--lever] [--complaint]   write a reminder or the complaint letter (M3b)
 ghostsoap status [--due] [--ics <file>]   deadlines, overdue items, next actions (M3a); a calendar file (decision 11)
 ghostsoap escalate <tag>             export an OAIC complaint pack (M3b)
-ghostsoap checklist [--next]         the hygiene checklist and progress (M4)
+ghostsoap checklist [--next] [--no-passphrase]   the hygiene checklist and progress (M4)
+ghostsoap checklist done | not-for-me | clear <id>...   mark an item (M4)
 ghostsoap registry check             validate the register (also run in CI)
 ghostsoap export | forget            (M3a)
 ```
@@ -247,6 +248,8 @@ Data under `checklist/au/`, one TOML file per item, with why it matters, the ste
 - Doxxing or serious invasion of privacy: report to police and eSafety; a community legal centre for the statutory tort
 
 The checklist is guidance: it links to the official page and records progress; it submits nothing.
+
+Built on 17 November 2026: `checklist/au/` holds every item above except the ASIC director address, which waits for ASIC's final position, with credit report access and the credit ban as separate items; the JustDeleteMe import is not built. Each file gives `rank`, `title`, `why`, `steps`, `applies`, `effort` (`minutes`, `an-hour` or `longer`), an optional `recheck_months` and `[[links]]` (`name`, `url`, `checked`), the official page first; unknown fields are refused. Progress is a mark per item (`done` with its day, or `not-for-me`) in state format 2, so it is encrypted with the rest of the state; `ghostsoap checklist done`, `not-for-me` and `clear` set it. The release workflow runs `xtask checklist-checked <month>`, which fails while any link was last checked before the release month.
 
 ## 8. Milestones and acceptance checks
 

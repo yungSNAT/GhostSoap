@@ -10,6 +10,7 @@
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
+use crate::core::checklist::Mark;
 use crate::core::law::{self, Deadline};
 use crate::core::letters;
 use crate::core::profile::Profile;
@@ -31,6 +32,9 @@ pub struct State {
     /// Oldest first.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub messages: Vec<Message>,
+    /// The user's checklist marks, one per item at most.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub checklist: Vec<Mark>,
 }
 
 /// One letter to one entry through one channel, carrying one request per lever.
@@ -470,6 +474,7 @@ impl State {
             format: FORMAT,
             profile,
             messages: Vec::new(),
+            checklist: Vec::new(),
         }
     }
 
@@ -525,6 +530,11 @@ impl State {
                 problems.push(format!("tag {tag} is used twice"));
             }
             message.problems(&mut problems);
+        }
+        for (index, mark) in self.checklist.iter().enumerate() {
+            if self.checklist[..index].iter().any(|m| m.item == mark.item) {
+                problems.push(format!("checklist item {} is marked twice", mark.item));
+            }
         }
         problems
     }

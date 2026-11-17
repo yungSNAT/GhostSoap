@@ -1,0 +1,26 @@
+rank = 120
+title = "If you are doxxed or your privacy is seriously invaded"
+why = "Doxxing is the intentional online exposure of a person's identity, private information or personal details without their consent, and can compromise their safety. GhostSoap prepares no reports or claims; these services can act."
+steps = [
+  "If you are in immediate danger or at risk of harm in Australia, call Triple Zero (000).",
+  "Report the material to the platform where it is posted; the eSafety Guide links each platform's reporting tools.",
+  "Report serious online abuse to eSafety, and seek help from the police or a legal, counselling or support service.",
+  "For the statutory tort for serious invasions of privacy (Privacy Act Schedule 2, from 10 June 2025), ask a community legal service for advice.",
+]
+applies = "Only if someone has published your personal details to harm or threaten you, or has seriously invaded your privacy"
+effort = "longer"
+
+[[links]]
+name = "eSafety: Doxing"
+url = "https://www.esafety.gov.au/industry/tech-trends-and-challenges/doxing"
+checked = 2026-11-17
+
+[[links]]
+name = "eSafety: Report"
+url = "https://www.esafety.gov.au/report"
+checked = 2026-11-17
+
+[[links]]
+name = "Community Legal Centres Australia: Find legal help"
+url = "https://clcs.org.au/legal-help/"
+checked = 2026-11-17

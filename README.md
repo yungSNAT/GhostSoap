@@ -57,6 +57,7 @@ ghostsoap clean                                  # delete the drafts once sent
 ghostsoap export                                 # a plaintext copy of your profile and records
 ghostsoap forget                                 # delete your profile, records and drafts
 ghostsoap law                                    # each request's legal basis and deadline
+ghostsoap checklist --next                       # the next data hygiene step, with its official page
 ```
 
 `plan` and `draft` take `--pack` or `--entry` (repeatable). Without `--lever`, they ask each business to stop direct marketing, to stop passing your details to other marketers and to say where it got them (APP 7). Other requests are named with `--lever`. Requests that return your details or need your own words go to one business at a time, and those that need your own words take `--detail`, for example `ghostsoap draft --entry equifax-au --lever s20t-correction --detail "The default listed for 2024 is not mine."`. Each letter includes only the details that business needs. Overseas people-search sites, and services whose privacy policy names an overseas company with no ABN (Indeed, LinkedIn), get no letter: GhostSoap has not established that Australian privacy law reaches them (it can reach an overseas business that carries on business in Australia, under section 5B), so it names a page of their own to check (a people-search site's search page, or the privacy or help page for Indeed and LinkedIn) and their own opt-out or privacy request form instead.
@@ -70,6 +71,8 @@ Drafts are `.eml` files your mail program opens ready to send, or text files to 
 `ghostsoap export` writes your profile and every letter's record, decrypted, to a new file so they survive a lost device or a forgotten passphrase: `ghostsoap-export-<date>.toml` in the data folder, or the file `--out` names. It refuses a file or link already at that path, makes the file readable only by you on macOS and Linux (on Windows it keeps the folder's access list) and warns as `draft` does when the folder is inside a Git working tree or a sync folder. The file is plaintext: keep it private and delete it when you no longer need it. If writing the export fails, GhostSoap deletes the part it wrote, or says where it is. GhostSoap cannot read an export back yet.
 
 `ghostsoap forget` lists what it will delete and asks you to type `forget` (`--yes` skips the question): the state file, exports it wrote under their default name in the data folder, and the drafts GhostSoap wrote in its drafts folder and in each folder the state records from `draft --out`, but only drafts that still hold what GhostSoap wrote; other files stay, as do exports you wrote elsewhere with `export --out`. `--no-passphrase` deletes without reading the state, so the `--out` folders are not looked in. It leaves a recorded folder that has since become a link, and reports it and each other path it cannot delete, then carries on. GhostSoap keeps nothing in the system keyring. Deleting does not erase: the disk may still hold what was deleted.
+
+`ghostsoap checklist` lists data hygiene steps that letters do not cover, such as a breach check, your credit reports, a credit ban after fraud, the Do Not Call Register, a silent number and silent enrolment, each linked to its official page with the day the page was checked. `--next` shows the next step in full. Your progress is kept in your encrypted state: `ghostsoap checklist done breach-check` marks a step done (`--on` gives another day), `not-for-me` marks one that does not apply to you and `clear` removes a mark. A step marked done comes back as 'check again' once its re-check interval has passed. `--no-passphrase` lists the steps without your progress. GhostSoap submits nothing for you.
 
 If you edit a draft or write your own words, `ghostsoap check <file>` warns of claims the law table does not support: a sentence that holds a word for erasing and a legal source or a word of duty, the GDPR, California's privacy law, foreign article numbers and time periods written as a number and a unit. A flag may be harmless. To check `--detail` text, save it to a file first. The check matches words and never stops you sending. It passes the law table's own wording wherever it appears, even where that row does not apply to the business you are writing to, and it refuses a file it cannot match, with the same warnings: an empty file, HTML, or a base64 or quoted-printable mail body. No warning does not mean a letter is accurate or legally sound, and the check is not legal advice.
 
@@ -87,7 +90,7 @@ The skill is guidance, not a lock. It does not stop an agent that can read your 
 
 ## Safety
 
-- Your profile and the record of your letters (which businesses, which requests, the day you sent each and the folder each draft went to) are encrypted with [age](https://age-encryption.org/) under your passphrase, in one file in your user data folder: `%LOCALAPPDATA%\GhostSoap` on Windows, `~/Library/Application Support/GhostSoap` on macOS, and `$XDG_DATA_HOME/ghostsoap` (by default `~/.local/share/ghostsoap`) on Linux. Set `GHOSTSOAP_HOME` to use another folder. A lost passphrase cannot be recovered. `init` and each command that changes the file warn, without stopping, when that folder is inside a Git working tree or a OneDrive, Dropbox or iCloud Drive folder; like the drafts check, it looks only in the usual places.
+- Your profile, the record of your letters (which businesses, which requests, the day you sent each and the folder each draft went to) and your checklist progress are encrypted with [age](https://age-encryption.org/) under your passphrase, in one file in your user data folder: `%LOCALAPPDATA%\GhostSoap` on Windows, `~/Library/Application Support/GhostSoap` on macOS, and `$XDG_DATA_HOME/ghostsoap` (by default `~/.local/share/ghostsoap`) on Linux. Set `GHOSTSOAP_HOME` to use another folder. A lost passphrase cannot be recovered. `init` and each command that changes the file warn, without stopping, when that folder is inside a Git working tree or a OneDrive, Dropbox or iCloud Drive folder; like the drafts check, it looks only in the usual places.
 - Requests for access return personal information. Make them only about yourself: requesting someone else's information may be an offence. GhostSoap never puts them in a pack.
 - If someone with access to your device may be watching what you do, read eSafety's [online safety checklist](https://www.esafety.gov.au/key-topics/domestic-family-violence/online-safety-checklist) before you start.
 
@@ -100,7 +103,6 @@ Nothing from GhostSoap itself: it makes no network connections, and you send eac
 - Send requests under the Australian Privacy Principles and the credit reporting rules in Part IIIA of the Privacy Act: stop direct marketing, tell me where you got my information, destroy what you no longer need, give me access, correct it.
 - Keep a register of Australian data brokers, recruiters and large consumer businesses, each entry sourced and dated.
 - Track deadlines and replies in an encrypted file on your computer, and export an escalation pack.
-- Guide wider data hygiene: breach checks, credit bans, the Do Not Call Register, silent numbers and more.
 
 ## What it will not do
 
@@ -139,7 +141,7 @@ The banner's lettering and emblem are drawn from Cascadia Mono and Besley glyphs
 ## Licences
 
 - Code: licensed under the Functional Source License, Version 1.1, ALv2 Future License (FSL-1.1-ALv2). You may use, modify and redistribute it for any purpose except a Competing Use as defined in LICENSE (making it available to others in a competing commercial product or service), and each version becomes available under Apache-2.0 2 years after it is made available. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
-- Register and checklist data (`registry/` and, from milestone M4, `checklist/`): [CC0-1.0](LICENSE-DATA), so other privacy projects can reuse it.
+- Register and checklist data (`registry/` and `checklist/`): [CC0-1.0](LICENSE-DATA), so other privacy projects can reuse it.
 
 GhostSoap is not affiliated with, endorsed by or connected to Activision or the Call of Duty franchise. The name is a nod to it, nothing more.
 

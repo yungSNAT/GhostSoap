@@ -23,7 +23,20 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Milestone M4 (docs/plan.md): every checklist link must have been read in the
+  # release month, so a stale page holds the release until it is checked again.
+  checklist:
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install
+      - run: cargo run --locked -p xtask -- checklist-checked "$(date -u +%Y-%m)"
+
   release:
+    needs: checklist
     # A job that calls a reusable workflow accepts no timeout-minutes; every
     # job in release-binary.yml sets its own.
     permissions:

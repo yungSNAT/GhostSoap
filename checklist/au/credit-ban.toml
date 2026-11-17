@@ -1,0 +1,16 @@
+rank = 30
+title = "Ban your credit report after fraud"
+why = "During a ban, a credit reporting body must not use or disclose your credit report, and it tells a lender who asks for the report about the ban. That makes it harder for someone to get credit in your name."
+steps = [
+  "Ask each credit reporting body the OAIC lists (Equifax, Experian and illion) for a ban through its online form, or ask one of them to pass your request to the other 2.",
+  "Or draft the request with GhostSoap: ghostsoap plan --entry equifax-au --lever s20k-ban (or experian-au).",
+  "The ban lasts 21 days after your first request. Each body must tell you at least 5 business days before it ends, and must extend it if it believes you have been or are likely to be a victim of fraud.",
+  "A ban and each extension are free. While a ban is in place, applying for credit yourself may be harder.",
+]
+applies = "Only if you have been, or are likely to be, the victim of fraud, such as after a breach that exposed your identity documents"
+effort = "minutes"
+
+[[links]]
+name = "OAIC: Fraud and your credit report"
+url = "https://www.oaic.gov.au/privacy/your-privacy-rights/credit-reporting/fraud-and-your-credit-report"
+checked = 2026-11-17

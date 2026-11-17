@@ -1,0 +1,16 @@
+rank = 90
+title = "Set a record access code on your My Health Record"
+why = "Once you set a record access code, a healthcare provider organisation that has not accessed your record before cannot view it unless you give it the code. Organisations that have already accessed it keep access until you remove them."
+steps = [
+  "Sign in to myGov, open My Health Record from your linked services and choose Privacy & Access, then My Healthcare Organisations.",
+  "Remove each organisation on the list you do not want to keep access: select Manage Access, remove it, then Save.",
+  "Under All Other Healthcare Providers, select Manage Access and set a code of 4 to 8 characters. Note it, so you can give it to the providers you choose.",
+  "Providers can still upload documents without the code, and may use emergency ('break glass') access in a medical emergency; access history shows who opened your record.",
+]
+applies = "Everyone with a My Health Record linked to myGov"
+effort = "minutes"
+
+[[links]]
+name = "Australian Digital Health Agency: Restrict access to your record"
+url = "https://www.digitalhealth.gov.au/initiatives-and-programs/my-health-record/manage-your-record/privacy-and-access/restrict-access-to-your-record"
+checked = 2026-11-17

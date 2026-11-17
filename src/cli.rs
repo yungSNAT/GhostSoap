@@ -13,6 +13,7 @@ use clap::{Args, CommandFactory, Parser, Subcommand};
 use serde_json::{Value, json};
 
 use crate::core::check;
+use crate::core::checklist::{self, MarkKind};
 use crate::core::deadline::{self, Due};
 use crate::core::embedded;
 use crate::core::law::{self, Deadline};
@@ -167,6 +168,12 @@ pub enum Command {
         #[arg(long)]
         passphrase_stdin: bool,
     },
+    /// The data hygiene checklist: steps beyond letters, such as breach checks, credit bans
+    /// and the Do Not Call Register, each linked to its official page.
+    ///
+    /// It lists every item with your progress, kept in your encrypted state. Mark an item
+    /// with `done`, `not-for-me` or `clear`. Nothing is submitted for you.
+    Checklist(ChecklistArgs),
     /// Show the law table: each lever's legal basis, deadline and charge rule.
     Law {
         /// Print JSON for scripts and AI agents.
@@ -251,6 +258,48 @@ pub struct ReplyArgs {
     /// was wrong. It stays as history.
     #[arg(long, value_parser = parse_withdrawn, conflicts_with_all = ["status", "agreed_until", "on"])]
     withdraw: Option<tracker::Withdrawn>,
+    /// Read the passphrase from standard input instead of the terminal (for scripts).
+    #[arg(long)]
+    passphrase_stdin: bool,
+}
+
+#[derive(Debug, Args)]
+#[command(args_conflicts_with_subcommands = true)]
+pub struct ChecklistArgs {
+    #[command(subcommand)]
+    command: Option<ChecklistCommand>,
+    /// Show one item in full: the first to check again, else the first to do.
+    #[arg(long)]
+    next: bool,
+    /// Leave out your progress, so no passphrase is asked for.
+    #[arg(long, conflicts_with = "passphrase_stdin")]
+    no_passphrase: bool,
+    /// Read the passphrase from standard input instead of the terminal (for scripts).
+    #[arg(long)]
+    passphrase_stdin: bool,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ChecklistCommand {
+    /// Mark items done.
+    Done {
+        #[command(flatten)]
+        marks: MarkArgs,
+        /// The day you did it, as YYYY-MM-DD; today if left out.
+        #[arg(long, value_parser = parse_date)]
+        on: Option<NaiveDate>,
+    },
+    /// Mark items that do not apply to you.
+    NotForMe(MarkArgs),
+    /// Remove your mark from items, so they are to do again.
+    Clear(MarkArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct MarkArgs {
+    /// The item's id, as `ghostsoap checklist` lists it; repeat for more.
+    #[arg(required = true)]
+    items: Vec<String>,
     /// Read the passphrase from standard input instead of the terminal (for scripts).
     #[arg(long)]
     passphrase_stdin: bool,
@@ -397,6 +446,7 @@ pub fn run(cli: Cli) -> ExitCode {
             due,
             passphrase_stdin,
         }) => status(due, passphrase_stdin),
+        Some(Command::Checklist(args)) => checklist(&args),
         Some(Command::Law { json }) => {
             if json {
                 show_law_json();
@@ -1099,6 +1149,141 @@ fn status(due_only: bool, passphrase_stdin: bool) -> Result<(), String> {
         );
     }
     Ok(())
+}
+
+fn checklist(args: &ChecklistArgs) -> Result<(), String> {
+    let items = checklist::parse(&embedded::checklist())?;
+    let today = today();
+    let (marks, mark) = match &args.command {
+        None => return show_checklist(&items, args, today),
+        Some(ChecklistCommand::Done { marks, on }) => {
+            (marks, Some((MarkKind::Done, on.unwrap_or(today))))
+        }
+        Some(ChecklistCommand::NotForMe(marks)) => (marks, Some((MarkKind::NotForMe, today))),
+        Some(ChecklistCommand::Clear(marks)) => (marks, None),
+    };
+    if let Some(unknown) = marks
+        .items
+        .iter()
+        .find(|id| !items.iter().any(|i| i.id == **id))
+    {
+        return Err(format!(
+            "no checklist item is called {unknown}; `ghostsoap checklist --no-passphrase` \
+             lists them"
+        ));
+    }
+    let lines = update_state(
+        marks.passphrase_stdin,
+        |state| {
+            for id in &marks.items {
+                checklist::set_mark(&mut state.checklist, id, mark);
+            }
+            Ok(())
+        },
+        |()| {},
+        |(), state| {
+            Ok(items
+                .iter()
+                .filter(|item| marks.items.contains(&item.id))
+                .map(|item| {
+                    let progress = checklist::progress(item, &state.checklist, today);
+                    format!("{}  {}", item.id, progress.words())
+                })
+                .collect::<Vec<_>>())
+        },
+    )?;
+    println!("{}", lines.join("\n"));
+    Ok(())
+}
+
+/// The checklist with the user's progress, unless `--no-passphrase` is given or there is no
+/// state yet; with `--next`, one item in full.
+fn show_checklist(
+    items: &[checklist::Item],
+    args: &ChecklistArgs,
+    today: NaiveDate,
+) -> Result<(), String> {
+    let dir = state::data_dir().map_err(|e| e.to_string())?;
+    let marks = if args.no_passphrase || !state::state_path(&dir).exists() {
+        eprintln!(
+            "Progress is not shown. It is kept in your encrypted state once `ghostsoap init` \
+             has run."
+        );
+        None
+    } else {
+        let passphrase = Input::new(args.passphrase_stdin)
+            .passphrase("Passphrase: ")
+            .map_err(|e| e.to_string())?;
+        Some(
+            state::load(&dir, passphrase)
+                .map_err(|e| e.to_string())?
+                .checklist,
+        )
+    };
+    let progress =
+        |item: &checklist::Item| marks.as_ref().map(|m| checklist::progress(item, m, today));
+    if args.next {
+        match checklist::next(items, marks.as_deref().unwrap_or_default(), today) {
+            Some(item) => print!("{}", checklist_item(item, progress(item))),
+            None => println!("Nothing left: every item is done or not for you."),
+        }
+        return Ok(());
+    }
+    let width = items.iter().map(|i| i.id.len()).max().unwrap_or(0) + 2;
+    for item in items {
+        let status = progress(item).map_or(String::new(), |p| format!("{:<31}", p.words()));
+        println!(
+            "{:<width$}{status}{}  ({})",
+            item.id,
+            item.title,
+            item.effort.words()
+        );
+    }
+    if let Some(marks) = &marks {
+        let count = |wanted: fn(&checklist::Progress) -> bool| {
+            items
+                .iter()
+                .filter(|item| wanted(&checklist::progress(item, marks, today)))
+                .count()
+        };
+        println!(
+            "to do {}  check again {}  done {}  not for me {}",
+            count(|p| *p == checklist::Progress::ToDo),
+            count(|p| matches!(p, checklist::Progress::CheckAgain(_))),
+            count(|p| matches!(p, checklist::Progress::Done(_))),
+            count(|p| *p == checklist::Progress::NotForMe),
+        );
+    }
+    Ok(())
+}
+
+/// One checklist item in full, as `checklist --next` shows it.
+fn checklist_item(item: &checklist::Item, progress: Option<checklist::Progress>) -> String {
+    let mut out = format!("{}  ({})\n", item.title, item.id);
+    if let Some(progress) = progress {
+        out += &format!("Status: {}\n", progress.words());
+    }
+    let recheck = item
+        .recheck_months
+        .map_or("once".to_owned(), |m| format!("every {m} months"));
+    out += &format!(
+        "Applies: {}\nEffort: {}. Do it {recheck}.\n\nWhy: {}\n\nSteps:\n",
+        item.applies,
+        item.effort.words(),
+        item.why
+    );
+    for (n, step) in item.steps.iter().enumerate() {
+        out += &format!("{}. {step}\n", n + 1);
+    }
+    out += "\nLinks:\n";
+    for link in &item.links {
+        out += &format!("- {}: {} (checked {})\n", link.name, link.url, link.checked);
+    }
+    out + &format!(
+        "\nWhen it is done: ghostsoap checklist done {id}\n\
+         If it is not for you: ghostsoap checklist not-for-me {id}\n",
+        id = item.id
+    )
 }
 
 /// The count line: each action state and what `count` gives for it.

@@ -1,0 +1,17 @@
+rank = 70
+title = "Ask Google to remove search results showing your contact details"
+why = "Google's Results about you finds search results that show your home address, phone number or email address, and lets you ask Google to remove them from its search results. Google may keep a result it considers valuable to the public, such as one from a government or news website."
+steps = [
+  "Open Results about you while signed in to your Google account and let it search for your details.",
+  "In the 'To review' tab, request removal of each result you want kept private, or mark it as reviewed.",
+  "Turn on notifications to hear when a new result shows your details.",
+  "Some of these features are still rolling out for adults in certain markets. If you do not want to sign in, Google's detailed removal request form is the other way to ask.",
+]
+applies = "Everyone with a Google account"
+effort = "minutes"
+recheck_months = 6
+
+[[links]]
+name = "Google: Find and remove personal info in Google Search results"
+url = "https://support.google.com/websearch/answer/12719076"
+checked = 2026-11-17

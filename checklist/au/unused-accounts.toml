@@ -1,0 +1,16 @@
+rank = 80
+title = "Delete accounts you no longer use"
+why = "An account you no longer use but leave active can expose your information, because you are not checking it."
+steps = [
+  "List the online accounts you no longer use, starting with social media and messaging.",
+  "Delete each one through the service's official app or website. Uninstalling an app does not delete or deactivate the account.",
+  "Where the business is in GhostSoap's register, you can also ask it to destroy what it no longer needs: ghostsoap plan --entry <id> --lever app11-destroy.",
+]
+applies = "Everyone"
+effort = "longer"
+recheck_months = 12
+
+[[links]]
+name = "ASD's ACSC: Secure your online activity"
+url = "https://www.cyber.gov.au/publication/personal-cyber-security-handbook/secure-your-online-activity"
+checked = 2026-11-17
