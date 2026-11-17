@@ -14,6 +14,8 @@ ghostsoap plan --pack start-here --json   # the planned requests, to whom and wh
 ghostsoap plan --entry quantium-au --json # one business
 ghostsoap law --json                      # each request's legal basis, deadline and charge
 ghostsoap registry list --json            # the packs and businesses to choose from
+ghostsoap checklist --no-passphrase       # data hygiene steps beyond letters, with official pages
+ghostsoap checklist --next --no-passphrase # the first step in full
 ```
 
 These commands need no profile and no passphrase. Errors go to standard error with a non-zero exit code. `plan` steps have an `action`:
@@ -35,6 +37,7 @@ ghostsoap sent GS-7K3QX            # records a letter as sent, by the tag in its
 ghostsoap reply GS-7K3QX refused   # records an answer; --lever names one request
 ghostsoap status                   # lists what to do next, overdue first, with dates
 ghostsoap clean                    # deletes the drafts once sent
+ghostsoap checklist done do-not-call  # records a checklist step as done
 ```
 
 `sent` takes the day with `--on 2026-11-03` if it was not today, and `sent GS-7K3QX --withdraw` takes the record back if the letter was not sent after all. The record sits in their encrypted state file, so these need their passphrase.

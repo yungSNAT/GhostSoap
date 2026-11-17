@@ -1,0 +1,22 @@
+rank = 10
+title = "Check whether your email address was in a data breach"
+why = "A breach can expose your email address with a password, your phone number or your identity documents. Knowing which breaches included you tells you which passwords to change and whether to protect your identity."
+steps = [
+  "Search each email address you use on Have I Been Pwned.",
+  "For each breach it lists, change that service's password and the password of any other account that used the same one.",
+  "If a breach exposed identity documents, such as a driver licence or passport, contact IDCARE, the national identity and cyber support service, for a response plan, and see the credit ban item.",
+  "Turn on Have I Been Pwned's notifications to hear when your address appears in a future breach.",
+]
+applies = "Everyone"
+effort = "minutes"
+recheck_months = 6
+
+[[links]]
+name = "Have I Been Pwned"
+url = "https://haveibeenpwned.com/"
+checked = 2026-11-17
+
+[[links]]
+name = "IDCARE"
+url = "https://www.idcare.org/"
+checked = 2026-11-17

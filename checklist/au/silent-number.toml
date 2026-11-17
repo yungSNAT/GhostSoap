@@ -1,0 +1,16 @@
+rank = 50
+title = "Make your phone number silent"
+why = "A silent (unlisted) number does not appear in print or electronic phone directories or in operator-assisted directory services such as 1223, and does not show on the phone you call, except when you call some telcos or emergency numbers such as 000 and 112."
+steps = [
+  "Ask your telco to make your number silent; you can ask when you sign up.",
+  "Ask whether it charges an ongoing fee: some telcos may, so you can shop around.",
+  "A silent number does not stop telemarketing calls; see the Do Not Call Register item.",
+  "If you think your telco has wrongly disclosed your number, complain to it first, then to the Telecommunications Industry Ombudsman.",
+]
+applies = "Everyone with a phone number"
+effort = "minutes"
+
+[[links]]
+name = "ACMA: Make your phone number more private"
+url = "https://www.acma.gov.au/make-your-phone-number-more-private"
+checked = 2026-11-17

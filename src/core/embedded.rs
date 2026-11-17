@@ -1,8 +1,8 @@
 // Copyright 2026 Ryan Duguid
 // SPDX-License-Identifier: FSL-1.1-ALv2
 
-//! The shipped register, embedded at compile time by `build.rs`, so an installed binary
-//! (or a later WebAssembly build) needs no register files on disk.
+//! The shipped register and checklist, embedded at compile time by `build.rs`, so an
+//! installed binary (or a later WebAssembly build) needs no data files on disk.
 
 use crate::core::register::{RegisterFiles, SourceFile};
 
@@ -26,4 +26,9 @@ pub fn register() -> RegisterFiles {
         entries: files(data::ENTRIES),
         packs: files(data::PACKS),
     }
+}
+
+/// The checklist items built into this binary.
+pub fn checklist() -> Vec<SourceFile> {
+    files(data::CHECKLIST)
 }

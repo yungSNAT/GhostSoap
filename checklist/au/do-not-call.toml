@@ -1,0 +1,19 @@
+rank = 40
+title = "Put your numbers on the Do Not Call Register"
+why = "Telemarketers must follow the register's rules, so registering is how the ACMA says to stop telemarketing calls, including to a silent number."
+steps = [
+  "Register each number you hold that is used mainly for private or domestic purposes, as the account holder or a nominee.",
+  "A number stays on the register indefinitely unless you remove it.",
+]
+applies = "Everyone with a phone number used mainly for private or domestic purposes"
+effort = "minutes"
+
+[[links]]
+name = "Do Not Call Register"
+url = "https://www.donotcall.gov.au/"
+checked = 2026-11-17
+
+[[links]]
+name = "Do Not Call Register: Registering numbers"
+url = "https://www.donotcall.gov.au/consumers/consumer-overview/registering-numbers"
+checked = 2026-11-17

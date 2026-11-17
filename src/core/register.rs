@@ -776,7 +776,7 @@ pub(crate) fn is_email(address: &str) -> bool {
 }
 
 /// A plain TOML date (no time or offset) as a calendar date.
-fn date_of(value: &Datetime) -> Option<Date> {
+pub(crate) fn date_of(value: &Datetime) -> Option<Date> {
     match (value.date, value.time, value.offset) {
         (Some(d), None, None) => Date::new(
             i16::try_from(d.year).ok()?,

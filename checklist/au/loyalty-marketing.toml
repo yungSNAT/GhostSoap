@@ -1,0 +1,15 @@
+rank = 100
+title = "Opt out of marketing from loyalty programmes"
+why = "Any organisation the Privacy Act covers must let you opt out of direct marketing. The Act covers organisations with an annual turnover of more than $3 million, and some other organisations."
+steps = [
+  "For each programme you belong to, click 'unsubscribe' in its marketing emails, or reply 'unsubscribe' or 'STOP' to its emails and texts.",
+  "To also ask the programmes in GhostSoap's register to stop using your details for marketing and to say where they got them, draft letters: ghostsoap draft --pack loyalty.",
+]
+applies = "Everyone in a loyalty programme"
+effort = "an-hour"
+recheck_months = 12
+
+[[links]]
+name = "OAIC: Advertising, marketing and spam"
+url = "https://www.oaic.gov.au/privacy/your-privacy-rights/more-privacy-rights/advertising,-marketing-and-spam"
+checked = 2026-11-17

@@ -1,0 +1,16 @@
+rank = 60
+title = "Enrol as a silent elector"
+why = "Silent enrolment keeps your address off future editions of the publicly available electoral roll."
+steps = [
+  "Check you are eligible: an Australian citizen aged 18 or over (at 16 or 17 you can register ahead) who has lived at the address for at least one month.",
+  "Make a Commonwealth statutory declaration explaining in detail the risk to your or your family's personal safety, witnessed by a person the AEC's form lists, and apply with one accepted form of identification.",
+  "Family members enrolled at your address with the same family name are strongly advised to apply as well, each with their own application.",
+  "Your address stays on roll editions already public. Once silent enrolment is granted, masking your details can take up to 7 days.",
+]
+applies = "Only where your or your family's personal safety is at risk. Your profession, a silent phone number or not wanting junk mail are not reasons on their own."
+effort = "longer"
+
+[[links]]
+name = "AEC: Silent electors"
+url = "https://www.aec.gov.au/Enrolling_to_vote/Special_Category/silent-electors.htm"
+checked = 2026-11-17

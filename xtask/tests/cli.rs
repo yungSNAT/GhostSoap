@@ -267,3 +267,21 @@ fn evidence_hash_succeeds_when_every_url_hashes() {
     assert!(out.stderr.is_empty());
     server.join().unwrap();
 }
+
+#[test]
+fn checklist_checked_fails_on_a_link_checked_before_the_release_month() {
+    let fixture = Fixture::new("checklist");
+    let passed = fixture.run(&["checklist-checked", "2026-11"]);
+    assert_eq!(passed.status.code(), Some(0), "{passed:?}");
+    let stale = fixture.run(&["checklist-checked", "2099-01"]);
+    assert_eq!(stale.status.code(), Some(1), "{stale:?}");
+    let stderr = String::from_utf8_lossy(&stale.stderr);
+    assert!(
+        stderr
+            .contains("not checked since 2099-01 began: breach-check: https://haveibeenpwned.com/"),
+        "{stderr}"
+    );
+    let bad = fixture.run(&["checklist-checked", "December"]);
+    assert_eq!(bad.status.code(), Some(1), "{bad:?}");
+    assert!(String::from_utf8_lossy(&bad.stderr).contains("error: December is not a month"));
+}
