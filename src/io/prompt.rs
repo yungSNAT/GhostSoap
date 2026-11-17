@@ -32,8 +32,7 @@ impl Input {
         Ok(self.raw_line(prompt)?.trim().to_owned())
     }
 
-    /// One line of input after printing `prompt`, with only its line ending removed, as
-    /// the terminal prompt reads a passphrase.
+    /// One line of input after printing `prompt`, with only its line ending removed.
     fn raw_line(&mut self, prompt: &str) -> io::Result<String> {
         eprint!("{prompt}");
         io::stderr().flush()?;

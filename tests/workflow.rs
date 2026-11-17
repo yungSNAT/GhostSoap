@@ -218,6 +218,14 @@ fn a_stdin_passphrase_keeps_its_edge_spaces_as_the_prompt_does() {
     let tmp = tempfile::tempdir().unwrap();
     let home = tmp.path().join("home");
     let spaced = format!("  {PASSPHRASE} ");
+    let trimmed_repeat = init_answers(&spaced).replace(
+        &format!("{spaced}\n{spaced}\n"),
+        &format!("{spaced}\n{PASSPHRASE}\n"),
+    );
+    let out = ghostsoap(&home, &["init", "--passphrase-stdin"], &trimmed_repeat);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(text(&out.stderr).contains("the passphrases do not match"));
+    assert!(!home.join("state.age").exists());
     let out = ghostsoap(
         &home,
         &["init", "--passphrase-stdin"],
