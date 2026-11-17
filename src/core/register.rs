@@ -775,7 +775,7 @@ pub(crate) fn is_email(address: &str) -> bool {
 }
 
 /// A plain TOML date (no time or offset) as a calendar date.
-fn date_of(value: &Datetime) -> Option<NaiveDate> {
+pub(crate) fn date_of(value: &Datetime) -> Option<NaiveDate> {
     match (value.date, value.time, value.offset) {
         (Some(d), None, None) => {
             NaiveDate::from_ymd_opt(i32::from(d.year), u32::from(d.month), u32::from(d.day))

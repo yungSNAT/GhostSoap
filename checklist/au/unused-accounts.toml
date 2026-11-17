@@ -4,7 +4,7 @@ why = "An account you no longer use but leave active can expose your information
 steps = [
   "List the online accounts you no longer use, starting with social media and messaging.",
   "Delete each one through the service's official app or website. Uninstalling an app does not delete or deactivate the account.",
-  "Where the business is in GhostSoap's register, you can also ask it to destroy what it no longer needs: ghostsoap plan --entry <id> --lever app11-destroy.",
+  "Where the business is in GhostSoap's register, you can also ask it to destroy what it no longer needs: ghostsoap draft --entry <id> --lever app11-destroy.",
 ]
 applies = "Everyone"
 effort = "longer"

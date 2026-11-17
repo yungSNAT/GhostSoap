@@ -8,8 +8,9 @@ use std::collections::BTreeSet;
 
 use chrono::{Months, NaiveDate};
 use serde::{Deserialize, Serialize};
+use toml::value::Datetime;
 
-use crate::core::register::SourceFile;
+use crate::core::register::{self, SourceFile};
 
 /// One checklist item, read from `checklist/au/<id>.toml`.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -56,8 +57,16 @@ impl Effort {
 pub struct Link {
     pub name: String,
     pub url: String,
-    /// The day the page was last read to confirm the item.
+    /// The day the page was last read to confirm the item, a plain TOML date as the
+    /// register writes its dates.
+    #[serde(deserialize_with = "plain_date")]
     pub checked: NaiveDate,
+}
+
+fn plain_date<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<NaiveDate, D::Error> {
+    let value = Datetime::deserialize(deserializer)?;
+    register::date_of(&value)
+        .ok_or_else(|| serde::de::Error::custom("use a plain date such as 2026-11-17"))
 }
 
 /// The user's mark on one item, kept in the encrypted state. A mark for an item this

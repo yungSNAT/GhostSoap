@@ -63,6 +63,10 @@ fn every_problem_is_reported_before_any_item_is_returned() {
         file("c.toml", &item_text(1, "recheck_months = 0")),
         file("d.toml", "rank = 3\nunknown = 1\n"),
         file("e.txt", ""),
+        file(
+            "g.toml",
+            &item_text(5, "").replace("2026-11-17", "2026-11-17T10:00:00"),
+        ),
     ])
     .unwrap_err();
     for expected in [
@@ -73,12 +77,16 @@ fn every_problem_is_reported_before_any_item_is_returned() {
         "c.toml: recheck_months must be at least 1",
         "d.toml: unknown field `unknown`",
         "e.txt: not a .toml file",
+        "g.toml: use a plain date such as 2026-11-17",
     ] {
         assert!(err.contains(expected), "missing {expected:?} in:\n{err}");
     }
     let no_links = item_text(1, "");
-    let no_links = &no_links[..no_links.find("[[links]]").unwrap()];
-    let err = parse(&[file("f.toml", no_links)]).unwrap_err();
+    let no_links = format!(
+        "{}links = []\n",
+        &no_links[..no_links.find("[[links]]").unwrap()]
+    );
+    let err = parse(&[file("f.toml", &no_links)]).unwrap_err();
     assert!(err.contains("f.toml: it needs at least one link"), "{err}");
 }
 
