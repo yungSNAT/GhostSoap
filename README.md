@@ -13,7 +13,7 @@
 [![OpenSSF Scorecard](https://raw.githubusercontent.com/ryanduguid/.github/badges/yungSNAT/GhostSoap.svg)](https://scorecard.dev/viewer/?uri=github.com/yungSNAT/GhostSoap)<br>
 [![rust: 1.99+](.github/assets/badges/rust.svg)](https://www.rust-lang.org/) [![licence: FSL-1.1-ALv2](.github/assets/badges/licence.svg)](#licences)
 
-[Install](#install) · [Use](#use) · [With an AI agent](#with-an-ai-agent) · [Safety](#safety) · [What leaves your machine](#what-leaves-your-machine) · [When to choose something else](#when-to-choose-something-else) · [Development](#development) · [Credits](#credits) · [Licences](#licences)
+[Web page](https://yungsnat.github.io/GhostSoap/) · [Install](#install) · [Use](#use) · [With an AI agent](#with-an-ai-agent) · [Safety](#safety) · [What leaves your machine](#what-leaves-your-machine) · [When to choose something else](#when-to-choose-something-else) · [Development](#development) · [Credits](#credits) · [Licences](#licences)
 
 </div>
 
