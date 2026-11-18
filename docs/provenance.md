@@ -300,6 +300,17 @@ Evidence: 2 `[[evidence]]` hashes for `peopledatalabs-au` (the 'Do Not Sell or S
 
 Swordfish was read again on 17 November 2026: its privacy policy, opt-out and terms pages served only a bot check ('Checking for any bots'), to a browser and to Firecrawl, so it is still not added.
 
+### Ad-tech candidates and Swordfish (19 November 2026)
+
+Checked on 19 November 2026 from about 10:10 am to 10:20 am AEDT by an AI agent working for the maintainer, from public pages only: no name or email was searched, no form submitted and no account created. No person has re-checked them. None was added. Entries carry no device identifiers (the maintainer's ruling on `mobile_ad_id`), so an ad-tech entry is useful only where a letter naming the register's identity fields can reach what the business holds.
+
+| Candidate | Read | Reason not added |
+|---|---|---|
+| Eyeota | Privacy Center, Marketplace and Audience Platform privacy policy and privacy contact page on eyeota.com | The policy says its platform 'is not designed to collect any identifiable Personal Data such as full name, email address, physical address' and stores cookie IDs, mobile advertising IDs and hashed emails; its opt-outs work per browser or device setting. It names Eyeota Pte Ltd of Singapore as the operator; ABN Lookup has EYEOTA AUSTRALIA PTY LTD (15 603 918 029, active), but no page read names it as responsible for the platform. A letter giving a name, email or address could not identify a record, so the entry would mislead |
+| Lotame | Privacy Center, Services Privacy Notice and 'information privacy choices' page on lotame.com | The notice names Lotame as a division of Epsilon Data Management, LLC, and offers a privacy rights request form for email addresses, but no page read mentions Australia, and ABN Lookup has only a cancelled ABN for LOTAME SOLUTIONS ASIA PTE. LTD. (54 603 249 501) and no Epsilon Data Management. An overseas ad-tech firm is outside the overseas categories the plan allows (people-search sites and business contact-data brokers) |
+| Mobilewalla | Privacy Center on mobilewalla.com | It names Mobilewalla Inc., processes mobile advertising IDs, location, IP addresses and hashed emails, and offers opt-outs and access and deletion 'nationwide', under United States state laws. No page read mentions Australia, ABN Lookup has no match, and an overseas ad-tech firm is outside the overseas categories the plan allows |
+| Swordfish | Home page, privacy policy, opt-out form, terms, CCPA notice, 'Our Data', FAQ and GDPR pages on swordfish.ai, readable this time | The policy names Swordfish AI Inc., a Delaware corporation, and its opt-out form asks for a country, but no page of its own states coverage in Australia ('Our Data' gives only worldwide counts, such as 3.5 billion data points), which the other business contact-data brokers' entries rest on. It can be added when one of its own pages shows Australian coverage |
+
 ### Rejected candidates (M1)
 
 | Candidate | Reason |
