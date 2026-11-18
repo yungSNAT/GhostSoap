@@ -1,0 +1,40 @@
+name: macOS install
+
+# Follow the README's Install section on macOS: build and install GhostSoap with cargo,
+# run the command it gives and check the output starts as the README says it does.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: macos-install-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    timeout-minutes: 30
+    runs-on: macos-latest
+    steps:
+      # Stands in for the README's `git clone` and `cd GhostSoap`.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # rustup reads the pinned version from rust-toolchain.toml.
+      - run: rustup toolchain install
+      - run: cargo install --locked --path .
+      - name: Run the README's command and compare its first lines
+        run: |
+          # The text block after 'You should see' in the Install section.
+          awk '/^You should see/ { seen = 1; next }
+            seen && /^```text/ { inside = 1; next }
+            inside && /^```/ { exit }
+            inside { print }' README.md > expected.txt
+          test -s expected.txt
+          ghostsoap plan --pack start-here > plan.txt
+          head -n "$(wc -l < expected.txt)" plan.txt > actual.txt
+          diff -u expected.txt actual.txt
