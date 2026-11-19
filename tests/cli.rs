@@ -502,12 +502,11 @@ fn in_data_folder(home: Option<&std::path::Path>, args: &[&str], input: &str) ->
         .stderr(std::process::Stdio::piped())
         .spawn()
         .unwrap();
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(input.as_bytes())
-        .unwrap();
+    // A child that exits before reading closes the pipe; its output is what is tested.
+    match child.stdin.take().unwrap().write_all(input.as_bytes()) {
+        Err(e) if e.kind() != std::io::ErrorKind::BrokenPipe => panic!("write stdin: {e}"),
+        _ => {}
+    }
     child.wait_with_output().unwrap()
 }
 
@@ -565,15 +564,21 @@ fn forget_deletes_nothing_when_it_cannot_read_the_state_or_the_folder() {
         "passphrase\n",
     );
     assert_eq!(out.status.code(), Some(1), "{}", text(&out.stderr));
-    assert!(!out.stderr.is_empty());
-    assert_eq!(
-        std::fs::read(tmp.path().join("state.age")).unwrap(),
-        b"not a state"
+    let state = tmp.path().join("state.age");
+    assert!(
+        text(&out.stderr).contains(&format!("cannot decrypt {}", state.display())),
+        "{}",
+        text(&out.stderr)
     );
+    assert_eq!(std::fs::read(&state).unwrap(), b"not a state");
 
-    let file = tmp.path().join("state.age");
-    let out = in_data_folder(Some(&file), &["forget", "--no-passphrase", "--yes"], "");
+    let out = in_data_folder(Some(&state), &["forget", "--no-passphrase", "--yes"], "");
     assert_eq!(out.status.code(), Some(1), "{}", text(&out.stderr));
-    assert!(!out.stderr.is_empty());
-    assert!(file.is_file());
+    let not_a_folder = std::fs::read_dir(&state).unwrap_err().to_string();
+    assert!(
+        text(&out.stderr).contains(&not_a_folder),
+        "{}",
+        text(&out.stderr)
+    );
+    assert!(state.is_file());
 }
