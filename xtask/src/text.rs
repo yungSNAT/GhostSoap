@@ -429,7 +429,7 @@ mod tests {
 
     #[test]
     fn lists_the_fields_a_page_serves() {
-        let html = "<form><INPUT type=text NAME=firstName><input name='email' required>\
+        let html = "<form>1 < 2 <INPUT type=text NAME=firstName><input required name='email'>\
             <input type=\"hidden\" data-name=\"x\" name=\"item&#91;1&#93;\"/>\
             <textarea\nname = \"message\"></textarea><select name=\"state\"></select>\
             <input name=\"email\"><input type=\"submit\"><button name=\"go\">Go</button>\

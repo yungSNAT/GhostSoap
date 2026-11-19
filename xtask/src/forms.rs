@@ -319,6 +319,25 @@ mod tests {
     }
 
     #[test]
+    fn a_refused_connection_fails_only_if_the_host_is_gone() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let form = fields(
+            &format!("http://{}/", listener.local_addr().unwrap()),
+            &["email"],
+        );
+        drop(listener);
+        let gone = |_: &str, _: &str| Ok(Dns::NoSuchName);
+        assert_eq!(
+            check(&loopback_agent(), &gone, &form),
+            Check::Dead("host does not exist".to_owned())
+        );
+        assert!(matches!(
+            check(&loopback_agent(), &there, &form),
+            Check::Inconclusive(_)
+        ));
+    }
+
+    #[test]
     fn an_unchecked_form_must_still_load() {
         let form = |url: String| Form {
             url,
@@ -408,7 +427,12 @@ mod tests {
                 .replace("exemption_risk = \"none\"", "exemption_risk = \"overseas\""),
             ..entry("b-au", "")
         };
-        let urls = sent_to(&[request, overseas]).unwrap();
+        let retired = entry(
+            "c-au",
+            "\n[[channels]]\nkind = \"web-form\"\naddress = \"https://c.example/request\"\n\
+             levers = [\"app7-no-marketing\"]\n\n[obsolete]\nreason = \"closed\"\n",
+        );
+        let urls = sent_to(&[request, overseas, retired]).unwrap();
         assert_eq!(urls["https://a.example/request"], ["a-au"]);
         assert_eq!(urls["https://example.com.au/form"], ["b-au"]);
         assert_eq!(urls.len(), 2, "{urls:?}");

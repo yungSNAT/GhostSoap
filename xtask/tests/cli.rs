@@ -269,6 +269,35 @@ fn evidence_hash_succeeds_when_every_url_hashes() {
 }
 
 #[test]
+fn form_commands_report_fields_and_unreadable_lists() {
+    let fixture = Fixture::new("forms");
+    let (url, server) = serve(
+        "200 OK",
+        "text/html",
+        "<form><input name=\"email\"><textarea name=\"message\"></textarea></form>",
+    );
+    let out = fixture
+        .command()
+        .args(["form-fields", &url])
+        .env("NO_PROXY", "127.0.0.1")
+        .env("no_proxy", "127.0.0.1")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        format!("{url}\n  email\n  message\n")
+    );
+    server.join().unwrap();
+
+    let out = fixture.run(&["form-check", "missing", "missing.toml"]);
+    assert_eq!(out.status.code(), Some(1), "{out:?}");
+    assert!(String::from_utf8_lossy(&out.stderr).contains("error: cannot read missing"));
+    let out = fixture.run(&["form-fields"]);
+    assert_eq!(out.status.code(), Some(2), "{out:?}");
+}
+
+#[test]
 fn checklist_checked_fails_on_a_link_checked_before_the_release_month() {
     let fixture = Fixture::new("checklist");
     let passed = fixture.run(&["checklist-checked", "2026-11"]);
