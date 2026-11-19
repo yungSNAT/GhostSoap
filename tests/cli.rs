@@ -483,3 +483,95 @@ fn a_reader_that_stops_early_is_not_an_error() {
         assert!(out.stderr.is_empty(), "{args:?}: {}", text(&out.stderr));
     }
 }
+
+/// Run with the data folder settings removed, or with `GHOSTSOAP_HOME` set to `home`, and
+/// `input` on standard input.
+fn in_data_folder(home: Option<&std::path::Path>, args: &[&str], input: &str) -> Output {
+    use std::io::Write;
+    let mut command = Command::new(env!("CARGO_BIN_EXE_ghostsoap"));
+    command.args(args);
+    for name in ["GHOSTSOAP_HOME", "LOCALAPPDATA", "HOME", "XDG_DATA_HOME"] {
+        command.env_remove(name);
+    }
+    if let Some(home) = home {
+        command.env("GHOSTSOAP_HOME", home);
+    }
+    let mut child = command
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(input.as_bytes())
+        .unwrap();
+    child.wait_with_output().unwrap()
+}
+
+#[test]
+fn every_command_that_keeps_data_says_how_to_name_a_data_folder() {
+    for args in [
+        &["init", "--passphrase-stdin"][..],
+        &["checklist"],
+        &["checklist", "done", "breach-check", "--passphrase-stdin"],
+        &["export", "--passphrase-stdin"],
+        &["forget", "--passphrase-stdin"],
+    ] {
+        let out = in_data_folder(None, args, "");
+        assert_eq!(out.status.code(), Some(1), "{args:?}");
+        assert!(
+            text(&out.stderr).contains("cannot find a data directory; set GHOSTSOAP_HOME"),
+            "{args:?}: {}",
+            text(&out.stderr)
+        );
+    }
+}
+
+#[test]
+fn commands_that_ask_for_the_passphrase_report_end_of_input() {
+    let tmp = tempfile::tempdir().unwrap();
+    std::fs::write(tmp.path().join("state.age"), "not a state").unwrap();
+    for args in [
+        &["checklist", "done", "breach-check", "--passphrase-stdin"][..],
+        &["export", "--passphrase-stdin"],
+        &["forget", "--passphrase-stdin"],
+    ] {
+        let out = in_data_folder(Some(tmp.path()), args, "");
+        assert_eq!(out.status.code(), Some(1), "{args:?}");
+        assert!(
+            text(&out.stderr).contains("input ended"),
+            "{args:?}: {}",
+            text(&out.stderr)
+        );
+    }
+    assert_eq!(
+        std::fs::read(tmp.path().join("state.age")).unwrap(),
+        b"not a state"
+    );
+}
+
+#[test]
+fn forget_deletes_nothing_when_it_cannot_read_the_state_or_the_folder() {
+    let tmp = tempfile::tempdir().unwrap();
+    std::fs::write(tmp.path().join("state.age"), "not a state").unwrap();
+    let out = in_data_folder(
+        Some(tmp.path()),
+        &["forget", "--passphrase-stdin"],
+        "passphrase\n",
+    );
+    assert_eq!(out.status.code(), Some(1), "{}", text(&out.stderr));
+    assert!(!out.stderr.is_empty());
+    assert_eq!(
+        std::fs::read(tmp.path().join("state.age")).unwrap(),
+        b"not a state"
+    );
+
+    let file = tmp.path().join("state.age");
+    let out = in_data_folder(Some(&file), &["forget", "--no-passphrase", "--yes"], "");
+    assert_eq!(out.status.code(), Some(1), "{}", text(&out.stderr));
+    assert!(!out.stderr.is_empty());
+    assert!(file.is_file());
+}

@@ -960,6 +960,15 @@ mod tests {
     }
 
     #[test]
+    fn linux_falls_back_to_the_home_folder_without_xdg_data_home() {
+        let vars = |name: &str| (name == "HOME").then(|| "home".into());
+        assert_eq!(
+            data_dir_for("linux", vars).unwrap(),
+            Path::new("home/.local/share/ghostsoap")
+        );
+    }
+
+    #[test]
     fn data_directory_uses_the_platform_and_explicit_override() {
         let env = std::collections::BTreeMap::from([
             ("LOCALAPPDATA", "appdata"),
