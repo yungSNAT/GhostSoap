@@ -1,0 +1,66 @@
+name: Form check
+
+# Once a week, request each web form the register sends users to and fail if one is gone
+# or no longer serves a field listed in xtask/forms.toml, opening or updating one issue
+# that lists them. It requests each page once, a few seconds apart, and never submits a
+# form or sends anyone's details.
+on:
+  schedule:
+    - cron: "27 4 * * 3"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: form-check
+  cancel-in-progress: false
+
+jobs:
+  forms:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # rustup reads the pinned version from rust-toolchain.toml.
+      - run: rustup toolchain install
+      - name: Check the forms
+        id: check
+        run: |
+          status=0
+          cargo run --locked -p xtask -- form-check > forms.md 2> forms.log || status=$?
+          cat forms.log >&2
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+      - name: Open, update or close the form issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: Register form check
+          STATUS: ${{ steps.check.outputs.status }}
+        run: |
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          number=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 \
+            --search "\"$TITLE\" in:title" --json number,title \
+            --jq "map(select(.title == env.TITLE)) | .[0].number // empty")
+          if [ "$STATUS" = 0 ]; then
+            inconclusive=$(grep -c '^inconclusive: ' forms.log || true)
+            summary="Every checked form loads with its fields as of $(date -u +%Y-%m-%d). Inconclusive checks, listed in the run log: $inconclusive. $run_url"
+            echo "$summary"
+            if [ -n "$number" ]; then
+              gh issue close "$number" --repo "$GITHUB_REPOSITORY" --comment "$summary"
+            fi
+            exit 0
+          fi
+          if [ ! -s forms.md ]; then
+            printf 'The form check could not run. See the run log.\n' > forms.md
+          fi
+          printf '\nRun: %s\n' "$run_url" >> forms.md
+          if [ -n "$number" ]; then
+            gh issue edit "$number" --repo "$GITHUB_REPOSITORY" --body-file forms.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file forms.md
+          fi
+          # Fail the run so the change is seen, not only filed.
+          exit 1

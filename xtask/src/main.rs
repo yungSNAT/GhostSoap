@@ -12,9 +12,14 @@
 //!                                                     the law table, optionally saving
 //!                                                     each page's text
 //! cargo run -p xtask -- email-changes <base> <head>   warn of email addresses a change added
+//! cargo run -p xtask -- form-check [registry/au [xtask/forms.toml]]
+//!                                                     fail if a form users are sent to is
+//!                                                     gone or lacks a listed field
+//! cargo run -p xtask -- form-fields <url>...          print the fields each page serves
 //! cargo run -p xtask -- no-network                    fail if ghostsoap could open a connection
 //! ```
 
+mod forms;
 mod no_network;
 #[cfg(test)]
 mod registry_table;
@@ -653,20 +658,32 @@ fn check_form(
     lookup: &dyn Fn(&str, &str) -> Result<Dns, String>,
     url: &str,
 ) -> Check {
-    match agent.get(url).header("User-Agent", USER_AGENT).call() {
-        Ok(_) => Check::Fine,
-        Err(e @ ureq::Error::StatusCode(401 | 403 | 405 | 429 | 500..=599)) => {
-            Check::Inconclusive(e.to_string())
-        }
-        Err(e @ ureq::Error::StatusCode(_)) => Check::Dead(e.to_string()),
-        Err(e) => {
-            let host = url.parse::<ureq::http::Uri>().ok();
-            match host.as_ref().and_then(|u| u.host()).map(|h| lookup(h, "A")) {
-                Some(Ok(Dns::NoSuchName)) => Check::Dead("host does not exist".to_owned()),
-                _ => Check::Inconclusive(e.to_string()),
+    get_form(agent, lookup, url).map_or_else(|check| check, |_| Check::Fine)
+}
+
+/// `check_form`'s request: the response, or the `Check` its failure counts as.
+fn get_form(
+    agent: &ureq::Agent,
+    lookup: &dyn Fn(&str, &str) -> Result<Dns, String>,
+    url: &str,
+) -> Result<ureq::http::Response<ureq::Body>, Check> {
+    agent
+        .get(url)
+        .header("User-Agent", USER_AGENT)
+        .call()
+        .map_err(|e| match e {
+            ureq::Error::StatusCode(401 | 403 | 405 | 429 | 500..=599) => {
+                Check::Inconclusive(e.to_string())
             }
-        }
-    }
+            ureq::Error::StatusCode(_) => Check::Dead(e.to_string()),
+            _ => {
+                let host = url.parse::<ureq::http::Uri>().ok();
+                match host.as_ref().and_then(|u| u.host()).map(|h| lookup(h, "A")) {
+                    Some(Ok(Dns::NoSuchName)) => Check::Dead("host does not exist".to_owned()),
+                    _ => Check::Inconclusive(e.to_string()),
+                }
+            }
+        })
 }
 
 fn report(changed: &[String], failing: &[String], channels: &[String], laws: &[String]) -> String {
@@ -739,6 +756,19 @@ fn main() -> ExitCode {
         Some((command, [base, head])) if command == "email-changes" => {
             emails_changed(Path::new(base), Path::new(head))
         }
+        Some((command, rest)) if command == "form-check" && rest.len() <= 2 => {
+            let agent = agent(TIMEOUT);
+            forms::run(
+                Path::new(rest.first().map_or("registry/au", String::as_str)),
+                Path::new(rest.get(1).map_or("xtask/forms.toml", String::as_str)),
+                &agent,
+                &|name, record| dns_query(&agent, DNS_RESOLVER, name, record),
+                forms::PAUSE,
+            )
+        }
+        Some((command, urls)) if command == "form-fields" && !urls.is_empty() => {
+            forms::print_fields(&agent(TIMEOUT), urls)
+        }
         Some((command, [])) if command == "no-network" => no_network::run(),
         Some((command, [month])) if command == "checklist-checked" => checklist_checked(month),
         _ => {
@@ -746,6 +776,8 @@ fn main() -> ExitCode {
                 "usage: xtask evidence-hash <url>... \
                  | xtask evidence-drift [registry dir [page text dir]] \
                  | xtask email-changes <base registry dir> <head registry dir> \
+                 | xtask form-check [registry dir [forms file]] \
+                 | xtask form-fields <url>... \
                  | xtask no-network \
                  | xtask checklist-checked <YYYY-MM>"
             );
@@ -756,7 +788,7 @@ fn main() -> ExitCode {
 
 #[cfg(test)]
 mod tests {
-    const ENTRY: &str = r#"
+    pub(crate) const ENTRY: &str = r#"
 id = "example-au"
 name = "Example"
 legal_entity = "Example Pty Ltd"
@@ -979,7 +1011,7 @@ levers = []
         );
     }
 
-    fn serve_body(status: &str, media: &str, body: &str) -> String {
+    pub(crate) fn serve_body(status: &str, media: &str, body: &str) -> String {
         serve_replies(status, media, body, 1).0
     }
 
@@ -1033,11 +1065,11 @@ levers = []
             .replace('+', " ")
     }
 
-    fn serve_once(status: &str) -> String {
+    pub(crate) fn serve_once(status: &str) -> String {
         serve_body(status, "text/plain", "")
     }
 
-    fn loopback_agent() -> ureq::Agent {
+    pub(crate) fn loopback_agent() -> ureq::Agent {
         ureq::Agent::config_builder()
             .proxy(None)
             .timeout_global(Some(Duration::from_secs(5)))

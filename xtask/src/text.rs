@@ -152,6 +152,98 @@ pub fn main_text(html: &str) -> String {
         .join(" ")
 }
 
+/// The `name` of each `input`, `textarea` and `select` element in an HTML page, in page
+/// order with repeats removed, ignoring comments and skipped elements: the fields a page
+/// serves without running a script.
+pub fn field_names(html: &str) -> Vec<String> {
+    let lower = html.to_ascii_lowercase();
+    let mut names: Vec<String> = Vec::new();
+    let mut i = 0;
+    while let Some(j) = lower[i..].find('<').map(|j| i + j) {
+        if lower[j..].starts_with("<!--") {
+            i = after(&lower, j, "-->");
+            continue;
+        }
+        let Some(tag) = tag_at(&lower, j) else {
+            i = j + 1;
+            continue;
+        };
+        i = if tag.closing || !SKIPPED.contains(&tag.name.as_str()) {
+            tag.end
+        } else {
+            skip_element(&lower, &tag)
+        };
+        if !tag.closing && ["input", "textarea", "select"].contains(&tag.name.as_str()) {
+            let name = attribute(&html[j..tag.end], "name").map(|v| decode_entities(&v));
+            if let Some(name) = name.filter(|n| !n.is_empty() && !names.contains(n)) {
+                names.push(name);
+            }
+        }
+    }
+    names
+}
+
+/// The value of attribute `wanted` (lowercase) in `tag`, the source of one start tag.
+fn attribute(tag: &str, wanted: &str) -> Option<String> {
+    let bytes = tag.as_bytes();
+    // Past `<` and the element name.
+    let mut i = 1 + bytes[1..]
+        .iter()
+        .position(|&b| b.is_ascii_whitespace() || b == b'/' || b == b'>')
+        .unwrap_or(bytes.len() - 1);
+    loop {
+        while bytes
+            .get(i)
+            .is_some_and(|&b| b.is_ascii_whitespace() || b == b'/')
+        {
+            i += 1;
+        }
+        let start = i;
+        while bytes
+            .get(i)
+            .is_some_and(|&b| !b.is_ascii_whitespace() && !b"=/>".contains(&b))
+        {
+            i += 1;
+        }
+        if i == start {
+            return None;
+        }
+        let key = tag[start..i].to_ascii_lowercase();
+        while bytes.get(i).is_some_and(u8::is_ascii_whitespace) {
+            i += 1;
+        }
+        let value = if bytes.get(i) == Some(&b'=') {
+            i += 1;
+            while bytes.get(i).is_some_and(u8::is_ascii_whitespace) {
+                i += 1;
+            }
+            let (from, to) = match bytes.get(i) {
+                Some(&quote @ (b'"' | b'\'')) => {
+                    let end = bytes[i + 1..]
+                        .iter()
+                        .position(|&b| b == quote)
+                        .map_or(bytes.len(), |k| i + 1 + k);
+                    (i + 1, end)
+                }
+                _ => {
+                    let end = bytes[i..]
+                        .iter()
+                        .position(|&b| b.is_ascii_whitespace() || b == b'>')
+                        .map_or(bytes.len(), |k| i + k);
+                    (i, end)
+                }
+            };
+            i = (to + 1).min(bytes.len());
+            &tag[from..to]
+        } else {
+            ""
+        };
+        if key == wanted {
+            return Some(value.to_owned());
+        }
+    }
+}
+
 /// The index just past the end of the skipped element that `start` opens, or the end of
 /// the document. Raw-text elements end at their first end tag; `template` and `svg` nest,
 /// skipping comments and CDATA sections, and `<svg/>` closes itself.
@@ -333,6 +425,33 @@ mod tests {
             <main class=\"x\"><h1>Privacy</h1><p>Email <b>privacy@x.au</b></p></main>\
             <footer>2026</footer></body></html>";
         assert_eq!(main_text(html), "Privacy Email privacy@x.au");
+    }
+
+    #[test]
+    fn lists_the_fields_a_page_serves() {
+        let html = "<form><INPUT type=text NAME=firstName><input name='email' required>\
+            <input type=\"hidden\" data-name=\"x\" name=\"item&#91;1&#93;\"/>\
+            <textarea\nname = \"message\"></textarea><select name=\"state\"></select>\
+            <input name=\"email\"><input type=\"submit\"><button name=\"go\">Go</button>\
+            <label for=\"name\">Name</label></form>";
+        assert_eq!(
+            field_names(html),
+            ["firstName", "email", "item[1]", "message", "state"]
+        );
+    }
+
+    #[test]
+    fn ignores_fields_in_comments_scripts_and_templates() {
+        let html = "<!-- <input name=\"old\"> --><script>'<input name=\"js\">'</script>\
+            <template><input name=\"later\"></template><noscript><input name=\"ns\"></noscript>\
+            <input data-x=\"<input name=decoy>\" name=\"real\">";
+        assert_eq!(field_names(html), ["real"]);
+    }
+
+    #[test]
+    fn a_page_without_fields_lists_none() {
+        assert!(field_names("<p>Use our form at <a href=\"/f\">this page</a>.</p>").is_empty());
+        assert!(field_names("<input type=\"text\"><input name=\"\">").is_empty());
     }
 
     #[test]
