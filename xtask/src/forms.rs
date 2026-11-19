@@ -22,6 +22,9 @@ use crate::{Check, Dns, MIN_TEXT, dns_query, get_form, record, text};
 /// Pause between requests, so no site sees more than one request every few seconds.
 pub const PAUSE: Duration = Duration::from_secs(3);
 
+/// The exit status of a run that keeps the open issue open.
+pub const HELD: u8 = 3;
+
 /// What the check expects of one form.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Expect {
@@ -177,10 +180,12 @@ pub fn check(
 pub fn run(
     dir: &Path,
     forms_file: &Path,
+    open: &str,
     agent: &ureq::Agent,
     resolver: &str,
     pause: Duration,
 ) -> ExitCode {
+    let _ = open;
     let lookup = |name: &str, record: &str| dns_query(agent, resolver, name, record);
     let loaded = std::fs::read_to_string(forms_file)
         .map_err(|e| format!("cannot read {}: {e}", forms_file.display()))
@@ -221,7 +226,8 @@ pub fn run(
 }
 
 /// Print the fields each page serves, for writing `forms.toml`.
-pub fn print_fields(agent: &ureq::Agent, urls: &[String]) -> ExitCode {
+pub fn print_fields(agent: &ureq::Agent, urls: &[String], pause: Duration) -> ExitCode {
+    let _ = pause;
     let lookup = |_: &str, _: &str| Err("not looked up".to_owned());
     let mut failed = false;
     for url in urls {
@@ -280,6 +286,31 @@ mod tests {
                 "missing field `phone`; the page serves `firstName`, `email`, `message`".to_owned()
             )
         );
+    }
+
+    #[test]
+    fn a_field_left_only_as_a_hidden_input_has_changed() {
+        let page = "<main><form><input name=\"firstName\">\
+            <input type=\"hidden\" name=\"email\"></form></main>";
+        let url = serve_body("200 OK", "text/html", page);
+        let form = fields(&url, &["firstName", "email"]);
+        assert_eq!(
+            check(&loopback_agent(), &there, &form),
+            Check::Dead("missing field `email`; the page serves `firstName`".to_owned())
+        );
+    }
+
+    #[test]
+    fn a_page_with_no_content_is_gone() {
+        for expect in ["fields = [\"email\"]", "unchecked = \"drawn by a script\""] {
+            let url = serve_body("204 No Content", "text/html", "");
+            let form = parse(&format!("[[form]]\nurl = \"{url}\"\n{expect}\n")).unwrap();
+            assert_eq!(
+                check(&loopback_agent(), &there, &form[0]),
+                Check::Dead("the page answers 204 No Content".to_owned()),
+                "{expect}"
+            );
+        }
     }
 
     #[test]
@@ -483,14 +514,32 @@ mod tests {
     }
 
     fn run_on(temp: &tempfile::TempDir) -> ExitCode {
+        run_with_issue(temp, "")
+    }
+
+    fn run_with_issue(temp: &tempfile::TempDir, open: &str) -> ExitCode {
         let (dir, file) = (temp.path().join("au"), temp.path().join("forms.toml"));
         run(
             &dir,
             &file,
+            open,
             &loopback_agent(),
             &no_resolver(),
             Duration::ZERO,
         )
+    }
+
+    #[test]
+    fn run_keeps_an_issue_open_while_a_form_it_names_cannot_be_checked() {
+        let url = serve_once("403 Forbidden");
+        let temp = fixture(&url, "fields = [\"email\"]");
+        let open = format!("- `a-au`: web form {url}: missing field `email`\n");
+        assert_eq!(run_with_issue(&temp, &open), ExitCode::from(HELD));
+        // A form the issue does not name may be inconclusive without holding it.
+        let url = serve_once("403 Forbidden");
+        let temp = fixture(&url, "fields = [\"email\"]");
+        let other = format!("- `b-au`: web form {url}x: missing field `email`\n");
+        assert_eq!(run_with_issue(&temp, &other), ExitCode::SUCCESS);
     }
 
     #[test]
@@ -499,7 +548,14 @@ mod tests {
         let (dir, file) = (temp.path().join("au"), temp.path().join("forms.toml"));
         let resolver = serve_body("200 OK", "application/json", "{\"Status\": 3}");
         assert_eq!(
-            run(&dir, &file, &loopback_agent(), &resolver, Duration::ZERO),
+            run(
+                &dir,
+                &file,
+                "",
+                &loopback_agent(),
+                &resolver,
+                Duration::ZERO
+            ),
             ExitCode::FAILURE
         );
     }
@@ -537,7 +593,14 @@ mod tests {
         let missing = temp.path().join("missing");
         for (dir, file) in [(&dir, &missing), (&missing, &file)] {
             assert_eq!(
-                run(dir, file, &loopback_agent(), &no_resolver(), Duration::ZERO),
+                run(
+                    dir,
+                    file,
+                    "",
+                    &loopback_agent(),
+                    &no_resolver(),
+                    Duration::ZERO
+                ),
                 ExitCode::FAILURE
             );
         }
@@ -546,6 +609,7 @@ mod tests {
             run(
                 &dir,
                 &file,
+                "",
                 &loopback_agent(),
                 &no_resolver(),
                 Duration::ZERO
@@ -560,8 +624,21 @@ mod tests {
     fn prints_the_fields_each_page_serves() {
         let url = serve_body("200 OK", "text/html", FORM);
         let gone = serve_once("404 Not Found");
-        assert_eq!(print_fields(&loopback_agent(), &[url]), ExitCode::SUCCESS);
-        assert_eq!(print_fields(&loopback_agent(), &[gone]), ExitCode::FAILURE);
+        let pause = Duration::from_millis(300);
+        let started = std::time::Instant::now();
+        assert_eq!(
+            print_fields(&loopback_agent(), &[url, gone], pause),
+            ExitCode::FAILURE
+        );
+        assert!(
+            started.elapsed() >= pause,
+            "the second page was not requested after a pause"
+        );
+        let url = serve_body("200 OK", "text/html", FORM);
+        assert_eq!(
+            print_fields(&loopback_agent(), &[url], pause),
+            ExitCode::SUCCESS
+        );
     }
 
     #[test]

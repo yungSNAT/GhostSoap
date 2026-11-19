@@ -430,7 +430,7 @@ mod tests {
     #[test]
     fn lists_the_fields_a_page_serves() {
         let html = "<form>1 < 2 <INPUT type=text NAME=firstName><input required name='email'>\
-            <input type=\"hidden\" data-name=\"x\" name=\"item&#91;1&#93;\"/>\
+            <input type=\"checkbox\" data-name=\"x\" name=\"item&#91;1&#93;\"/>\
             <textarea\nname = \"message\"></textarea><select name=\"state\"></select>\
             <input name=\"email\"><input type=\"submit\"><button name=\"go\">Go</button>\
             <label for=\"name\">Name</label></form>";
@@ -438,6 +438,21 @@ mod tests {
             field_names(html),
             ["firstName", "email", "item[1]", "message", "state"]
         );
+    }
+
+    #[test]
+    fn skips_controls_a_user_cannot_fill_in() {
+        let html = "<input type=hidden name=email><input TYPE=\"Hidden\" name=a>\
+            <input type=submit name=go><input type=reset name=r><input type=button name=b>\
+            <input type=image name=i><input name=off disabled><select name=s disabled></select>\
+            <textarea name=ro readonly></textarea><input type=email name=kept>";
+        assert_eq!(field_names(html), ["kept"]);
+    }
+
+    #[test]
+    fn the_contents_of_a_textarea_are_text() {
+        let html = "<textarea name=\"message\"><input name=\"email\"></TEXTAREA><input name=after>";
+        assert_eq!(field_names(html), ["message", "after"]);
     }
 
     #[test]

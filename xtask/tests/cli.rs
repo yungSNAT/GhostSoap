@@ -293,6 +293,9 @@ fn form_commands_report_fields_and_unreadable_lists() {
     let out = fixture.run(&["form-check", "missing", "missing.toml"]);
     assert_eq!(out.status.code(), Some(1), "{out:?}");
     assert!(String::from_utf8_lossy(&out.stderr).contains("error: cannot read missing"));
+    let out = fixture.run(&["form-check", "missing", "missing.toml", "issue.md"]);
+    assert_eq!(out.status.code(), Some(1), "{out:?}");
+    assert!(String::from_utf8_lossy(&out.stderr).contains("error: cannot read issue.md"));
     let out = fixture.run(&["form-fields"]);
     assert_eq!(out.status.code(), Some(2), "{out:?}");
 }

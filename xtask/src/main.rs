@@ -759,12 +759,13 @@ fn main() -> ExitCode {
         Some((command, rest)) if command == "form-check" && rest.len() <= 2 => forms::run(
             Path::new(rest.first().map_or("registry/au", String::as_str)),
             Path::new(rest.get(1).map_or("xtask/forms.toml", String::as_str)),
+            "",
             &agent(TIMEOUT),
             DNS_RESOLVER,
             forms::PAUSE,
         ),
         Some((command, urls)) if command == "form-fields" && !urls.is_empty() => {
-            forms::print_fields(&agent(TIMEOUT), urls)
+            forms::print_fields(&agent(TIMEOUT), urls, forms::PAUSE)
         }
         Some((command, [])) if command == "no-network" => no_network::run(),
         Some((command, [month])) if command == "checklist-checked" => checklist_checked(month),
