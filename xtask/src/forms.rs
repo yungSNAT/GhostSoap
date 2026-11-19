@@ -96,8 +96,7 @@ pub fn parse(source: &str) -> Result<Vec<Form>, String> {
 pub fn sent_to(entries: &[SourceFile]) -> Result<BTreeMap<String, Vec<String>>, String> {
     let mut urls: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for file in entries {
-        let entry: Entry =
-            toml::from_str(&file.text).map_err(|e| format!("{}: {e}", file.name))?;
+        let entry: Entry = toml::from_str(&file.text).map_err(|e| format!("{}: {e}", file.name))?;
         if entry.obsolete.is_some() {
             continue;
         }
@@ -276,15 +275,17 @@ mod tests {
         assert_eq!(
             check(&loopback_agent(), &there, &form),
             Check::Dead(
-                "missing field `phone`; the page serves `firstName`, `email`, `message`"
-                    .to_owned()
+                "missing field `phone`; the page serves `firstName`, `email`, `message`".to_owned()
             )
         );
     }
 
     #[test]
     fn a_page_of_text_with_no_fields_has_changed() {
-        let page = format!("<main><p>{}</p></main>", "We now take requests by phone. ".repeat(30));
+        let page = format!(
+            "<main><p>{}</p></main>",
+            "We now take requests by phone. ".repeat(30)
+        );
         let url = serve_body("200 OK", "text/html", &page);
         let form = fields(&url, &["email"]);
         assert!(matches!(
@@ -326,7 +327,10 @@ mod tests {
         let page = serve_body("200 OK", "text/html", "<div id=app></div>");
         assert_eq!(check(&loopback_agent(), &there, &form(page)), Check::Fine);
         let gone = form(serve_once("410 Gone"));
-        assert!(matches!(check(&loopback_agent(), &there, &gone), Check::Dead(_)));
+        assert!(matches!(
+            check(&loopback_agent(), &there, &gone),
+            Check::Dead(_)
+        ));
     }
 
     #[test]
@@ -358,11 +362,17 @@ mod tests {
             ),
             ("[[form]]\nurl = \"u\"\nfields = []\n", "non-empty list"),
             ("[[form]]\nurl = \"u\"\nfields = [\"\"]\n", "non-empty list"),
-            ("[[form]]\nurl = \"u\"\nunchecked = \" \"\n", "give a reason"),
+            (
+                "[[form]]\nurl = \"u\"\nunchecked = \" \"\n",
+                "give a reason",
+            ),
             ("[[form]]\nfields = [\"a\"]\n", "no url"),
             ("form = [1]\n", "form 1 is not a table"),
             ("form = 1\n", "no [[form]] tables"),
-            ("[[form]]\nurl = \"u\"\nfield = [\"a\"]\n", "unknown key `field`"),
+            (
+                "[[form]]\nurl = \"u\"\nfield = [\"a\"]\n",
+                "unknown key `field`",
+            ),
             ("forms = 1\n", "unknown key `forms`"),
             ("", "no [[form]] tables"),
             (
