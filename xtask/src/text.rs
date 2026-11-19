@@ -461,6 +461,20 @@ mod tests {
     }
 
     #[test]
+    fn controls_in_a_disabled_fieldset_cannot_be_filled_in() {
+        let html = "<fieldset disabled><input name=off><fieldset><select name=deep></select>\
+            </fieldset></fieldset><fieldset><input name=on></fieldset><input name=after>";
+        assert_eq!(field_names(html), ["on", "after"]);
+    }
+
+    #[test]
+    fn readonly_applies_only_to_text_controls() {
+        let html = "<select name=s readonly></select><input type=checkbox name=c readonly>\
+            <input type=radio name=r readonly><input name=t readonly><input type=email name=e readonly>";
+        assert_eq!(field_names(html), ["s", "c", "r"]);
+    }
+
+    #[test]
     fn the_contents_of_a_textarea_are_text() {
         let html = "<textarea name=\"message\"><input name=\"email\"></TEXTAREA><input name=after>";
         assert_eq!(field_names(html), ["message", "after"]);

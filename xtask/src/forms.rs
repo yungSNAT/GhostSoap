@@ -190,6 +190,22 @@ pub fn run(
     resolver: &str,
     pause: Duration,
 ) -> ExitCode {
+    let (report, code) = checked(dir, forms_file, open, agent, resolver, pause);
+    if !report.is_empty() {
+        println!("{report}");
+    }
+    code
+}
+
+/// `run`'s checks: the report it prints, empty when there is none, and its exit status.
+fn checked(
+    dir: &Path,
+    forms_file: &Path,
+    open: &str,
+    agent: &ureq::Agent,
+    resolver: &str,
+    pause: Duration,
+) -> (String, ExitCode) {
     let lookup = |name: &str, record: &str| dns_query(agent, resolver, name, record);
     let loaded = std::fs::read_to_string(forms_file)
         .map_err(|e| format!("cannot read {}: {e}", forms_file.display()))
@@ -201,7 +217,7 @@ pub fn run(
         (Ok(forms), Ok(sent_to)) => (forms, sent_to),
         (Err(e), _) | (_, Err(e)) => {
             eprintln!("error: {e}");
-            return ExitCode::FAILURE;
+            return (String::new(), ExitCode::FAILURE);
         }
     };
     let mut lines: Vec<String> = coverage(&forms, &sent_to)
@@ -220,20 +236,21 @@ pub fn run(
         record(&mut lines, &what, ids, result);
     }
     if lines.is_empty() {
-        return if held {
+        let code = if held {
             ExitCode::from(HELD)
         } else {
             ExitCode::SUCCESS
         };
+        return (String::new(), code);
     }
-    println!(
+    let report = format!(
         "The weekly form check found forms that are gone or no longer have the fields \
          users fill in. Check each against the business's own pages, then correct the \
          register entry's `[[channels]]` and `xtask/forms.toml` \
          (`cargo run -p xtask -- form-fields <url>` lists a page's fields).\n\n{}",
         lines.join("\n")
     );
-    ExitCode::FAILURE
+    (report, ExitCode::FAILURE)
 }
 
 /// Print the fields each page serves, for writing `forms.toml`, requesting the pages
@@ -543,6 +560,77 @@ mod tests {
         )
     }
 
+    /// A server that answers its requests in turn with `replies`, each a status and a body.
+    fn serve_in_turn(replies: &[(&'static str, &'static str)]) -> String {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/", listener.local_addr().unwrap());
+        let replies = replies.to_vec();
+        std::thread::spawn(move || {
+            for ((status, body), stream) in replies.into_iter().zip(listener.incoming()) {
+                let mut stream = stream.unwrap();
+                let _ = stream.read(&mut [0; 4096]);
+                let reply = format!(
+                    "HTTP/1.1 {status}\r\nContent-Type: text/html\r\nContent-Length: {}\r\n\
+                     Connection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                stream.write_all(reply.as_bytes()).unwrap();
+            }
+        });
+        url
+    }
+
+    #[test]
+    fn an_issue_keeps_each_form_it_names_until_that_form_can_be_checked() {
+        let (gone, refused, ok) = (
+            ("404 Not Found", ""),
+            ("403 Forbidden", ""),
+            ("200 OK", FORM),
+        );
+        let a = serve_in_turn(&[gone, refused, refused, ok]);
+        let b = serve_in_turn(&[ok, gone, ok, ok]);
+        let temp = tempfile::tempdir().unwrap();
+        std::fs::create_dir(temp.path().join("au")).unwrap();
+        let mut list = String::new();
+        for (id, url) in [("a-au", &a), ("b-au", &b)] {
+            let channel = format!(
+                "\n[[channels]]\nkind = \"web-form\"\naddress = \"{url}\"\n\
+                 levers = [\"app7-no-marketing\"]\n"
+            );
+            let file = entry(id, &channel);
+            std::fs::write(temp.path().join("au").join(&file.name), file.text).unwrap();
+            list += &format!("[[form]]\nurl = \"{url}\"\nfields = [\"email\"]\n\n");
+        }
+        let file = temp.path().join("forms.toml");
+        std::fs::write(&file, list).unwrap();
+        let dir = temp.path().join("au");
+        let week = |open: &str| {
+            checked(
+                &dir,
+                &file,
+                open,
+                &loopback_agent(),
+                &no_resolver(),
+                Duration::ZERO,
+            )
+        };
+        let names = |report: &str, url: &str| report.contains(&format!(": web form {url}: "));
+
+        // Week 1: a is gone, so the issue opens with it.
+        let (first, code) = week("");
+        assert_eq!(code, ExitCode::FAILURE);
+        assert!(names(&first, &a) && !names(&first, &b), "{first}");
+        // Week 2: a cannot be checked and b is gone; the new body still names a.
+        let (second, code) = week(&first);
+        assert_eq!(code, ExitCode::FAILURE);
+        assert!(names(&second, &a) && names(&second, &b), "{second}");
+        // Week 3: b is back but a still cannot be checked, so the issue stays open.
+        assert_eq!(week(&second), (String::new(), ExitCode::from(HELD)));
+        // Week 4: both pass.
+        assert_eq!(week(&second), (String::new(), ExitCode::SUCCESS));
+    }
+
     #[test]
     fn run_keeps_an_issue_open_while_a_form_it_names_cannot_be_checked() {
         let url = serve_once("403 Forbidden");
@@ -554,6 +642,11 @@ mod tests {
         let temp = fixture(&url, "fields = [\"email\"]");
         let other = format!("- `b-au`: web form {url}x: missing field `email`\n");
         assert_eq!(run_with_issue(&temp, &other), ExitCode::SUCCESS);
+        // Only the issue's own lines count, not a mention in a comment or prose.
+        let url = serve_once("403 Forbidden");
+        let temp = fixture(&url, "fields = [\"email\"]");
+        let prose = format!("The web form {url}: was slow last week.\n");
+        assert_eq!(run_with_issue(&temp, &prose), ExitCode::SUCCESS);
     }
 
     #[test]
