@@ -756,16 +756,13 @@ fn main() -> ExitCode {
         Some((command, [base, head])) if command == "email-changes" => {
             emails_changed(Path::new(base), Path::new(head))
         }
-        Some((command, rest)) if command == "form-check" && rest.len() <= 2 => {
-            let agent = agent(TIMEOUT);
-            forms::run(
-                Path::new(rest.first().map_or("registry/au", String::as_str)),
-                Path::new(rest.get(1).map_or("xtask/forms.toml", String::as_str)),
-                &agent,
-                &|name, record| dns_query(&agent, DNS_RESOLVER, name, record),
-                forms::PAUSE,
-            )
-        }
+        Some((command, rest)) if command == "form-check" && rest.len() <= 2 => forms::run(
+            Path::new(rest.first().map_or("registry/au", String::as_str)),
+            Path::new(rest.get(1).map_or("xtask/forms.toml", String::as_str)),
+            &agent(TIMEOUT),
+            DNS_RESOLVER,
+            forms::PAUSE,
+        ),
         Some((command, urls)) if command == "form-fields" && !urls.is_empty() => {
             forms::print_fields(&agent(TIMEOUT), urls)
         }

@@ -17,7 +17,7 @@ use std::time::Duration;
 
 use ghostsoap::core::register::{ChannelKind, Entry, ExemptionRisk, SourceFile};
 
-use crate::{Check, Dns, MIN_TEXT, get_form, record, text};
+use crate::{Check, Dns, MIN_TEXT, dns_query, get_form, record, text};
 
 /// Pause between requests, so no site sees more than one request every few seconds.
 pub const PAUSE: Duration = Duration::from_secs(3);
@@ -170,16 +170,18 @@ pub fn check(
     }
 }
 
-/// Check every form in `forms` against the register in `dir`. Prints a Markdown report of
-/// forms that are gone or changed, or nothing; inconclusive checks go to stderr. Exits 1
-/// if any form is gone or changed, or the list and the register disagree.
+/// Check every form in `forms` against the register in `dir`, asking `resolver` (a DNS
+/// over HTTPS endpoint) whether the host of a form that does not answer exists. Prints a
+/// Markdown report of forms that are gone or changed, or nothing; inconclusive checks go to
+/// stderr. Exits 1 if any form is gone or changed, or the list and the register disagree.
 pub fn run(
     dir: &Path,
     forms_file: &Path,
     agent: &ureq::Agent,
-    lookup: &dyn Fn(&str, &str) -> Result<Dns, String>,
+    resolver: &str,
     pause: Duration,
 ) -> ExitCode {
+    let lookup = |name: &str, record: &str| dns_query(agent, resolver, name, record);
     let loaded = std::fs::read_to_string(forms_file)
         .map_err(|e| format!("cannot read {}: {e}", forms_file.display()))
         .and_then(|s| parse(&s).map_err(|e| format!("{}: {e}", forms_file.display())));
@@ -203,7 +205,7 @@ pub fn run(
         }
         let what = format!("web form {}", form.url);
         let ids = sent_to.get(&form.url).map_or(&[][..], Vec::as_slice);
-        record(&mut lines, &what, ids, check(agent, lookup, form));
+        record(&mut lines, &what, ids, check(agent, &lookup, form));
     }
     if lines.is_empty() {
         return ExitCode::SUCCESS;
@@ -474,9 +476,32 @@ mod tests {
         temp
     }
 
+    /// A resolver that is never asked: nothing listens there.
+    fn no_resolver() -> String {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        format!("http://{}/", listener.local_addr().unwrap())
+    }
+
     fn run_on(temp: &tempfile::TempDir) -> ExitCode {
         let (dir, file) = (temp.path().join("au"), temp.path().join("forms.toml"));
-        run(&dir, &file, &loopback_agent(), &there, Duration::ZERO)
+        run(
+            &dir,
+            &file,
+            &loopback_agent(),
+            &no_resolver(),
+            Duration::ZERO,
+        )
+    }
+
+    #[test]
+    fn run_fails_on_a_form_whose_host_public_dns_says_is_gone() {
+        let temp = fixture(&no_resolver(), "fields = [\"email\"]");
+        let (dir, file) = (temp.path().join("au"), temp.path().join("forms.toml"));
+        let resolver = serve_body("200 OK", "application/json", "{\"Status\": 3}");
+        assert_eq!(
+            run(&dir, &file, &loopback_agent(), &resolver, Duration::ZERO),
+            ExitCode::FAILURE
+        );
     }
 
     #[test]
@@ -512,13 +537,19 @@ mod tests {
         let missing = temp.path().join("missing");
         for (dir, file) in [(&dir, &missing), (&missing, &file)] {
             assert_eq!(
-                run(dir, file, &loopback_agent(), &there, Duration::ZERO),
+                run(dir, file, &loopback_agent(), &no_resolver(), Duration::ZERO),
                 ExitCode::FAILURE
             );
         }
         std::fs::write(&file, "form = 1\n").unwrap();
         assert_eq!(
-            run(&dir, &file, &loopback_agent(), &there, Duration::ZERO),
+            run(
+                &dir,
+                &file,
+                &loopback_agent(),
+                &no_resolver(),
+                Duration::ZERO
+            ),
             ExitCode::FAILURE
         );
         std::fs::write(dir.join("a-au.toml"), "broken = ").unwrap();
