@@ -181,9 +181,9 @@ pub fn check(
 
 /// At most 20 field names from a page, each in backticks, shortened and stripped of
 /// backticks and control characters, so that a page cannot write Markdown into the issue.
-fn quoted(names: &[String]) -> String {
+fn quoted(all: &[String]) -> String {
     const SHOWN: usize = 20;
-    let names: Vec<String> = names
+    let names: Vec<String> = all
         .iter()
         .take(SHOWN)
         .map(|name| {
@@ -203,7 +203,10 @@ fn quoted(names: &[String]) -> String {
         })
         .collect();
     let mut out = format!("`{}`", names.join("`, `"));
-    if names.len() < SHOWN || true {}
+    let more = all.len().saturating_sub(SHOWN);
+    if more > 0 {
+        out += &format!(" and {more} more");
+    }
     out
 }
 
@@ -364,8 +367,12 @@ mod tests {
         else {
             panic!("the form has changed");
         };
-        // Only the 4 backticks the message itself puts around the 2 lists.
-        assert_eq!(problem.matches('`').count(), 4, "{problem}");
+        // Only the backticks the message puts around `email` and the 20 names it shows.
+        assert_eq!(problem.matches('`').count(), 42, "{problem}");
+        assert!(
+            problem.contains("`x' [a link](https://bad.example) @someone`"),
+            "{problem}"
+        );
         assert!(!problem.contains('\n'), "{problem}");
         assert!(
             problem.contains(&format!("{}...", "n".repeat(MAX_NAME))),
