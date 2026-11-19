@@ -9,6 +9,8 @@ const SKIPPED: [&str; 6] = ["script", "style", "noscript", "template", "svg", "i
 const RAW_TEXT: [&str; 4] = ["script", "style", "noscript", "iframe"];
 /// `input` types a user does not type into or choose.
 const NOT_FILLED: [&str; 5] = ["hidden", "submit", "reset", "button", "image"];
+/// `input` types that ignore `readonly`.
+const NOT_READONLY: [&str; 5] = ["checkbox", "radio", "file", "range", "color"];
 
 /// Whether a response is HTML: its media type names HTML in any letter case or, with no
 /// `Content-Type`, its body starts like an HTML document.
@@ -160,6 +162,8 @@ pub fn main_text(html: &str) -> String {
 pub fn field_names(html: &str) -> Vec<String> {
     let lower = html.to_ascii_lowercase();
     let mut names: Vec<String> = Vec::new();
+    // Whether each open `fieldset` is disabled.
+    let mut fieldsets: Vec<bool> = Vec::new();
     let mut i = 0;
     while let Some(j) = lower[i..].find('<').map(|j| i + j) {
         if lower[j..].starts_with("<!--") {
@@ -175,16 +179,30 @@ pub fn field_names(html: &str) -> Vec<String> {
         } else {
             skip_element(&lower, &tag)
         };
+        let source = &html[j..tag.end];
+        if tag.name == "fieldset" {
+            // shortcut: a control in a disabled fieldset's first legend counts as disabled,
+            // though browsers let users fill it in; the check would then report it missing,
+            // loudly. Track the first legend if a listed form ever puts a field there.
+            if tag.closing {
+                fieldsets.pop();
+            } else {
+                fieldsets.push(attribute(source, "disabled").is_some());
+            }
+        }
         if !tag.closing && ["input", "textarea", "select"].contains(&tag.name.as_str()) {
-            let source = &html[j..tag.end];
             if tag.name == "textarea" {
                 // Its contents are text, even when they look like tags.
                 i = raw_text_end(&lower, tag.end, "textarea");
             }
-            let fillable = attribute(source, "disabled").is_none()
-                && attribute(source, "readonly").is_none()
-                && !attribute(source, "type")
-                    .is_some_and(|kind| NOT_FILLED.contains(&kind.to_ascii_lowercase().as_str()));
+            let kind = attribute(source, "type").map(|kind| kind.to_ascii_lowercase());
+            let kind = kind.as_deref().unwrap_or("");
+            let readonly = attribute(source, "readonly").is_some()
+                && (tag.name == "textarea" || tag.name == "input" && !NOT_READONLY.contains(&kind));
+            let fillable = !fieldsets.contains(&true)
+                && attribute(source, "disabled").is_none()
+                && !readonly
+                && !NOT_FILLED.contains(&kind);
             let name = attribute(source, "name").map(|v| decode_entities(&v));
             if let Some(name) = name.filter(|n| fillable && !n.is_empty() && !names.contains(n)) {
                 names.push(name);

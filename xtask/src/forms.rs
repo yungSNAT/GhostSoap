@@ -181,7 +181,7 @@ pub fn check(
 /// Markdown report of forms that are gone or changed, or nothing; inconclusive checks go to
 /// stderr. Exits 1 if any form is gone or changed, or the list and the register disagree.
 /// Otherwise exits `HELD` if a form named in `open`, the text of the open issue, could not
-/// be checked, as the issue cannot yet be closed.
+/// be checked, as the issue cannot yet be closed. A report keeps such a form listed.
 pub fn run(
     dir: &Path,
     forms_file: &Path,
@@ -224,7 +224,7 @@ fn checked(
         .into_iter()
         .map(|problem| format!("- {problem}"))
         .collect();
-    let mut held = false;
+    let mut held = Vec::new();
     for (i, form) in forms.iter().enumerate() {
         if i > 0 {
             std::thread::sleep(pause);
@@ -232,17 +232,28 @@ fn checked(
         let what = format!("web form {}", form.url);
         let ids = sent_to.get(&form.url).map_or(&[][..], Vec::as_slice);
         let result = check(agent, &lookup, form);
-        held |= matches!(result, Check::Inconclusive(_)) && open.contains(&format!("{what}:"));
+        // The issue's lines are those `record` writes: "- `<ids>`: <what>: <problem>".
+        let named = || {
+            open.lines()
+                .any(|line| line.starts_with("- `") && line.contains(&format!("`: {what}: ")))
+        };
+        if matches!(result, Check::Inconclusive(_)) && named() {
+            held.push(format!(
+                "- `{}`: {what}: could not be checked this week, so it stays listed",
+                ids.join("`, `")
+            ));
+        }
         record(&mut lines, &what, ids, result);
     }
     if lines.is_empty() {
-        let code = if held {
-            ExitCode::from(HELD)
-        } else {
+        let code = if held.is_empty() {
             ExitCode::SUCCESS
+        } else {
+            ExitCode::from(HELD)
         };
         return (String::new(), code);
     }
+    lines.extend(held);
     let report = format!(
         "The weekly form check found forms that are gone or no longer have the fields \
          users fill in. Check each against the business's own pages, then correct the \
