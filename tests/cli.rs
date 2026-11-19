@@ -503,9 +503,8 @@ fn in_data_folder(home: Option<&std::path::Path>, args: &[&str], input: &str) ->
         .spawn()
         .unwrap();
     // A child that exits before reading closes the pipe; its output is what is tested.
-    match child.stdin.take().unwrap().write_all(input.as_bytes()) {
-        Err(e) if e.kind() != std::io::ErrorKind::BrokenPipe => panic!("write stdin: {e}"),
-        _ => {}
+    if let Err(e) = child.stdin.take().unwrap().write_all(input.as_bytes()) {
+        assert_eq!(e.kind(), std::io::ErrorKind::BrokenPipe, "write stdin: {e}");
     }
     child.wait_with_output().unwrap()
 }
