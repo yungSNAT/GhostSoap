@@ -1,0 +1,227 @@
+# Every web form the register sends users to: each web-form channel that carries a request,
+# and each overseas entry's own form. `cargo run -p xtask -- form-check` requests each page
+# once a week, never submitting it, and fails if one is gone or no longer serves a field
+# listed here. `fields` are the `name` attributes of the fields a user fills in from what
+# GhostSoap gives them (their name, contact details and the letter), as the page serves
+# them; `cargo run -p xtask -- form-fields <url>` lists them. A form whose fields a plain
+# request cannot see is `unchecked`, with the reason, and is still requested.
+# A test fails when this list and the register disagree. Last read: 19 November 2026.
+
+[[form]]
+url = "https://www.afterpay.com/en-AU/submit-form"
+fields = ["firstName", "lastName", "email", "description"]
+
+[[form]]
+url = "https://www.rgfstaffing.com.au/privacy-request"
+fields = ["input_1.3", "input_1.6", "input_2", "input_3"]
+
+[[form]]
+url = "https://www.coles.com.au/help/enquiry?path=Online-shopping%2FPrivacy"
+fields = ["id-givenName", "id-familyName", "id-email"]
+
+[[form]]
+url = "https://www.equifax.com.au/eform/submit/credit-ban"
+fields = [
+    "field_first_name_3[und][0][value]",
+    "field_last_name_3[und][0][value]",
+    "field_email_address_3[und][0][email]",
+    "field_street_address_3[und][0][value]",
+]
+
+[[form]]
+url = "https://www.donotcontact.com.au/"
+fields = ["txtFirstName", "txtLastName", "txtAddressLine1", "txtEmailAddress"]
+
+[[form]]
+url = "https://www.experian.com.au/data-and-marketing/consumer-opt-out"
+fields = ["email", "first_name", "last_name", "address1"]
+
+[[form]]
+url = "https://smrtr.com.au/opt-out-form/"
+fields = ["input_1", "input_10"]
+
+[[form]]
+url = "https://www.telstra.com.au/forms/request-customer-account-information"
+fields = ["nominatedcontactname", "nominatedcontactphone", "nominatedcontactemail"]
+
+[[form]]
+url = "https://marketing.vodafone.com.au/unsubscribe-here"
+fields = ["1104721_277784pi_1104721_277784"]
+
+[[form]]
+url = "https://contactout.com/optout"
+fields = ["email"]
+
+[[form]]
+url = "https://infotracer.com/do-not-sell-share-my-personal-information/"
+fields = [
+    "InfoPay_Core_Components_OptOuts_DataRemovalServiceModel[fname]",
+    "InfoPay_Core_Components_OptOuts_DataRemovalServiceModel[lname]",
+]
+
+[[form]]
+url = "https://recordsfinder.com/do-not-sell-share-my-personal-information/"
+fields = [
+    "InfoPay_Core_Components_OptOuts_DataRemovalServiceModel[fname]",
+    "InfoPay_Core_Components_OptOuts_DataRemovalServiceModel[lname]",
+]
+
+[[form]]
+url = "https://www.apollo.io/privacy-policy/remove"
+fields = ["email"]
+
+[[form]]
+url = "https://www.locatefamily.com/removal2.html"
+fields = ["lfr_name", "lfr_email", "lfr_url", "lfr_linenumbers"]
+
+[[form]]
+url = "https://www.lusha.com/privacy-center/request-removal/"
+fields = ["workemail", "firstname", "lastname"]
+
+[[form]]
+url = "https://www.uplead.com/opt-out/"
+fields = ["form_fields[full_name]", "form_fields[contact_email_address]", "form_fields[email]"]
+
+[[form]]
+url = "https://admin.id4me.me/remove"
+unchecked = "its fields have no names in the page as served"
+
+[[form]]
+url = "https://www.amazon.com.au/gp/help/customer/contact-us?ie=UTF8&ref_=cu_surl"
+unchecked = "asks the user to sign in first"
+
+[[form]]
+url = "https://www.amazon.com.au/gp/privacycentral/dsar/preview.html"
+unchecked = "asks the user to sign in first"
+
+[[form]]
+url = "https://www.linkedin.com/help/linkedin/ask/TSO-DPO"
+unchecked = "asks the user to sign in first"
+
+[[form]]
+url = "https://www.canva.com/settings/email-preferences"
+unchecked = "asks the user to sign in first"
+
+[[form]]
+url = "https://www.equifax.com.au/personal/corrections-portal"
+unchecked = "a page that links to the business's own portal"
+
+[[form]]
+url = "https://www.equifax.com.au/personal/products/credit-and-identity-products"
+unchecked = "a page that links to the business's own portal"
+
+[[form]]
+url = "https://www.experian.com.au/consumer/correction-process"
+unchecked = "a page that links to the business's own portal"
+
+[[form]]
+url = "https://www.experian.com.au/consumer/order-credit-report"
+unchecked = "a page that links to the business's own portal"
+
+[[form]]
+url = "https://www.experian.com.au/consumer/request-a-ban"
+unchecked = "a page that links to the business's own portal"
+
+[[form]]
+url = "https://www.jbhifi.com.au/pages/privacy-policy"
+unchecked = "a privacy policy that names the request route"
+
+[[form]]
+url = "https://www.ebay.com.au/help/account/adchoice/adchoice?id=4648"
+unchecked = "a help page that links to account settings"
+
+[[form]]
+url = "https://www.ebay.com.au/help/account/default/ebay-account?id=5089#request"
+unchecked = "a help page that links to account settings"
+
+[[form]]
+url = "https://www.anz.com.au/support/complaints/"
+unchecked = "drawn by a script"
+
+[[form]]
+url = "https://www.canva.com/help/legal-form/"
+unchecked = "drawn by a script"
+
+[[form]]
+url = "https://www.commbank.com.au/support/compliments-and-complaints.html"
+unchecked = "drawn by a script"
+
+[[form]]
+url = "https://www.roberthalf.com/au/en/insights/unsubscribe"
+unchecked = "drawn by a script"
+
+[[form]]
+url = "https://banking.westpac.com.au/olfmu/eforms/ConsumerFeedback/#/welcome"
+unchecked = "drawn by a script"
+
+[[form]]
+url = "https://app.talefin.com/consumer"
+unchecked = "drawn by a script"
+
+[[form]]
+url = "https://app.snov.io/clear-email"
+unchecked = "drawn by a script"
+
+[[form]]
+url = "https://privacy.peopledatalabs.com/policies?modal=select-requester"
+unchecked = "drawn by a script"
+
+[[form]]
+url = "https://privacy.winrcorp.com/"
+unchecked = "drawn by a script"
+
+[[form]]
+url = "https://requests.hrtechprivacy.com/create"
+unchecked = "drawn by a script"
+
+[[form]]
+url = "https://rocketreach.co/remove-profile"
+unchecked = "drawn by a script"
+
+[[form]]
+url = "https://submit-irm.trustarc.com/services/validation/5cd95301-1855-4698-8929-3b7e5e14750b"
+unchecked = "drawn by a script"
+
+[[form]]
+url = "https://privacyportal-eu.onetrust.com/webform/8940117c-e735-4010-9984-0b12ad7dc7fc/93ad4a8e-4d3b-475b-abb7-69c82a941a6e"
+unchecked = "drawn by a script"
+
+[[form]]
+url = "https://privacy-portal-manpowergroup.my.onetrust.com/webform/1ef6af7e-5375-472f-9219-c7092454fa4f/ec432b1f-00dd-45ab-a673-760c2bc63fc0"
+unchecked = "drawn by a script"
+
+[[form]]
+url = "https://www.optus.com.au/notices/manage-marketing-preferences"
+unchecked = "did not answer a scripted request within 30 seconds"
+
+[[form]]
+url = "https://www.allianz.com.au/help-and-contact/contact-us/dispute-resolution.html"
+unchecked = "refuses scripted requests (403)"
+
+[[form]]
+url = "https://careeronehelp.zendesk.com/hc/en-gb/requests/new"
+unchecked = "refuses scripted requests (403)"
+
+[[form]]
+url = "https://help.realestate.com.au/hc/en-us/requests/new?ticket_form_id=634928"
+unchecked = "refuses scripted requests (403)"
+
+[[form]]
+url = "https://help.ticketek.com.au/hc/en-us/requests/new?ticket_form_id=900001795406"
+unchecked = "refuses scripted requests (403)"
+
+[[form]]
+url = "https://latitudefs.zendesk.com/hc/en-au/requests/new?ticket_form_id=19263713458321"
+unchecked = "refuses scripted requests (403)"
+
+[[form]]
+url = "https://ocswf.ebay.com/privacy"
+unchecked = "refuses scripted requests (403)"
+
+[[form]]
+url = "https://privacy.costar.com/DSAR-submission/"
+unchecked = "refuses scripted requests (403)"
+
+[[form]]
+url = "https://privacyrequest.zoominfo.com/remove/verify"
+unchecked = "refuses scripted requests (403)"

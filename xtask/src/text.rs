@@ -7,6 +7,15 @@
 const SKIPPED: [&str; 6] = ["script", "style", "noscript", "template", "svg", "iframe"];
 /// Skipped elements whose content is raw text, which ends at the first matching end tag.
 const RAW_TEXT: [&str; 4] = ["script", "style", "noscript", "iframe"];
+/// `input` types a user does not type into or choose.
+const NOT_FILLED: [&str; 5] = ["hidden", "submit", "reset", "button", "image"];
+/// Elements without contents or an end tag.
+const VOID: [&str; 13] = [
+    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track",
+    "wbr",
+];
+/// `input` types that ignore `readonly`.
+const NOT_READONLY: [&str; 5] = ["checkbox", "radio", "file", "range", "color"];
 
 /// Whether a response is HTML: its media type names HTML in any letter case or, with no
 /// `Content-Type`, its body starts like an HTML document.
@@ -150,6 +159,138 @@ pub fn main_text(html: &str) -> String {
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// The `name` of each `input`, `textarea` and `select` element in an HTML page, in page
+/// order with repeats removed, ignoring comments and skipped elements: the fields a page
+/// serves without running a script.
+pub fn field_names(html: &str) -> Vec<String> {
+    let lower = html.to_ascii_lowercase();
+    let mut names: Vec<String> = Vec::new();
+    // Whether each open `fieldset` is disabled.
+    let mut fieldsets: Vec<bool> = Vec::new();
+    let mut i = 0;
+    while let Some(j) = lower[i..].find('<').map(|j| i + j) {
+        if lower[j..].starts_with("<!--") {
+            i = after(&lower, j, "-->");
+            continue;
+        }
+        let Some(tag) = tag_at(&lower, j) else {
+            i = j + 1;
+            continue;
+        };
+        i = if tag.closing || !SKIPPED.contains(&tag.name.as_str()) {
+            tag.end
+        } else {
+            skip_element(&lower, &tag)
+        };
+        let source = &html[j..tag.end];
+        let element = tag.name.as_str();
+        let hidden = !tag.closing
+            && element.starts_with(|c: char| c.is_ascii_alphabetic())
+            && attribute(source, "hidden").is_some();
+        if hidden && !VOID.contains(&element) {
+            // Nothing inside an element with the `hidden` attribute is shown; a browser
+            // ignores `/>` on an element that is not void.
+            // shortcut: an unclosed hidden element (`p`, `li`, `td` may omit their end tags)
+            // skips to the end of the document, so later fields read as missing: a false
+            // alarm that fails the run, never a field counted as served. Track implied end
+            // tags if a listed form ever trips it.
+            i = skip_element(&lower, &tag);
+            continue;
+        }
+        if tag.name == "fieldset" {
+            // shortcut: a control in a disabled fieldset's first legend counts as disabled,
+            // though browsers let users fill it in; the check would then report it missing,
+            // loudly. Track the first legend if a listed form ever puts a field there.
+            if tag.closing {
+                fieldsets.pop();
+            } else {
+                fieldsets.push(attribute(source, "disabled").is_some());
+            }
+        }
+        if !tag.closing && ["input", "textarea", "select"].contains(&tag.name.as_str()) {
+            if tag.name == "textarea" {
+                // Its contents are text, even when they look like tags.
+                i = raw_text_end(&lower, tag.end, "textarea");
+            }
+            let kind = attribute(source, "type").map(|kind| kind.to_ascii_lowercase());
+            let kind = kind.as_deref().unwrap_or("");
+            let readonly = attribute(source, "readonly").is_some()
+                && (tag.name == "textarea" || tag.name == "input" && !NOT_READONLY.contains(&kind));
+            let fillable = !hidden
+                && !fieldsets.contains(&true)
+                && attribute(source, "disabled").is_none()
+                && !readonly
+                && !NOT_FILLED.contains(&kind);
+            let name = attribute(source, "name").map(|v| decode_entities(&v));
+            if let Some(name) = name.filter(|n| fillable && !n.is_empty() && !names.contains(n)) {
+                names.push(name);
+            }
+        }
+    }
+    names
+}
+
+/// The value of attribute `wanted` (lowercase) in `tag`, the source of one start tag.
+fn attribute(tag: &str, wanted: &str) -> Option<String> {
+    let bytes = tag.as_bytes();
+    // Past `<` and the element name.
+    let mut i = 1 + bytes[1..]
+        .iter()
+        .position(|&b| b.is_ascii_whitespace() || b == b'/' || b == b'>')
+        .unwrap_or(bytes.len() - 1);
+    loop {
+        while bytes
+            .get(i)
+            .is_some_and(|&b| b.is_ascii_whitespace() || b == b'/')
+        {
+            i += 1;
+        }
+        let start = i;
+        while bytes
+            .get(i)
+            .is_some_and(|&b| !b.is_ascii_whitespace() && !b"=/>".contains(&b))
+        {
+            i += 1;
+        }
+        if i == start {
+            return None;
+        }
+        let key = tag[start..i].to_ascii_lowercase();
+        while bytes.get(i).is_some_and(u8::is_ascii_whitespace) {
+            i += 1;
+        }
+        let value = if bytes.get(i) == Some(&b'=') {
+            i += 1;
+            while bytes.get(i).is_some_and(u8::is_ascii_whitespace) {
+                i += 1;
+            }
+            let (from, to) = match bytes.get(i) {
+                Some(&quote @ (b'"' | b'\'')) => {
+                    let end = bytes[i + 1..]
+                        .iter()
+                        .position(|&b| b == quote)
+                        .map_or(bytes.len(), |k| i + 1 + k);
+                    (i + 1, end)
+                }
+                _ => {
+                    let end = bytes[i..]
+                        .iter()
+                        .position(|&b| b.is_ascii_whitespace() || b == b'>')
+                        .map_or(bytes.len(), |k| i + k);
+                    (i, end)
+                }
+            };
+            i = (to + 1).min(bytes.len());
+            &tag[from..to]
+        } else {
+            ""
+        };
+        if key == wanted {
+            return Some(value.to_owned());
+        }
+    }
 }
 
 /// The index just past the end of the skipped element that `start` opens, or the end of
@@ -333,6 +474,71 @@ mod tests {
             <main class=\"x\"><h1>Privacy</h1><p>Email <b>privacy@x.au</b></p></main>\
             <footer>2026</footer></body></html>";
         assert_eq!(main_text(html), "Privacy Email privacy@x.au");
+    }
+
+    #[test]
+    fn lists_the_fields_a_page_serves() {
+        let html = "<form>1 < 2 <INPUT type=text NAME=firstName><input required name='email'>\
+            <input type=\"checkbox\" data-name=\"x\" name=\"item&#91;1&#93;\"/>\
+            <textarea\nname = \"message\"></textarea><select name=\"state\"></select>\
+            <input name=\"email\"><input type=\"submit\"><button name=\"go\">Go</button>\
+            <label for=\"name\">Name</label></form>";
+        assert_eq!(
+            field_names(html),
+            ["firstName", "email", "item[1]", "message", "state"]
+        );
+    }
+
+    #[test]
+    fn skips_controls_a_user_cannot_fill_in() {
+        let html = "<input type=hidden name=email><input TYPE=\"Hidden\" name=a>\
+            <input type=submit name=go><input type=reset name=r><input type=button name=b>\
+            <input type=image name=i><input name=off disabled><select name=s disabled></select>\
+            <textarea name=ro readonly></textarea><input type=email name=kept>";
+        assert_eq!(field_names(html), ["kept"]);
+    }
+
+    #[test]
+    fn controls_hidden_by_the_hidden_attribute_are_skipped() {
+        let html = "<?pi hidden ?><input type=\"text\" name=\"email\" hidden><div hidden><p>\
+            <input name=inner></p><div><select name=deep></select></div></div>\
+            <section hidden/><input name=under></section>\
+            <img hidden src=x><br hidden><input name=seen>";
+        assert_eq!(field_names(html), ["seen"]);
+    }
+
+    #[test]
+    fn controls_in_a_disabled_fieldset_cannot_be_filled_in() {
+        let html = "<fieldset disabled><input name=off><fieldset><select name=deep></select>\
+            </fieldset></fieldset><fieldset><input name=on></fieldset><input name=after>";
+        assert_eq!(field_names(html), ["on", "after"]);
+    }
+
+    #[test]
+    fn readonly_applies_only_to_text_controls() {
+        let html = "<select name=s readonly></select><input type=checkbox name=c readonly>\
+            <input type=radio name=r readonly><input name=t readonly><input type=email name=e readonly>";
+        assert_eq!(field_names(html), ["s", "c", "r"]);
+    }
+
+    #[test]
+    fn the_contents_of_a_textarea_are_text() {
+        let html = "<textarea name=\"message\"><input name=\"email\"></TEXTAREA><input name=after>";
+        assert_eq!(field_names(html), ["message", "after"]);
+    }
+
+    #[test]
+    fn ignores_fields_in_comments_scripts_and_templates() {
+        let html = "<!-- <input name=\"old\"> --><script>'<input name=\"js\">'</script>\
+            <template><input name=\"later\"></template><noscript><input name=\"ns\"></noscript>\
+            <input data-x=\"<input name=decoy>\" name=\"real\">";
+        assert_eq!(field_names(html), ["real"]);
+    }
+
+    #[test]
+    fn a_page_without_fields_lists_none() {
+        assert!(field_names("<p>Use our form at <a href=\"/f\">this page</a>.</p>").is_empty());
+        assert!(field_names("<input type=\"text\"><input name=\"\">").is_empty());
     }
 
     #[test]
