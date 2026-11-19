@@ -9,6 +9,11 @@ const SKIPPED: [&str; 6] = ["script", "style", "noscript", "template", "svg", "i
 const RAW_TEXT: [&str; 4] = ["script", "style", "noscript", "iframe"];
 /// `input` types a user does not type into or choose.
 const NOT_FILLED: [&str; 5] = ["hidden", "submit", "reset", "button", "image"];
+/// Elements without contents or an end tag.
+const VOID: [&str; 13] = [
+    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track",
+    "wbr",
+];
 /// `input` types that ignore `readonly`.
 const NOT_READONLY: [&str; 5] = ["checkbox", "radio", "file", "range", "color"];
 
@@ -180,6 +185,13 @@ pub fn field_names(html: &str) -> Vec<String> {
             skip_element(&lower, &tag)
         };
         let source = &html[j..tag.end];
+        let element = tag.name.as_str();
+        let hidden = !tag.closing && attribute(source, "hidden").is_some();
+        if hidden && !tag.self_closing && !VOID.contains(&element) {
+            // Nothing inside an element with the `hidden` attribute is shown.
+            i = skip_element(&lower, &tag);
+            continue;
+        }
         if tag.name == "fieldset" {
             // shortcut: a control in a disabled fieldset's first legend counts as disabled,
             // though browsers let users fill it in; the check would then report it missing,
@@ -199,7 +211,8 @@ pub fn field_names(html: &str) -> Vec<String> {
             let kind = kind.as_deref().unwrap_or("");
             let readonly = attribute(source, "readonly").is_some()
                 && (tag.name == "textarea" || tag.name == "input" && !NOT_READONLY.contains(&kind));
-            let fillable = !fieldsets.contains(&true)
+            let fillable = !hidden
+                && !fieldsets.contains(&true)
                 && attribute(source, "disabled").is_none()
                 && !readonly
                 && !NOT_FILLED.contains(&kind);
