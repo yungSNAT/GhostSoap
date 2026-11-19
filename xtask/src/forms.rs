@@ -363,23 +363,28 @@ mod tests {
             page += &format!("<input name=\"f{i}\">");
         }
         let url = serve_body("200 OK", "text/html", &(page + "</form></main>"));
-        let Check::Dead(problem) = check(&loopback_agent(), &there, &fields(&url, &["email"]))
-        else {
-            panic!("the form has changed");
-        };
+        // The Debug text shows a newline in the message as `\n`.
+        let problem = format!(
+            "{:?}",
+            check(&loopback_agent(), &there, &fields(&url, &["email"]))
+        );
+        assert!(
+            problem.starts_with("Dead(\"missing field `email`;"),
+            "{problem}"
+        );
         // Only the backticks the message puts around `email` and the 20 names it shows.
         assert_eq!(problem.matches('`').count(), 42, "{problem}");
         assert!(
             problem.contains("`x' [a link](https://bad.example) @someone`"),
             "{problem}"
         );
-        assert!(!problem.contains('\n'), "{problem}");
+        assert!(!problem.contains("\\n"), "{problem}");
         assert!(
             problem.contains(&format!("{}...", "n".repeat(MAX_NAME))),
             "{problem}"
         );
         assert!(!problem.contains(&"n".repeat(MAX_NAME + 1)), "{problem}");
-        assert!(problem.ends_with("` and 13 more"), "{problem}");
+        assert!(problem.ends_with("` and 13 more\")"), "{problem}");
     }
 
     #[test]
