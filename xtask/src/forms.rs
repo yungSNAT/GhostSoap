@@ -140,6 +140,9 @@ pub fn check(
     form: &Form,
 ) -> Check {
     let mut response = match get_form(agent, lookup, &form.url) {
+        Ok(response) if response.status() == ureq::http::StatusCode::NO_CONTENT => {
+            return Check::Dead("the page answers 204 No Content".to_owned());
+        }
         Ok(response) => response,
         Err(check) => return check,
     };
@@ -177,6 +180,8 @@ pub fn check(
 /// over HTTPS endpoint) whether the host of a form that does not answer exists. Prints a
 /// Markdown report of forms that are gone or changed, or nothing; inconclusive checks go to
 /// stderr. Exits 1 if any form is gone or changed, or the list and the register disagree.
+/// Otherwise exits `HELD` if a form named in `open`, the text of the open issue, could not
+/// be checked, as the issue cannot yet be closed.
 pub fn run(
     dir: &Path,
     forms_file: &Path,
@@ -185,7 +190,6 @@ pub fn run(
     resolver: &str,
     pause: Duration,
 ) -> ExitCode {
-    let _ = open;
     let lookup = |name: &str, record: &str| dns_query(agent, resolver, name, record);
     let loaded = std::fs::read_to_string(forms_file)
         .map_err(|e| format!("cannot read {}: {e}", forms_file.display()))
@@ -204,16 +208,23 @@ pub fn run(
         .into_iter()
         .map(|problem| format!("- {problem}"))
         .collect();
+    let mut held = false;
     for (i, form) in forms.iter().enumerate() {
         if i > 0 {
             std::thread::sleep(pause);
         }
         let what = format!("web form {}", form.url);
         let ids = sent_to.get(&form.url).map_or(&[][..], Vec::as_slice);
-        record(&mut lines, &what, ids, check(agent, &lookup, form));
+        let result = check(agent, &lookup, form);
+        held |= matches!(result, Check::Inconclusive(_)) && open.contains(&format!("{what}:"));
+        record(&mut lines, &what, ids, result);
     }
     if lines.is_empty() {
-        return ExitCode::SUCCESS;
+        return if held {
+            ExitCode::from(HELD)
+        } else {
+            ExitCode::SUCCESS
+        };
     }
     println!(
         "The weekly form check found forms that are gone or no longer have the fields \
@@ -225,12 +236,15 @@ pub fn run(
     ExitCode::FAILURE
 }
 
-/// Print the fields each page serves, for writing `forms.toml`.
+/// Print the fields each page serves, for writing `forms.toml`, requesting the pages
+/// `pause` apart.
 pub fn print_fields(agent: &ureq::Agent, urls: &[String], pause: Duration) -> ExitCode {
-    let _ = pause;
     let lookup = |_: &str, _: &str| Err("not looked up".to_owned());
     let mut failed = false;
-    for url in urls {
+    for (i, url) in urls.iter().enumerate() {
+        if i > 0 {
+            std::thread::sleep(pause);
+        }
         let html = get_form(agent, &lookup, url)
             .map_err(|check| format!("{check:?}"))
             .and_then(|mut r| r.body_mut().read_to_string().map_err(|e| e.to_string()));

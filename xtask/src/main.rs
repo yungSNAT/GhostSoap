@@ -12,9 +12,11 @@
 //!                                                     the law table, optionally saving
 //!                                                     each page's text
 //! cargo run -p xtask -- email-changes <base> <head>   warn of email addresses a change added
-//! cargo run -p xtask -- form-check [registry/au [xtask/forms.toml]]
+//! cargo run -p xtask -- form-check [registry/au [xtask/forms.toml [open issue]]]
 //!                                                     fail if a form users are sent to is
-//!                                                     gone or lacks a listed field
+//!                                                     gone or lacks a listed field; exit 3
+//!                                                     if a form the open issue names could
+//!                                                     not be checked
 //! cargo run -p xtask -- form-fields <url>...          print the fields each page serves
 //! cargo run -p xtask -- no-network                    fail if ghostsoap could open a connection
 //! ```
@@ -756,14 +758,26 @@ fn main() -> ExitCode {
         Some((command, [base, head])) if command == "email-changes" => {
             emails_changed(Path::new(base), Path::new(head))
         }
-        Some((command, rest)) if command == "form-check" && rest.len() <= 2 => forms::run(
-            Path::new(rest.first().map_or("registry/au", String::as_str)),
-            Path::new(rest.get(1).map_or("xtask/forms.toml", String::as_str)),
-            "",
-            &agent(TIMEOUT),
-            DNS_RESOLVER,
-            forms::PAUSE,
-        ),
+        Some((command, rest)) if command == "form-check" && rest.len() <= 3 => {
+            let open = rest
+                .get(2)
+                .map(|p| std::fs::read_to_string(p).map_err(|e| format!("cannot read {p}: {e}")))
+                .transpose();
+            match open {
+                Ok(open) => forms::run(
+                    Path::new(rest.first().map_or("registry/au", String::as_str)),
+                    Path::new(rest.get(1).map_or("xtask/forms.toml", String::as_str)),
+                    open.as_deref().unwrap_or(""),
+                    &agent(TIMEOUT),
+                    DNS_RESOLVER,
+                    forms::PAUSE,
+                ),
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         Some((command, urls)) if command == "form-fields" && !urls.is_empty() => {
             forms::print_fields(&agent(TIMEOUT), urls, forms::PAUSE)
         }
@@ -774,7 +788,7 @@ fn main() -> ExitCode {
                 "usage: xtask evidence-hash <url>... \
                  | xtask evidence-drift [registry dir [page text dir]] \
                  | xtask email-changes <base registry dir> <head registry dir> \
-                 | xtask form-check [registry dir [forms file]] \
+                 | xtask form-check [registry dir [forms file [open issue file]]] \
                  | xtask form-fields <url>... \
                  | xtask no-network \
                  | xtask checklist-checked <YYYY-MM>"

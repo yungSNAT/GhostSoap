@@ -7,6 +7,8 @@
 const SKIPPED: [&str; 6] = ["script", "style", "noscript", "template", "svg", "iframe"];
 /// Skipped elements whose content is raw text, which ends at the first matching end tag.
 const RAW_TEXT: [&str; 4] = ["script", "style", "noscript", "iframe"];
+/// `input` types a user does not type into or choose.
+const NOT_FILLED: [&str; 5] = ["hidden", "submit", "reset", "button", "image"];
 
 /// Whether a response is HTML: its media type names HTML in any letter case or, with no
 /// `Content-Type`, its body starts like an HTML document.
@@ -174,8 +176,17 @@ pub fn field_names(html: &str) -> Vec<String> {
             skip_element(&lower, &tag)
         };
         if !tag.closing && ["input", "textarea", "select"].contains(&tag.name.as_str()) {
-            let name = attribute(&html[j..tag.end], "name").map(|v| decode_entities(&v));
-            if let Some(name) = name.filter(|n| !n.is_empty() && !names.contains(n)) {
+            let source = &html[j..tag.end];
+            if tag.name == "textarea" {
+                // Its contents are text, even when they look like tags.
+                i = raw_text_end(&lower, tag.end, "textarea");
+            }
+            let fillable = attribute(source, "disabled").is_none()
+                && attribute(source, "readonly").is_none()
+                && !attribute(source, "type")
+                    .is_some_and(|kind| NOT_FILLED.contains(&kind.to_ascii_lowercase().as_str()));
+            let name = attribute(source, "name").map(|v| decode_entities(&v));
+            if let Some(name) = name.filter(|n| fillable && !n.is_empty() && !names.contains(n)) {
                 names.push(name);
             }
         }
