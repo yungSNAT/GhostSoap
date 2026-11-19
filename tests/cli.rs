@@ -531,13 +531,15 @@ fn every_command_that_keeps_data_says_how_to_name_a_data_folder() {
 }
 
 #[test]
-fn commands_that_ask_for_the_passphrase_report_end_of_input() {
+fn commands_that_read_standard_input_report_its_end_and_change_nothing() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("state.age"), "not a state").unwrap();
     for args in [
-        &["checklist", "done", "breach-check", "--passphrase-stdin"][..],
+        &["checklist", "--passphrase-stdin"][..],
+        &["checklist", "done", "breach-check", "--passphrase-stdin"],
         &["export", "--passphrase-stdin"],
         &["forget", "--passphrase-stdin"],
+        &["forget", "--no-passphrase", "--passphrase-stdin"],
     ] {
         let out = in_data_folder(Some(tmp.path()), args, "");
         assert_eq!(out.status.code(), Some(1), "{args:?}");
