@@ -186,9 +186,16 @@ pub fn field_names(html: &str) -> Vec<String> {
         };
         let source = &html[j..tag.end];
         let element = tag.name.as_str();
-        let hidden = !tag.closing && attribute(source, "hidden").is_some();
-        if hidden && !tag.self_closing && !VOID.contains(&element) {
-            // Nothing inside an element with the `hidden` attribute is shown.
+        let hidden = !tag.closing
+            && element.starts_with(|c: char| c.is_ascii_alphabetic())
+            && attribute(source, "hidden").is_some();
+        if hidden && !VOID.contains(&element) {
+            // Nothing inside an element with the `hidden` attribute is shown; a browser
+            // ignores `/>` on an element that is not void.
+            // shortcut: an unclosed hidden element (`p`, `li`, `td` may omit their end tags)
+            // skips to the end of the document, so later fields read as missing: a false
+            // alarm that fails the run, never a field counted as served. Track implied end
+            // tags if a listed form ever trips it.
             i = skip_element(&lower, &tag);
             continue;
         }

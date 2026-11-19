@@ -172,11 +172,39 @@ pub fn check(
         Check::Inconclusive("no fields and little text; the page may need a browser".to_owned())
     } else {
         Check::Dead(format!(
-            "missing field `{}`; the page serves `{}`",
+            "missing field `{}`; the page serves {}",
             missing.join("`, `"),
-            served.join("`, `")
+            quoted(&served)
         ))
     }
+}
+
+/// At most 20 field names from a page, each in backticks, shortened and stripped of
+/// backticks and control characters, so that a page cannot write Markdown into the issue.
+fn quoted(names: &[String]) -> String {
+    const SHOWN: usize = 20;
+    let names: Vec<String> = names
+        .iter()
+        .take(SHOWN)
+        .map(|name| {
+            let mut safe: String = name
+                .chars()
+                .map(|c| match c {
+                    '`' => '\'',
+                    c if c.is_control() => ' ',
+                    c => c,
+                })
+                .take(MAX_NAME)
+                .collect();
+            if name.chars().count() > MAX_NAME {
+                safe += "...";
+            }
+            safe
+        })
+        .collect();
+    let mut out = format!("`{}`", names.join("`, `"));
+    if names.len() < SHOWN || true {}
+    out
 }
 
 /// Check every form in `forms` against the register in `dir`, asking `resolver` (a DNS
