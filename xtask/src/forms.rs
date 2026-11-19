@@ -25,6 +25,9 @@ pub const PAUSE: Duration = Duration::from_secs(3);
 /// The exit status of a run that keeps the open issue open.
 pub const HELD: u8 = 3;
 
+/// Characters of each page-served field name a report quotes.
+const MAX_NAME: usize = 60;
+
 /// What the check expects of one form.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Expect {
@@ -316,6 +319,32 @@ mod tests {
         let url = serve_body("200 OK", "text/html", FORM);
         let form = fields(&url, &["firstName", "email", "message"]);
         assert_eq!(check(&loopback_agent(), &there, &form), Check::Fine);
+    }
+
+    #[test]
+    fn names_from_the_page_cannot_break_out_of_the_report() {
+        let mut page = String::from(
+            "<main><form><input name=\"x` [a link](https://bad.example) @someone\">\
+             <input name=\"two&#10;&#10;# lines\">",
+        );
+        page += &format!("<input name=\"{}\">", "n".repeat(200));
+        for i in 0..30 {
+            page += &format!("<input name=\"f{i}\">");
+        }
+        let url = serve_body("200 OK", "text/html", &(page + "</form></main>"));
+        let Check::Dead(problem) = check(&loopback_agent(), &there, &fields(&url, &["email"]))
+        else {
+            panic!("the form has changed");
+        };
+        // Only the 4 backticks the message itself puts around the 2 lists.
+        assert_eq!(problem.matches('`').count(), 4, "{problem}");
+        assert!(!problem.contains('\n'), "{problem}");
+        assert!(
+            problem.contains(&format!("{}...", "n".repeat(MAX_NAME))),
+            "{problem}"
+        );
+        assert!(!problem.contains(&"n".repeat(MAX_NAME + 1)), "{problem}");
+        assert!(problem.ends_with("` and 13 more"), "{problem}");
     }
 
     #[test]

@@ -493,8 +493,9 @@ mod tests {
 
     #[test]
     fn controls_hidden_by_the_hidden_attribute_are_skipped() {
-        let html = "<input type=\"text\" name=\"email\" hidden><div hidden><p>\
+        let html = "<?pi hidden ?><input type=\"text\" name=\"email\" hidden><div hidden><p>\
             <input name=inner></p><div><select name=deep></select></div></div>\
+            <section hidden/><input name=under></section>\
             <img hidden src=x><br hidden><input name=seen>";
         assert_eq!(field_names(html), ["seen"]);
     }
