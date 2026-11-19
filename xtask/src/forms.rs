@@ -343,6 +343,18 @@ mod tests {
     }
 
     #[test]
+    fn a_field_left_only_with_the_hidden_attribute_has_changed() {
+        let page = "<main><form><input name=\"firstName\">\
+            <input type=\"text\" name=\"email\" hidden></form></main>";
+        let url = serve_body("200 OK", "text/html", page);
+        let form = fields(&url, &["firstName", "email"]);
+        assert_eq!(
+            check(&loopback_agent(), &there, &form),
+            Check::Dead("missing field `email`; the page serves `firstName`".to_owned())
+        );
+    }
+
+    #[test]
     fn a_page_with_no_content_is_gone() {
         for expect in ["fields = [\"email\"]", "unchecked = \"drawn by a script\""] {
             let url = serve_body("204 No Content", "text/html", "");

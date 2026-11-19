@@ -479,6 +479,14 @@ mod tests {
     }
 
     #[test]
+    fn controls_hidden_by_the_hidden_attribute_are_skipped() {
+        let html = "<input type=\"text\" name=\"email\" hidden><div hidden><p>\
+            <input name=inner></p><div><select name=deep></select></div></div>\
+            <img hidden src=x><br hidden><input name=seen>";
+        assert_eq!(field_names(html), ["seen"]);
+    }
+
+    #[test]
     fn controls_in_a_disabled_fieldset_cannot_be_filled_in() {
         let html = "<fieldset disabled><input name=off><fieldset><select name=deep></select>\
             </fieldset></fieldset><fieldset><input name=on></fieldset><input name=after>";
