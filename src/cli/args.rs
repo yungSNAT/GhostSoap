@@ -256,7 +256,7 @@ pub struct SelectionArgs {
 }
 
 impl SelectionArgs {
-    fn selection(&self) -> Selection {
+    pub(super) fn selection(&self) -> Selection {
         Selection {
             packs: self.pack.clone(),
             entries: self.entry.clone(),
