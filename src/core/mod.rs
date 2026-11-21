@@ -14,3 +14,11 @@ pub mod plan;
 pub mod profile;
 pub mod register;
 pub mod tracker;
+
+/// The name the state file gives `value`, such as `refused-with-reasons`.
+pub(crate) fn named(value: impl serde::Serialize) -> String {
+    serde_json::to_value(value)
+        .ok()
+        .and_then(|v| v.as_str().map(str::to_owned))
+        .expect("a unit variant serialises as its name")
+}

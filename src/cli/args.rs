@@ -267,9 +267,9 @@ impl SelectionArgs {
 }
 
 pub(super) fn parse_lever(name: &str) -> Result<Lever, String> {
-    Lever::from_name(name).ok_or_else(|| {
-        let names: Vec<&str> = Lever::ALL.iter().map(|l| l.name()).collect();
-        format!("unknown lever; use one of {}", names.join(", "))
+    serde_json::from_value(json!(name)).map_err(|_| {
+        let names = Lever::ALL.map(Lever::name).join(", ");
+        format!("unknown lever; use one of {names}")
     })
 }
 
@@ -306,13 +306,7 @@ pub(super) fn parse_withdrawn(name: &str) -> Result<tracker::Withdrawn, String> 
 }
 
 pub(super) fn parse_channel(name: &str) -> Result<ChannelKind, String> {
-    match name {
-        "email" => Ok(ChannelKind::Email),
-        "web-form" => Ok(ChannelKind::WebForm),
-        "post" => Ok(ChannelKind::Post),
-        "phone" => Ok(ChannelKind::Phone),
-        _ => Err("use email, web-form, post or phone".to_owned()),
-    }
+    parse_named(name, "email, web-form, post or phone")
 }
 
 #[derive(Debug, Subcommand)]

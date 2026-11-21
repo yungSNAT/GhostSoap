@@ -483,7 +483,7 @@ fn saved_text_rejoins_to_the_hashed_text() {
     assert_eq!(head, url);
     assert!(body.contains("Second sentence.\nThird."), "{body}");
     let rejoined = body.trim_end_matches('\n').replace('\n', " ");
-    assert_eq!(hex(&Sha256::digest(rejoined.as_bytes())), page.sha256);
+    assert_eq!(sha256(rejoined.as_bytes()), page.sha256);
 }
 
 fn source(text: &str) -> SourceFile {

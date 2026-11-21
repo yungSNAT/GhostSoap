@@ -216,3 +216,28 @@ fn channel_and_deadline_labels_preserve_their_distinctions() {
     );
     assert_eq!(deadline_summary(Deadline::NotStated), "no time set");
 }
+
+/// `--lever` and `--channel` take the names the register writes, and list them on a mistake.
+#[test]
+fn lever_and_channel_names_parse_as_the_register_writes_them() {
+    for lever in Lever::ALL {
+        assert_eq!(parse_lever(lever.name()), Ok(lever));
+    }
+    let names = Lever::ALL.map(Lever::name).join(", ");
+    assert_eq!(
+        parse_lever("App12"),
+        Err(format!("unknown lever; use one of {names}"))
+    );
+    for kind in [
+        ChannelKind::Email,
+        ChannelKind::WebForm,
+        ChannelKind::Post,
+        ChannelKind::Phone,
+    ] {
+        assert_eq!(parse_channel(&named(kind)), Ok(kind));
+    }
+    assert_eq!(
+        parse_channel("Email"),
+        Err("use email, web-form, post or phone".to_owned())
+    );
+}

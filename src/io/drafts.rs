@@ -210,7 +210,8 @@ fn sync_dir(dir: &Path) -> io::Result<()> {
     Ok(())
 }
 
-fn sha256(bytes: &[u8]) -> String {
+/// The SHA-256 of `bytes` in lowercase hex.
+pub fn sha256(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
         .iter()
         .map(|b| format!("{b:02x}"))

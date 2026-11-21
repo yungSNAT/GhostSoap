@@ -504,3 +504,19 @@ fn only_an_email_channel_may_serve_spam_unsubscribe() {
     let report = with_spam("post", "PO Box 1, Sydney NSW 2001");
     assert_error(&report, "only an email channel may serve");
 }
+
+/// Register files, messages and plans all use the serde name of a lever or obsolete reason.
+#[test]
+fn lever_and_obsolete_reason_names_are_their_serde_names() {
+    for lever in Lever::ALL {
+        assert_eq!(serde_json::to_value(lever).unwrap(), lever.name());
+    }
+    for name in ["acquired", "merged", "duplicate", "closed", "out-of-scope"] {
+        let reason: ObsoleteReason = serde_json::from_value(name.into()).unwrap();
+        let obsolete = Obsolete {
+            reason,
+            replaced_by: None,
+        };
+        assert_eq!(obsolete.skip_reason(), format!("obsolete ({name})"));
+    }
+}
