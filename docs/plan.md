@@ -217,7 +217,7 @@ ghostsoap export | forget            (M3a)
 ## 6. Register
 
 - **Seed:** the 3 credit reporting bodies; the firms in the ACCC's 2024 data broker report (CoreLogic, PropTrack, Quantium, LiveRamp, Nielsen, Oracle and others named there); Australian people-search sites (leads from the Optery list such as Reverse Australia, verified independently); marketing-list firms; directories; the large loyalty programmes as APP 7 targets. Target for v0.1: 25 to 40 entries at `verified` or better. Small and correct beats large and stale. On 26 October 2026 Ryan widened the register to recruiters, job boards and large consumer firms (decision 8), which takes it past that target.
-- **Data licence:** CC0-1.0 for `registry/` and `checklist/`, so other projects (datenanfragen, eraseme) can reuse it; code under FSL-1.1-ALv2.
+- **Data licence:** CC0-1.0 for `registry/` and `checklist/`, so other projects (datenanfragen, eraseme) can reuse it; code under AGPL-3.0-or-later with section 7(b) attribution terms in `NOTICE`.
 - **Freshness:** CI fails an entry with no source, an unknown lever or a malformed ABN, and warns when `verified_at` is older than 12 months. A scheduled workflow opens one issue a quarter listing stale entries. Since M1, entries carry `[[evidence]]` hashes of their source pages, and a monthly workflow opens or updates one issue listing pages that changed or could not be read, and closes it when every page matches again (normalisation in `registry/README.md`). Since 5 November 2026 the same run requests each `manual_check` page and hashes the OAIC's recognised external dispute resolution register.
 - **Backlog (M3b):** unvetted leads go in `registry/au/backlog.toml` (name, lead source, date found, reason not yet an entry), as markramm/data-broker-registry keeps `backlog.json`, so a lead is neither guessed at nor silently dropped. `registry check` prints coverage counts: entries by quality grade, kind and pack, and backlog size.
 - **Contribution:** an issue form and a pull request template asking for the source URL and the date checked. Replies from `tested` requests (with personal details removed) can raise an entry's grade.
@@ -279,7 +279,7 @@ Built on 17 November 2026: `checklist/au/` holds every item above except the ASI
 ```text
 GhostSoap/
   Cargo.toml  Cargo.lock  rust-toolchain.toml  clippy.toml  build.rs
-  LICENSE (FSL-1.1-ALv2)  LICENSE-DATA (CC0-1.0)  NOTICE  README.md  SECURITY.md  CONTRIBUTING.md
+  LICENSE (AGPL-3.0-or-later)  LICENSE-DATA (CC0-1.0)  NOTICE  README.md  SECURITY.md  CONTRIBUTING.md
   src/  main.rs  lib.rs  core/  io/  cli.rs
   xtask/  fuzz/  skills/ghostsoap/
   registry/au/  *.toml  packs/

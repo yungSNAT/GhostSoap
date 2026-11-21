@@ -1,24 +1,24 @@
 GhostSoap
-Copyright 2026 Ryan Duguid (https://github.com/ryanduguid)
+Copyright 2026 Ryan Duguid
 
-Ryan Duguid's contributions are licensed under the Functional Source
-License, Version 1.1, ALv2 Future License (FSL-1.1-ALv2); see LICENSE.
-Retained third-party material remains under its own licence, as stated below.
+Ryan Duguid's contributions are licensed under the GNU Affero General Public
+License, version 3 or (at your option) any later version. See LICENSE.
+Third-party material keeps the terms stated below.
 
-For each version licensed under FSL-1.1-ALv2, an additional licence under the
-Apache License, Version 2.0 becomes effective on the second anniversary of the
-date that version was made available.
+Additional terms under section 7 of the GNU Affero General Public License,
+version 3
 
-Versions made available before this change remain available under the
-licences they were released with.
+Under section 7(b), you must preserve attribution identifying Ryan Duguid as
+the author of his material retained in a covered work, either in that
+material or in the Appropriate Legal Notices displayed by works containing
+it. The attribution may be reworded to reflect modifications. Ryan Duguid
+asks, but does not require, that it link to https://github.com/yungSNAT/GhostSoap.
 
-Redistribution under FSL-1.1-ALv2 requires including its terms or a link to
-them and keeping the copyright notices supplied with the software.
-Redistribution under another applicable licence follows that licence's
-conditions.
-
-Data in registry/ and checklist/ is dedicated to the public domain under
-CC0 1.0 Universal (see LICENSE-DATA).
+The register and checklist data in registry/ and checklist/ are dedicated to
+the public domain under CC0 1.0 Universal. See LICENSE-DATA.
 
 Third-party material reused under its own licence is listed in
 docs/provenance.md.
+
+Versions released before this change keep the licences they were released with,
+including any future grants under those terms.

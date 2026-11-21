@@ -1,5 +1,6 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Additional terms under AGPL-3.0 section 7(b): see NOTICE.
 
 //! `xtask form-check`: does each web form a user is sent to still load, and does it still
 //! have the fields the user fills in from what GhostSoap gives them?

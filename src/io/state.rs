@@ -1,5 +1,6 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Additional terms under AGPL-3.0 section 7(b): see NOTICE.
 
 //! The encrypted state file (plan section 5, 'Storage and secrets'). Format 1 (M2) held the
 //! profile alone; format 2 (M3a) adds the messages, their requests and events. A format 1

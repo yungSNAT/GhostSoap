@@ -1,5 +1,6 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Additional terms under AGPL-3.0 section 7(b): see NOTICE.
 
 //! Maintainer tasks for the GhostSoap register. Not part of the `ghostsoap` binary, which
 //! makes no network requests of its own.
@@ -791,7 +792,10 @@ fn main() -> ExitCode {
                  | xtask form-check [registry dir [forms file [open issue file]]] \
                  | xtask form-fields <url>... \
                  | xtask no-network \
-                 | xtask checklist-checked <YYYY-MM>"
+                 | xtask checklist-checked <YYYY-MM>\n\n\
+                 Copyright 2026 Ryan Duguid. No warranty.\n\
+                 AGPL-3.0-or-later with additional terms (see NOTICE).\n\
+                 Licence: https://github.com/yungSNAT/GhostSoap/blob/main/LICENSE"
             );
             ExitCode::from(2)
         }

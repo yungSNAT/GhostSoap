@@ -28,4 +28,4 @@ compiler. GhostSoap provides information and templates, not legal advice.
 
 ## Reuse
 
-- [Reusing this code](https://github.com/yungSNAT/GhostSoap/blob/main/AGENTS.md#reusing-this-code): Ryan Duguid's work under FSL-1.1-ALv2; keep its notices and licence; public credit is requested.
+- [Reusing this code](https://github.com/yungSNAT/GhostSoap/blob/main/AGENTS.md#reusing-this-code): Ryan Duguid's code under AGPL-3.0-or-later with section 7(b) attribution terms in NOTICE. Register and checklist data are CC0-1.0.

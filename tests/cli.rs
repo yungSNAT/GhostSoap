@@ -1,5 +1,6 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Additional terms under AGPL-3.0 section 7(b): see NOTICE.
 
 use std::process::{Command, Output};
 
@@ -18,7 +19,11 @@ fn text(bytes: &[u8]) -> String {
 fn help_prints_usage() {
     let out = ghostsoap(&["--help"]);
     assert_eq!(out.status.code(), Some(0));
-    assert!(text(&out.stdout).contains("Usage: ghostsoap"));
+    let stdout = text(&out.stdout);
+    assert!(stdout.contains("Usage: ghostsoap"));
+    assert!(stdout.contains("Copyright 2026 Ryan Duguid. No warranty."));
+    assert!(stdout.contains("AGPL-3.0-or-later with additional terms (see NOTICE)."));
+    assert!(stdout.contains("https://github.com/yungSNAT/GhostSoap/blob/main/LICENSE"));
     assert!(out.stderr.is_empty());
 }
 

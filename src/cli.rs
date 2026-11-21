@@ -1,5 +1,6 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Additional terms under AGPL-3.0 section 7(b): see NOTICE.
 
 //! Command-line interface.
 
@@ -53,6 +54,9 @@ fn print_line(line: std::fmt::Arguments) {
     }
 }
 
+const LICENCE_NOTICE: &str = "Copyright 2026 Ryan Duguid. No warranty.\n\
+    AGPL-3.0-or-later with additional terms (see NOTICE).\n\
+    Licence: https://github.com/yungSNAT/GhostSoap/blob/main/LICENSE";
 const LEGAL_NOTICE: &str = "GhostSoap provides information and templates, not legal advice.";
 const CHECK_LIMITS: &str = "This check matches words. It flags a sentence that holds a word for \
                             erasing and a legal source or a word of duty, so a flag may be \
@@ -68,6 +72,7 @@ const OVERSEAS_NOTE: &str = "run from overseas; GhostSoap has not established th
 /// Prepare Australian Privacy Act requests to data brokers and track the replies.
 #[derive(Debug, Parser)]
 #[command(name = "ghostsoap", version, about, long_about = None)]
+#[command(after_help = LICENCE_NOTICE)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Command>,
