@@ -37,7 +37,7 @@ use std::time::Duration;
 
 use ghostsoap::core::register::{ChannelKind, Entry, SourceFile};
 use ghostsoap::core::{checklist, embedded};
-use sha2::{Digest, Sha256};
+use ghostsoap::io::drafts::sha256;
 
 use channels::*;
 use emails::*;
@@ -135,23 +135,15 @@ fn evidence_page(agent: &ureq::Agent, url: &str) -> Result<Page, PageError> {
         }
         let hidden = text::cloudflare_emails(&html).join("\n");
         let searchable = format!("{html}\n{main}\n{hidden}").to_lowercase();
-        (
-            Sha256::digest(main.as_bytes()),
-            Some(main),
-            Some(searchable),
-        )
+        (sha256(main.as_bytes()), Some(main), Some(searchable))
     } else {
-        (Sha256::digest(&bytes), None, None)
+        (sha256(&bytes), None, None)
     };
     Ok(Page {
-        sha256: hex(&digest),
+        sha256: digest,
         main,
         text,
     })
-}
-
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 /// Save a page's main text as `<entry id>-<URL hash>.txt` under `dir`, so a later run's
@@ -168,7 +160,7 @@ fn save_text(dir: &Path, id: &str, url: &str, main: &str) {
 
 /// The file name and contents `save_text` writes.
 fn text_file(id: &str, url: &str, main: &str) -> (String, String) {
-    let name = format!("{id}-{}.txt", hex(&Sha256::digest(url.as_bytes())[..4]));
+    let name = format!("{id}-{}.txt", &sha256(url.as_bytes())[..8]);
     (name, format!("{url}\n\n{}\n", main.replace(". ", ".\n")))
 }
 

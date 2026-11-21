@@ -262,7 +262,7 @@ pub(super) fn check_obsolete(entry: &Entry, errors: &mut Vec<String>) {
     if obsolete.reason.needs_redirect() && obsolete.replaced_by.is_none() {
         errors.push(format!(
             "obsolete.reason `{}` needs replaced_by",
-            obsolete.reason.name()
+            named(obsolete.reason)
         ));
     }
     if obsolete.replaced_by.as_deref() == Some(entry.id.as_str()) {

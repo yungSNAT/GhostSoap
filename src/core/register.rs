@@ -12,6 +12,8 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use toml::value::Datetime;
 
+use crate::core::named;
+
 mod validate;
 
 pub use validate::*;
@@ -102,11 +104,6 @@ impl Lever {
         Self::S21vCorrection,
         Self::SpamUnsubscribe,
     ];
-
-    /// The lever named `name` in register files.
-    pub fn from_name(name: &str) -> Option<Lever> {
-        Self::ALL.into_iter().find(|l| l.name() == name)
-    }
 
     /// The name used in register files.
     pub fn name(self) -> &'static str {
@@ -211,7 +208,7 @@ pub struct ManualCheck {
 }
 
 /// Why an entry was retired. The reasons follow datenanfragen's obsolete records (CC0).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ObsoleteReason {
     /// Bought by another entity, which now handles requests.
@@ -227,16 +224,6 @@ pub enum ObsoleteReason {
 }
 
 impl ObsoleteReason {
-    fn name(self) -> &'static str {
-        match self {
-            Self::Acquired => "acquired",
-            Self::Merged => "merged",
-            Self::Duplicate => "duplicate",
-            Self::Closed => "closed",
-            Self::OutOfScope => "out-of-scope",
-        }
-    }
-
     /// Whether requests now belong to another entry, which must be named.
     fn needs_redirect(self) -> bool {
         matches!(self, Self::Acquired | Self::Merged | Self::Duplicate)
@@ -254,8 +241,8 @@ impl Obsolete {
     /// Why a plan skips this entry, and where to go instead.
     pub fn skip_reason(&self) -> String {
         match &self.replaced_by {
-            Some(id) => format!("obsolete ({}); use {id} instead", self.reason.name()),
-            None => format!("obsolete ({})", self.reason.name()),
+            Some(id) => format!("obsolete ({}); use {id} instead", named(self.reason)),
+            None => format!("obsolete ({})", named(self.reason)),
         }
     }
 }
