@@ -80,11 +80,7 @@ If you edit a draft or write your own words, `ghostsoap check <file>` warns of c
 
 [`skills/ghostsoap/SKILL.md`](skills/ghostsoap/SKILL.md) lets an AI agent help you choose requests and explain them, using `ghostsoap plan --pack start-here --json` and `ghostsoap law --json`, which need no profile. You still run `init` and `draft` and send every letter yourself.
 
-- **An agent on your computer that reads skills, such as Muse Code:** copy `skills/ghostsoap` into its skills folder. It can run `plan` and `law`.
-- **Grok Bot:** ask the bot to add the skill from this repository. What it can do depends on where it runs commands: on your computer, `plan` and `law`; otherwise it works as a hosted agent does.
-- **ChatGPT Dot and other hosted agents:** point the agent at this repository. It runs on its own computer, not yours: it reads the register or builds GhostSoap there. Never put your profile there.
-
-These routes come from third-party guides and press coverage and have not yet been tested in any of these products.
+For an agent on your computer that reads skills, copy `skills/ghostsoap` into its skills folder. A hosted agent runs on its own computer, not yours: never put your profile there.
 
 The skill is guidance, not a lock. It does not stop an agent that can read your files from reading plaintext drafts, so keep agents away from GhostSoap's data folder or use `ghostsoap draft --pack start-here --copy`, which writes no draft files. What an agent reads may reach its provider, including which businesses and requests you choose.
 
