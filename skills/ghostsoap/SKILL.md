@@ -1,6 +1,8 @@
 ---
 name: ghostsoap
 description: Help someone in Australia choose Privacy Act requests to data brokers, recruiters and other businesses with GhostSoap, and explain each request's legal basis and deadline. Use when they ask to opt out of data brokers, stop marketing, or find out who holds their details. The person keeps their own details and sends every request.
+metadata:
+  author: Ryan Duguid
 ---
 
 # GhostSoap

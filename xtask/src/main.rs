@@ -745,6 +745,7 @@ fn checklist_checked(month: &str) -> ExitCode {
 }
 
 fn main() -> ExitCode {
+    // nosemgrep: rust.lang.security.args.args -- a maintainer tool's subcommand and paths; no access decision rests on them
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.split_first() {
         Some((command, urls)) if command == "evidence-hash" && !urls.is_empty() => hash(urls),
@@ -1143,9 +1144,8 @@ levers = []
 
     #[test]
     fn drift_loads_a_register_and_reports_success_using_local_evidence() {
-        let fixture =
-            std::env::temp_dir().join(format!("ghostsoap-drift-local-{}", std::process::id()));
-        std::fs::create_dir(&fixture).unwrap();
+        let temp = tempfile::tempdir().unwrap();
+        let fixture = temp.path();
         let (form, form_requests) = serve_replies("200 OK", "text/plain", "", 1);
         // The entry's source page is searched for its email address, so it is served here
         // too: the test must not reach the internet.
@@ -1173,9 +1173,9 @@ levers = []
             r#"{"value":[{"registerId":"TEST-VERSION"}]}"#,
             LAWS.len(),
         );
-        let status = drift(&fixture, None, &loopback_agent(), &dns, &versions, &[]);
+        let status = drift(fixture, None, &loopback_agent(), &dns, &versions, &[]);
         std::fs::remove_file(&entry_path).unwrap();
-        std::fs::remove_dir(&fixture).unwrap();
+        std::fs::remove_dir(fixture).unwrap();
         assert_eq!(status, ExitCode::SUCCESS);
         assert_eq!(
             form_requests.try_iter().collect::<Vec<_>>(),
@@ -1229,17 +1229,17 @@ levers = []
             Ok(Dns::NoSuchName)
         };
         let latest = |_: &str| Ok("TEST-VERSION".to_owned());
-        let text_dir = std::env::temp_dir().join(format!("ghostsoap-drift-{}", std::process::id()));
-        std::fs::create_dir(&text_dir).unwrap();
+        let temp = tempfile::tempdir().unwrap();
+        let text_dir = temp.path();
         let report = drift_report(
             &loopback_agent(),
             &[source(&entry), retired, malformed],
-            Some(&text_dir),
+            Some(text_dir),
             &lookup,
             &latest,
             &[stale_page(&legal)],
         );
-        let saved: Vec<_> = std::fs::read_dir(&text_dir)
+        let saved: Vec<_> = std::fs::read_dir(text_dir)
             .unwrap()
             .map(|item| {
                 let path = item.unwrap().path();
@@ -1248,7 +1248,7 @@ levers = []
                 text.unwrap()
             })
             .collect();
-        std::fs::remove_dir(&text_dir).unwrap();
+        std::fs::remove_dir(text_dir).unwrap();
         assert_eq!(saved.len(), 2);
         for (url, excerpt) in [
             (&changed, "Email privacy@example.com.au."),
@@ -1280,7 +1280,8 @@ levers = []
 
     #[test]
     fn saving_text_leaves_an_existing_non_directory_alone() {
-        let path = std::env::temp_dir().join(format!("ghostsoap-save-text-{}", std::process::id()));
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("save-text");
         std::fs::OpenOptions::new()
             .create_new(true)
             .write(true)
