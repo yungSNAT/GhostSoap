@@ -1,7 +1,9 @@
 GhostSoap
 Copyright 2026 Ryan Duguid
 
-Licensed under the GNU Affero General Public License, version 3 or (at your option) any later version; see LICENSE
+Ryan Duguid's contributions are licensed under the GNU Affero General Public
+License, version 3 or (at your option) any later version. See LICENSE.
+Third-party material keeps the terms stated below.
 
 Additional terms under section 7 of the GNU Affero General Public License,
 version 3
@@ -12,8 +14,8 @@ material or in the Appropriate Legal Notices displayed by works containing
 it. The attribution may be reworded to reflect modifications. Ryan Duguid
 asks, but does not require, that it link to https://github.com/yungSNAT/GhostSoap.
 
-Data in registry/ and checklist/ is dedicated to the public domain under
-CC0 1.0 Universal (see LICENSE-DATA).
+The register and checklist data in registry/ and checklist/ are dedicated to
+the public domain under CC0 1.0 Universal. See LICENSE-DATA.
 
 Third-party material reused under its own licence is listed in
 docs/provenance.md.
