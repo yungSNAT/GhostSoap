@@ -19,6 +19,7 @@ use crate::core::deadline::{self, Due};
 use crate::core::embedded;
 use crate::core::law::{self, Deadline};
 use crate::core::letters::{self, Letter, Request};
+use crate::core::named;
 use crate::core::plan::{self, Selection, Step};
 use crate::core::profile::Profile;
 use crate::core::register::{
@@ -88,14 +89,6 @@ const OVERSEAS_NOTE: &str = "run from overseas; GhostSoap has not established th
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Command>,
-}
-
-/// The name the state file gives `value`, such as `refused-with-reasons`.
-fn named(value: impl serde::Serialize) -> String {
-    serde_json::to_value(value)
-        .ok()
-        .and_then(|v| v.as_str().map(str::to_owned))
-        .expect("a unit variant serialises as its name")
 }
 
 /// Run a parsed command line.
