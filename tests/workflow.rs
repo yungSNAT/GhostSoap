@@ -13,6 +13,8 @@ use std::process::Output;
 
 use common::{PASSPHRASE, emls, ghostsoap, ghostsoap_with, init, init_answers, text};
 
+// This lives in tests/workflow/: under tests/ itself it would be a test target of its own.
+#[path = "workflow/export_forget.rs"]
 mod export_forget;
 
 #[test]

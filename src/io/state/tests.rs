@@ -53,7 +53,7 @@ fn a_held_lock_stops_a_write() {
 }
 
 /// A state file written by `ghostsoap init` at M2 (main at 2286400, format 1).
-const M2_FILE: &[u8] = include_bytes!("../../tests/fixtures/state/format-1.age");
+const M2_FILE: &[u8] = include_bytes!("../../../tests/fixtures/state/format-1.age");
 const M2_PASSPHRASE: &str = "present day, present time";
 
 /// A data folder holding the M2 state file.
