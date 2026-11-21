@@ -7,7 +7,6 @@ authors:
 abstract: "GhostSoap at no Price: prepare Australian Privacy Act requests to data brokers, for you to send from your own mailbox."
 repository-code: "https://github.com/yungSNAT/GhostSoap"
 license: AGPL-3.0-or-later
-license-url: "https://github.com/yungSNAT/GhostSoap/blob/main/LICENSE"
 keywords:
   - australia
   - cli
