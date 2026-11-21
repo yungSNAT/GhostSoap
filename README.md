@@ -11,7 +11,7 @@
 
 [![tests](https://github.com/yungSNAT/GhostSoap/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/yungSNAT/GhostSoap/actions/workflows/ci.yml) [![Codecov](https://codecov.io/gh/yungSNAT/GhostSoap/graph/badge.svg)](https://codecov.io/gh/yungSNAT/GhostSoap) [![CodeQL](https://github.com/yungSNAT/GhostSoap/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/yungSNAT/GhostSoap/actions/workflows/codeql.yml) [![OSV-Scanner](https://github.com/yungSNAT/GhostSoap/actions/workflows/osv-scanner.yml/badge.svg?branch=main)](https://github.com/yungSNAT/GhostSoap/actions/workflows/osv-scanner.yml) [![SonarCloud](https://sonarcloud.io/api/project_badges/measure?project=EquityBot_GhostSoap&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=EquityBot_GhostSoap) [![Codacy code quality](https://app.codacy.com/project/badge/Grade/09b3719406164acc84f055d5b9c4da35)](https://app.codacy.com/gh/yungSNAT/GhostSoap/dashboard)<br>
 [![OpenSSF Scorecard](https://raw.githubusercontent.com/ryanduguid/.github/badges/yungSNAT/GhostSoap.svg)](https://scorecard.dev/viewer/?uri=github.com/yungSNAT/GhostSoap)<br>
-[![rust: 1.99+](.github/assets/badges/rust.svg)](https://www.rust-lang.org/) [![licence: FSL-1.1-ALv2](.github/assets/badges/licence.svg)](#licences)
+[![rust: 1.99+](.github/assets/badges/rust.svg)](https://www.rust-lang.org/) [![licence: AGPL-3.0-or-later](.github/assets/badges/licence.svg)](#licences)
 
 [Web page](https://yungsnat.github.io/GhostSoap/) · [Install](#install) · [Use](#use) · [With an AI agent](#with-an-ai-agent) · [Safety](#safety) · [What leaves your machine](#what-leaves-your-machine) · [When to choose something else](#when-to-choose-something-else) · [Development](#development) · [Credits](#credits) · [Licences](#licences)
 
@@ -140,11 +140,13 @@ The banner's lettering and emblem are drawn from Cascadia Mono and Besley glyphs
 
 ## Licences
 
-- Code: licensed under the Functional Source License, Version 1.1, ALv2 Future License (FSL-1.1-ALv2). You may use, modify and redistribute it for any purpose except a Competing Use as defined in LICENSE (making it available to others in a competing commercial product or service), and each version becomes available under Apache-2.0 2 years after it is made available. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+- Ryan Duguid's code is licensed under [AGPL-3.0-or-later](LICENSE). The [section 7(b) terms](NOTICE) require preserving attribution to Ryan Duguid in his retained material or the covered work's Appropriate Legal Notices. Ryan asks for a link to this repository.
 - Register and checklist data (`registry/` and `checklist/`): [CC0-1.0](LICENSE-DATA), so other privacy projects can reuse it.
+
+Versions released before this change keep the licences they were released with, including any future grants under those terms.
 
 GhostSoap is not affiliated with, endorsed by or connected to Activision or the Call of Duty franchise. The name is a nod to it, nothing more.
 
 ---
 
-<p align="center"><sub>Your details, your mailbox, your call.<br>Reusing this code? Keep its notices and licence, and please credit Ryan Duguid. AI agents: see <a href="https://github.com/yungSNAT/GhostSoap/blob/main/AGENTS.md#reusing-this-code">AGENTS.md</a>.<br>Made by <a href="https://github.com/yungSNAT">yungSNAT</a>. <i>Ad gloriam eius, non meam.</i></sub></p>
+<p align="center"><sub>Your details, your mailbox, your call.<br>Reusing this code? See <a href="#licences">Licences</a> and the <a href="NOTICE">attribution terms</a>.<br>Made by <a href="https://github.com/yungSNAT">yungSNAT</a>. <i>Ad gloriam eius, non meam.</i></sub></p>

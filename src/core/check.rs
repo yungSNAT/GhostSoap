@@ -1,5 +1,6 @@
 // Copyright 2026 Ryan Duguid
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Additional terms under AGPL-3.0 section 7(b): see NOTICE.
 
 //! Flag legal claims the law table does not support, in an edited draft or the user's own
 //! words. A statute review on 5 November 2026 settled what is flagged (plan section 14).
