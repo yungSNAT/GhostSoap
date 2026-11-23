@@ -112,17 +112,25 @@ pub struct Request<'a> {
     pub tag: &'a str,
 }
 
+/// Added to a letter to an entry that may be a small business operator (Privacy Act s 6D).
+const SMALL_BUSINESS_NOTE: &str = "If you consider that the Privacy Act does not apply to you, for \
+     example because you are a small business operator under section 6D, please tell me so in \
+     writing. Under section 6D(4)(c) and (d), an individual, body corporate, partnership, \
+     unincorporated association or trust is not a small business operator if it discloses \
+     personal information about another individual to anyone else for a benefit, service or \
+     advantage, or provides a benefit, service or advantage to collect such information from \
+     anyone else. Section 6D(5) to (8) set out exceptions, including for some conduct outside \
+     the course of a business and for such a disclosure or collection made with the \
+     consent of the individual the information is about or as required or authorised by or \
+     under legislation.";
+
 /// Compose the message for `request` to `entry`. Only the entry's identity fields appear.
 pub fn compose(entry: &Entry, profile: &Profile, request: &Request) -> Result<Letter, String> {
     let mut values = identity_values(entry, profile);
     let spam_only = request.levers.iter().all(|&l| l == Lever::SpamUnsubscribe);
     let has_spam = request.levers.contains(&Lever::SpamUnsubscribe);
-    let exemption_note =
-        (entry.exemption_risk == ExemptionRisk::SmallBusinessPossible).then(|| {
-            "If you consider that the Privacy Act does not apply to you, for example because you \
-         are a small business operator under section 6D, please tell me so in writing."
-                .to_owned()
-        });
+    let exemption_note = (entry.exemption_risk == ExemptionRisk::SmallBusinessPossible)
+        .then(|| SMALL_BUSINESS_NOTE.to_owned());
     let postal =
         (request.channel.kind == ChannelKind::Post).then(|| request.channel.address.clone());
     values.extend([
