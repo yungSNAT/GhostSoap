@@ -18,7 +18,12 @@ requests, and not for any other purpose.
 
 If you consider that the Privacy Act does not apply to you, for example
 because you are a small business operator under section 6D, please tell me
-so in writing.
+so in writing. Under section 6D(4)(c) and (d), a business is not a small
+business operator if it discloses personal information about another
+individual for a benefit, service or advantage, or provides a benefit,
+service or advantage to collect such information; doing either with that
+individual's consent, or as required or authorised by law, does not count
+(section 6D(7) and (8)).
 
 Stop sending me direct marketing (APP 7.6(c), 7.7(a))
 Please stop sending me direct marketing communications, by any channel. To
