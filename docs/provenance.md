@@ -332,7 +332,7 @@ Not added:
 - Swordfish: as on 19 November 2026; its home page mentions Australia only in a customer's job title.
 - AroundDeal: its policy and terms name AroundDeal Holdings Limited and its removal form asks for an email address and country of residence, but its only Australian page read is a list of 249 ISO country codes it supports for filtering, which does not state that it holds Australian contacts.
 
-Evidence: no `[[evidence]]` hash was taken for `acxiom-au`, so the monthly drift check does not track its pages yet.
+Evidence: `acxiom-au` records the hash of the Australian notice taken on 24 November 2026, so the monthly drift check flags a change to it.
 
 ### Rejected candidates (M1)
 

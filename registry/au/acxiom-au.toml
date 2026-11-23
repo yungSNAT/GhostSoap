@@ -18,3 +18,8 @@ levers = []
 
 [manual_check]
 url = "https://www.acxiom.com/privacy/australia-data-products-privacy-policy/"
+
+[[evidence]]
+url = "https://www.acxiom.com/privacy/australia-data-products-privacy-policy/"
+checked_at = 2026-11-24
+sha256 = "fa783458cb685e32dda0b3119fd48df1def67d599afda319db1faeb807795f70"
