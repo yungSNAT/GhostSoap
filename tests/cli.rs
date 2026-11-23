@@ -473,7 +473,11 @@ fn a_reader_that_stops_early_is_not_an_error() {
     // As `ghostsoap law | head -1` leaves it: the reading end is closed before the output.
     let (reader, writer) = std::io::pipe().expect("make a pipe");
     drop(reader);
-    for args in [&["law"][..], &["plan", "--pack", "start-here"]] {
+    for args in [
+        &["law"][..],
+        &["plan", "--pack", "start-here"],
+        &["completions", "bash"],
+    ] {
         let out = Command::new(env!("CARGO_BIN_EXE_ghostsoap"))
             .args(args)
             .stdout(writer.try_clone().expect("share the pipe"))
@@ -487,4 +491,26 @@ fn a_reader_that_stops_early_is_not_an_error() {
         );
         assert!(out.stderr.is_empty(), "{args:?}: {}", text(&out.stderr));
     }
+}
+
+#[test]
+fn completions_print_a_script_for_each_supported_shell() {
+    for shell in ["bash", "elvish", "fish", "powershell", "zsh"] {
+        let out = ghostsoap(&["completions", shell]);
+        assert_eq!(out.status.code(), Some(0), "{shell}: {}", text(&out.stderr));
+        assert!(out.stderr.is_empty(), "{shell}: {}", text(&out.stderr));
+        let stdout = text(&out.stdout);
+        assert!(stdout.contains("ghostsoap"), "{shell}: {stdout}");
+        assert!(stdout.contains("completions"), "{shell}: {stdout}");
+    }
+}
+
+#[test]
+fn completions_rejects_an_unknown_shell() {
+    let out = ghostsoap(&["completions", "tcsh"]);
+    assert_eq!(out.status.code(), Some(2));
+    assert!(out.stdout.is_empty());
+    let stderr = text(&out.stderr);
+    assert!(stderr.contains("tcsh"), "{stderr}");
+    assert!(stderr.contains("possible values"), "{stderr}");
 }

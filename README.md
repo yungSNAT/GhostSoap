@@ -58,6 +58,7 @@ ghostsoap export                                 # a plaintext copy of your prof
 ghostsoap forget                                 # delete your profile, records and drafts
 ghostsoap law                                    # each request's legal basis and deadline
 ghostsoap checklist --next                       # the next data hygiene step, with its official page
+ghostsoap completions bash                       # shell completions (bash, zsh, fish, powershell or elvish)
 ```
 
 `plan` and `draft` take `--pack` or `--entry` (repeatable). Without `--lever`, they ask each business to stop direct marketing, to stop passing your details to other marketers and to say where it got them (APP 7). Other requests are named with `--lever`. Requests that return your details or need your own words go to one business at a time, and those that need your own words take `--detail`, for example `ghostsoap draft --entry equifax-au --lever s20t-correction --detail "The default listed for 2024 is not mine."`. Each letter includes only the details that business needs. Overseas people-search sites, and services whose privacy policy names an overseas company with no ABN (Indeed, LinkedIn), get no letter: GhostSoap has not established that Australian privacy law reaches them (it can reach an overseas business that carries on business in Australia, under section 5B), so it names a page of their own to check (a people-search site's search page, or the privacy or help page for Indeed and LinkedIn) and their own opt-out or privacy request form instead.

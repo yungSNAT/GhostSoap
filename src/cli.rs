@@ -55,16 +55,28 @@ use drafting::*;
 use planning::*;
 use records::*;
 
-/// Write one line to standard output, ignoring only a reader that has gone.
-fn print_line(line: std::fmt::Arguments) {
+/// Write bytes to standard output, ignoring only a reader that has gone.
+fn write_stdout(bytes: &[u8]) {
     use std::io::Write;
-    if let Err(e) = writeln!(std::io::stdout().lock(), "{line}") {
+    if let Err(e) = std::io::stdout().lock().write_all(bytes) {
         assert_eq!(
             e.kind(),
             std::io::ErrorKind::BrokenPipe,
             "failed printing to stdout: {e}"
         );
     }
+}
+
+/// Write one line to standard output, ignoring only a reader that has gone.
+fn print_line(line: std::fmt::Arguments) {
+    write_stdout(format!("{line}\n").as_bytes());
+}
+
+/// Write a shell completion script to standard output.
+fn print_completions(shell: clap_complete::Shell) {
+    let mut script = Vec::new();
+    clap_complete::generate(shell, &mut Cli::command(), "ghostsoap", &mut script);
+    write_stdout(&script);
 }
 
 const LICENCE_NOTICE: &str = "Copyright 2026 Ryan Duguid. No warranty.\n\
@@ -148,6 +160,10 @@ pub fn run(cli: Cli) -> ExitCode {
         Some(Command::Registry {
             command: RegistryCommand::List { json },
         }) => list_register(json),
+        Some(Command::Completions { shell }) => {
+            print_completions(shell);
+            Ok(())
+        }
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
