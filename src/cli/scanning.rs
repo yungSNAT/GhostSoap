@@ -19,8 +19,10 @@ pub(super) fn scan(args: &ScanArgs) -> Result<(), String> {
     };
     let mut pages = Vec::new();
     for entry in plan::scan(&register, &selection)? {
-        match (&entry.obsolete, &entry.manual_check) {
-            (None, Some(check)) => {
+        // A retired entry's page is not offered, as `plan` offers it no step.
+        let current = entry.obsolete.is_none();
+        match entry.manual_check.as_ref().filter(|_| current) {
+            Some(check) => {
                 let route = if entry.is_overseas() {
                     "its own form only"
                 } else {
@@ -32,8 +34,7 @@ pub(super) fn scan(args: &ScanArgs) -> Result<(), String> {
                 );
                 pages.push(check.url.as_str());
             }
-            (Some(_), _) => println!("skip    {}: retired from the register", entry.id),
-            (None, None) => println!(
+            None => println!(
                 "skip    {}: the register has no page of its own to check",
                 entry.id
             ),
