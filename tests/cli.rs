@@ -402,6 +402,7 @@ fn plan_json_keeps_the_overseas_caveat_of_the_text_output() {
     let plan = json_of(&["plan", "--entry", "infotracer-au", "--json"]);
     let note = plan["steps"][0]["note"].as_str().expect("note");
     assert!(note.contains("has not established"));
+    assert!(note.contains("(Privacy Act section 5B(1A) and (3))"));
     let out = ghostsoap(&["plan", "--entry", "infotracer-au"]);
     assert!(text(&out.stdout).contains(note));
 }
