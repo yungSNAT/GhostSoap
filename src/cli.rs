@@ -48,12 +48,14 @@ mod cleanup;
 mod drafting;
 mod planning;
 mod records;
+mod scanning;
 
 pub use args::*;
 use cleanup::*;
 use drafting::*;
 use planning::*;
 use records::*;
+use scanning::*;
 
 /// Write bytes to standard output, ignoring only a reader that has gone.
 fn write_stdout(bytes: &[u8]) {
@@ -118,6 +120,7 @@ pub fn run(cli: Cli) -> ExitCode {
                 show_plan(&selection.selection())
             }
         }
+        Some(Command::Scan(args)) => scan(&args),
         Some(Command::Draft {
             selection,
             out,
