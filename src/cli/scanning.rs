@@ -80,3 +80,23 @@ fn open_page(url: &str) -> Result<(), String> {
         Err(e) => Err(format!("could not open {url}: {program}: {e}")),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::opener;
+
+    #[test]
+    fn each_platform_gets_the_url_as_one_argument_with_no_shell() {
+        let url = "https://example.com/policies?name=privacy&modal=select";
+        assert_eq!(
+            opener("windows", url),
+            (
+                "rundll32.exe",
+                vec!["url.dll,FileProtocolHandler".to_owned(), url.to_owned()]
+            )
+        );
+        assert_eq!(opener("macos", url), ("open", vec![url.to_owned()]));
+        assert_eq!(opener("linux", url), ("xdg-open", vec![url.to_owned()]));
+        assert_eq!(opener("freebsd", url), ("xdg-open", vec![url.to_owned()]));
+    }
+}

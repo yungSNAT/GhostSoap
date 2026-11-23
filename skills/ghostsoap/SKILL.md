@@ -16,6 +16,7 @@ ghostsoap plan --pack start-here --json   # the planned requests, to whom and wh
 ghostsoap plan --entry quantium-au --json # one business
 ghostsoap law --json                      # each request's legal basis, deadline and charge
 ghostsoap registry list --json            # the packs and businesses to choose from
+ghostsoap scan                            # people-search sites' own pages, for the person to search
 ghostsoap checklist --no-passphrase       # data hygiene steps beyond letters, with official pages
 ghostsoap checklist --next --no-passphrase # the first step in full
 ```

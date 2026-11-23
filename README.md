@@ -50,6 +50,7 @@ letter  equifax-marketing-au  by email to customercomplaintsAU@equifax.com
 ghostsoap init                                   # your details, encrypted under a passphrase
 ghostsoap plan --pack start-here                 # what would be sent, to whom and why
 ghostsoap draft --pack start-here                # write the letters to the drafts folder
+ghostsoap scan --open                            # open people-search sites' own pages to look yourself up
 ghostsoap sent GS-7K3QX                          # record a letter as sent, by the tag in its subject
 ghostsoap reply GS-7K3QX acknowledged            # record an answer
 ghostsoap status                                 # what to do next, overdue first, with dates
@@ -141,8 +142,6 @@ The banner's lettering and emblem are drawn from Cascadia Mono and Besley glyphs
 - Register and checklist data (`registry/` and `checklist/`): [CC0-1.0](LICENSE-DATA), so other privacy projects can reuse it.
 
 Versions released before this change keep the licences they were released with, including any future grants under those terms.
-
-GhostSoap is not affiliated with, endorsed by or connected to Activision or the Call of Duty franchise. The name is a nod to it, nothing more.
 
 ---
 
