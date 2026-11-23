@@ -311,6 +311,29 @@ Checked on 19 November 2026 from about 10:10 am to 10:20 am AEDT by an AI agent 
 | Mobilewalla | Privacy Center on mobilewalla.com | It names Mobilewalla Inc., processes mobile advertising IDs, location, IP addresses and hashed emails, offers opt-outs under United States state privacy laws, and offers access and deletion to United States consumers 'nationwide, regardless of their state of residence'. No page read mentions Australia, ABN Lookup has no match, and an overseas ad-tech firm fits none of the plan's overseas categories |
 | Swordfish | Home page, privacy policy, opt-out form, terms, CCPA notice, 'Our Data', FAQ and GDPR pages on swordfish.ai, readable this time | The policy names Swordfish AI Inc., a Delaware corporation, and its opt-out form asks for a country, but no page of its own states coverage in Australia ('Our Data' gives only worldwide counts, such as 3.5 billion data points), which the other business contact-data brokers' entries rest on. It can be added when one of its own pages shows Australian coverage |
 
+### Acxiom and other leads (24 November 2026)
+
+A comparable tool's broker list named PersonLookup, ReverseAustralia, Radaris Australia, AusiBiz, Acxiom, illion, FullContact, Swordfish, AroundDeal, Zeta and AnalyticsIQ as Australian or business data brokers; only the names were used. Each was checked on 24 November 2026 (AEDT) by an AI agent working for the maintainer, from public pages only: no name or email was searched, no form submitted and no account created. No person has re-checked them. Acxiom became an overseas entry in the marketing pack: GhostSoap shows its own request form and sends no letter.
+
+| Entry | Lead | Verified from | Entity and ABN Lookup, 24 November 2026 |
+|---|---|---|---|
+| `acxiom-au` | A comparable tool's broker list | Australia privacy notice (effective 1 July 2025) and privacy centre on www.acxiom.com, and the Consumer International Rights Portal it links to | The notice gives Acxiom LLC of Conway, Arkansas as the address for Australian privacy rights requests and complaints, and names no Australian entity. ABN Lookup's all-names search for 'Acxiom' gives 13 matches: ACXIOM AUSTRALIA PTY LIMITED is a trading name under 95 087 293 525, the ABN of LiveRamp Australia Pty Limited (`liveramp-au`), and IPG ACXIOM AUSTRALIA PTY LTD (43 070 075 035, active) is not named on any Acxiom page read, so the entry has no ABN |
+
+- `acxiom-au`: the notice 'applies to all of Acxiom's information products involving Australian data'. It says Acxiom collects consumer information including name, address and telephone number, enhances it with Australian census and other demographic data, and that its marketing products 'contain information about individuals and households in Australia'. It offers opt-out and access requests online through the Consumer International Rights Portal, by telephone, or in writing to Acxiom LLC, Consumer Care Advocate CWY0301-026, Attention: Australia – Privacy Rights Requests, P.O. Box 2000, Conway, AR 72033. The portal asks first for the country of residence and has a reCAPTCHA; it did not resolve in DNS from the checking machine and was read through a scraping service. The M1 rejection below predates this check, which found the Australian notice.
+
+Not added:
+
+- PersonLookup, Radaris Australia and ReverseAustralia: as on 8 November 2026 (above). ReverseAustralia's privacy page still returns an error page.
+- AusiBiz: an Australian business directory of 3.9 million listings whose records include a 'Primary Business Contact', some of them sole traders. Every page served only a bot check to a plain request, and a scraping service read the home page once but not its links, so its operator, privacy policy and removal route could not be read from its own pages.
+- illion: merged into Experian (`experian-au`).
+- FullContact: its privacy policy names J2 Martech Corp., a Ziff Davis company, describes rights under United States state laws and mentions no Australian coverage.
+- Zeta: its privacy policy says Zeta is headquartered in the United States, offers its rights to anyone and gives privacy@zetaglobal.com, but no page read mentions Australia; it is an ad-tech firm, which fits none of the plan's overseas categories.
+- AnalyticsIQ: its privacy policy, shared with Alliant Cooperative Data Solutions LLC, describes United States consumer data and rights under United States state laws, with no Australian coverage.
+- Swordfish: as on 19 November 2026; its home page mentions Australia only in a customer's job title.
+- AroundDeal: its policy and terms name AroundDeal Holdings Limited and its removal form asks for an email address and country of residence, but its only Australian page read is a list of 249 ISO country codes it supports for filtering, which does not state that it holds Australian contacts.
+
+Evidence: no `[[evidence]]` hash was taken for `acxiom-au`, so the monthly drift check does not track its pages yet.
+
 ### Rejected candidates (M1)
 
 | Candidate | Reason |
@@ -318,7 +341,7 @@ Checked on 19 November 2026 from about 10:10 am to 10:20 am AEDT by an AI agent 
 | illion | Merged into Experian; its site redirects there |
 | Tasmanian Collection Service | Not on the OAIC list of credit reporting bodies |
 | Oracle Advertising | Closed in 2024 |
-| Acxiom | No Australian entity; its former Australian companies are now LiveRamp |
+| Acxiom | No Australian entity; its former Australian companies are now LiveRamp. Added on 24 November 2026 as an overseas entry (above) |
 | Data Solutions Australia | The company named in its policy no longer holds an active ABN |
 | Eight Dragons Digital | Privacy policy unreadable (invalid TLS certificate) |
 | Reverse Australia | Privacy page returns a server error; no legal entity or ABN found |

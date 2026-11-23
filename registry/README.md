@@ -57,6 +57,7 @@ Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI
 | Entry | Name | Kinds | Packs | Route |
 |---|---|---|---|---|
 | `acceleon-au` | Acceleon | property-data, people-search, directory | `people-search`, `start-here` | letter |
+| `acxiom-au` | Acxiom | marketing-list | `marketing` | its own web form |
 | `adecco-au` | Adecco | recruitment | `recruitment` | letter |
 | `afterpay-au` | Afterpay | financial-services | `banks-and-lenders` | letter |
 | `allianz-au` | Allianz Australia | insurance | `insurers` | letter |
