@@ -128,6 +128,11 @@ pub enum Command {
         #[command(subcommand)]
         command: RegistryCommand,
     },
+    /// Generate shell completions for bash, elvish, fish, powershell or zsh.
+    Completions {
+        /// Shell to generate completions for.
+        shell: clap_complete::Shell,
+    },
 }
 
 /// Which entities and requests.
