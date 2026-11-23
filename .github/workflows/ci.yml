@@ -57,6 +57,9 @@ jobs:
       - run: cargo run --locked -p xtask -- no-network
       - if: matrix.os != 'ubuntu-latest'
         run: cargo test --locked --workspace
+      # scan --open's Windows opener, run against a page on 127.0.0.1; it opens the browser.
+      - if: matrix.os == 'windows-latest'
+        run: cargo test --locked --test opener_windows -- --ignored
       # GhostSoap makes no network connections (README), so the tests run in a network
       # namespace with only loopback (xtask's tests serve pages on 127.0.0.1): a connection
       # to any other host fails instead of going out. The runner's own user runs them, so

@@ -6,9 +6,10 @@
 
 use super::*;
 
-const SCAN_NOTE: &str = "Search each page for yourself. GhostSoap sends nothing to these sites, \
-                         fills in no form and records nothing; `ghostsoap plan` shows the \
-                         letters it would draft.";
+const SCAN_NOTE: &str = "Search each page for yourself. GhostSoap itself connects to none of \
+                         these sites, fills in no form and records nothing; `--open` hands \
+                         each page to your browser, which connects to it. `ghostsoap plan` \
+                         shows the letters it would draft.";
 
 pub(super) fn scan(args: &ScanArgs) -> Result<(), String> {
     let register = built_in_register()?;
@@ -72,6 +73,11 @@ pub(super) fn opener(os: &str, url: &str) -> (&'static str, Vec<String>) {
 }
 
 fn open_page(url: &str) -> Result<(), String> {
+    // The register check already requires https; this keeps any other scheme, or an
+    // argument an opener could read as an option, from reaching the opener.
+    if !url.starts_with("https://") || url.contains(char::is_whitespace) {
+        return Err(format!("could not open {url}: not an https:// URL"));
+    }
     let (program, args) = opener(std::env::consts::OS, url);
     match std::process::Command::new(program).args(&args).status() {
         Ok(status) if status.success() => Ok(()),
@@ -84,7 +90,22 @@ fn open_page(url: &str) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::opener;
+    use super::{open_page, opener};
+
+    #[test]
+    fn only_an_https_page_reaches_the_opener() {
+        for url in [
+            "file:///etc/passwd",
+            "mailto:privacy@example.com",
+            "-a",
+            "https://example.com/a b",
+        ] {
+            assert_eq!(
+                open_page(url),
+                Err(format!("could not open {url}: not an https:// URL"))
+            );
+        }
+    }
 
     #[test]
     fn each_platform_gets_the_url_as_one_argument_with_no_shell() {
