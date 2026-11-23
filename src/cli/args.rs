@@ -22,6 +22,13 @@ pub enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// List the pages where people-search sites and directories show what they hold, for you
+    /// to search yourself; --open opens them in your browser.
+    ///
+    /// Without --pack or --entry it lists every people-search site and directory in the
+    /// register that has such a page. GhostSoap sends nothing to these sites, fills in no form
+    /// and records nothing.
+    Scan(ScanArgs),
     /// Write the planned letters to the drafts folder for you to send yourself.
     ///
     /// Each letter is recorded in your encrypted state under the tag in its subject line.
@@ -241,6 +248,19 @@ pub struct MarkArgs {
     /// Read the passphrase from standard input instead of the terminal (for scripts).
     #[arg(long)]
     pub(super) passphrase_stdin: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct ScanArgs {
+    /// A pack of entities, such as `marketing`; repeat for more.
+    #[arg(long)]
+    pub(super) pack: Vec<String>,
+    /// One entity by id, such as `infotracer-au`; repeat for more.
+    #[arg(long)]
+    pub(super) entry: Vec<String>,
+    /// Open each page in your default browser.
+    #[arg(long)]
+    pub(super) open: bool,
 }
 
 #[derive(Debug, Args)]

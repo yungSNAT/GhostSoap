@@ -366,8 +366,10 @@ fn plan_needs_no_profile_and_shows_overseas_sites() {
         "    app7-no-marketing (APP 7.6(c), 7.7(a); a reasonable period, OAIC guide 30 days)"
     ));
     assert!(stdout.contains(
-        "manual  locate-family-au: run from overseas; GhostSoap has not established that \
-         Australian privacy law reaches it, so it drafts no letter. Search for yourself at"
+        "manual  locate-family-au: run from overseas; Australian privacy law can reach an \
+         overseas organisation that carries on business in Australia (Privacy Act section \
+         5B(1A) and (3)), but GhostSoap has not established that it reaches this one, so it \
+         drafts no letter. Search for yourself at"
     ));
     assert!(!tmp.path().join("state.age").exists());
 }
@@ -378,8 +380,10 @@ fn overseas_services_get_a_manual_step_without_a_search() {
     let out = ghostsoap(tmp.path(), &["plan", "--pack", "recruitment"], "");
     assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
     assert!(text(&out.stdout).contains(
-        "manual  linkedin-au: run from overseas; GhostSoap has not established that Australian \
-         privacy law reaches it, so it drafts no letter. See \
+        "manual  linkedin-au: run from overseas; Australian privacy law can reach an overseas \
+         organisation that carries on business in Australia (Privacy Act section 5B(1A) and \
+         (3)), but GhostSoap has not established that it reaches this one, so it drafts no \
+         letter. See \
          https://www.linkedin.com/help/linkedin/answer/63, then use its own opt-out or privacy \
          request form at https://www.linkedin.com/help/linkedin/ask/TSO-DPO"
     ));

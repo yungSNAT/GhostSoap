@@ -48,12 +48,14 @@ mod cleanup;
 mod drafting;
 mod planning;
 mod records;
+mod scanning;
 
 pub use args::*;
 use cleanup::*;
 use drafting::*;
 use planning::*;
 use records::*;
+use scanning::*;
 
 /// Write bytes to standard output, ignoring only a reader that has gone.
 fn write_stdout(bytes: &[u8]) {
@@ -91,8 +93,10 @@ const CHECK_LIMITS: &str = "This check matches words. It flags a sentence that h
                             wording wherever it appears, even where that row does not apply to \
                             the business you are writing to. It looks for nothing else, so no \
                             flag does not mean the text is accurate, complete or legally sound.";
-const OVERSEAS_NOTE: &str = "run from overseas; GhostSoap has not established that Australian \
-                             privacy law reaches it, so it drafts no letter.";
+const OVERSEAS_NOTE: &str = "run from overseas; Australian privacy law can reach an overseas \
+                             organisation that carries on business in Australia (Privacy Act \
+                             section 5B(1A) and (3)), but GhostSoap has not established that it \
+                             reaches this one, so it drafts no letter.";
 
 /// Prepare Australian Privacy Act requests to data brokers and track the replies.
 #[derive(Debug, Parser)]
@@ -116,6 +120,7 @@ pub fn run(cli: Cli) -> ExitCode {
                 show_plan(&selection.selection())
             }
         }
+        Some(Command::Scan(args)) => scan(&args),
         Some(Command::Draft {
             selection,
             out,

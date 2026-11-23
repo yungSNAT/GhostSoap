@@ -7,7 +7,7 @@
 use std::collections::BTreeSet;
 
 use crate::core::letters::takes_detail;
-use crate::core::register::{Channel, ChannelKind, Entry, Lever, Register};
+use crate::core::register::{Channel, ChannelKind, Entry, Kind, Lever, Register};
 
 /// Levers sent when the user names none: they return no personal information and need
 /// nothing from the user beyond identity. `app11-destroy` is not one: only the user knows
@@ -106,6 +106,22 @@ fn check_detail(selection: &Selection) -> Result<(), String> {
         }
         _ => Ok(()),
     }
+}
+
+/// The entries `scan` lists: those selected, or without a selection every current
+/// people-search site and directory with a page of its own to check.
+pub fn scan<'a>(register: &'a Register, selection: &Selection) -> Result<Vec<&'a Entry>, String> {
+    if selection.packs.is_empty() && selection.entries.is_empty() {
+        let searchable = |e: &&Entry| {
+            e.obsolete.is_none()
+                && e.manual_check.is_some()
+                && e.kinds
+                    .iter()
+                    .any(|k| matches!(k, Kind::PeopleSearch | Kind::Directory))
+        };
+        return Ok(register.entries.values().filter(searchable).collect());
+    }
+    resolve(register, selection)
 }
 
 fn resolve<'a>(register: &'a Register, selection: &Selection) -> Result<Vec<&'a Entry>, String> {
