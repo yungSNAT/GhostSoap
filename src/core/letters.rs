@@ -119,8 +119,8 @@ const SMALL_BUSINESS_NOTE: &str = "If you consider that the Privacy Act does not
      unincorporated association or trust is not a small business operator if it discloses \
      personal information about another individual to anyone else for a benefit, service or \
      advantage, or provides a benefit, service or advantage to collect such information from \
-     anyone else. Section 6D(5) to (8) make exceptions, including for conduct outside the \
-     course of a business and for disclosure or collection with the individual's consent or \
+     anyone else. Section 6D(5) to (8) set out exceptions, including for some conduct outside \
+     the course of a business and for disclosure or collection with the individual's consent or \
      as required or authorised by or under legislation.";
 
 /// Compose the message for `request` to `entry`. Only the entry's identity fields appear.
