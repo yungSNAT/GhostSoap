@@ -397,6 +397,11 @@ fn marketing_pack_shows_the_contact_data_brokers_own_forms() {
     let stdout = text(&out.stdout);
     for (id, page, form) in [
         (
+            "acxiom-au",
+            "https://www.acxiom.com/privacy/australia-data-products-privacy-policy/",
+            "https://enterpriseot-privacy.my.onetrust.com/webform/c0a325be-6f68-46be-a0de-e4a750890f7d/237d294b-49ff-4d3c-a728-f4839c8d081b",
+        ),
+        (
             "contactout-au",
             "https://contactout.com/privacy_data_subjects",
             "https://contactout.com/optout",

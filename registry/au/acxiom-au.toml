@@ -1,0 +1,25 @@
+id = "acxiom-au"
+name = "Acxiom"
+legal_entity = "Acxiom LLC"
+kinds = ["marketing-list"]
+priority = "standard"
+quality = "verified"
+verified_at = 2026-11-24
+sources = ["https://www.acxiom.com/privacy/australia-data-products-privacy-policy/", "https://www.acxiom.com/privacy/international/", "https://enterpriseot-privacy.my.onetrust.com/webform/c0a325be-6f68-46be-a0de-e4a750890f7d/237d294b-49ff-4d3c-a728-f4839c8d081b"]
+identity_fields = ["full_name", "address"]
+exemption_risk = "overseas"
+escalation = []
+effort = "medium"
+
+[[channels]]
+kind = "web-form"
+address = "https://enterpriseot-privacy.my.onetrust.com/webform/c0a325be-6f68-46be-a0de-e4a750890f7d/237d294b-49ff-4d3c-a728-f4839c8d081b"
+levers = []
+
+[manual_check]
+url = "https://www.acxiom.com/privacy/australia-data-products-privacy-policy/"
+
+[[evidence]]
+url = "https://www.acxiom.com/privacy/australia-data-products-privacy-policy/"
+checked_at = 2026-11-24
+sha256 = "fa783458cb685e32dda0b3119fd48df1def67d599afda319db1faeb807795f70"
