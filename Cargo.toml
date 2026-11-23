@@ -8,7 +8,18 @@ edition = "2024"
 rust-version = "1.99"
 description = "Prepare Australian Privacy Act requests to data brokers and track the replies"
 license = "AGPL-3.0-or-later"
+repository = "https://github.com/yungSNAT/GhostSoap"
 publish = false
+
+# `cargo binstall ghostsoap` installs the release archive's binary instead of building it.
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/ghostsoap-{ version }-{ target }.tar.gz"
+bin-dir = "{ bin }{ binary-ext }"
+pkg-fmt = "tgz"
+
+[package.metadata.binstall.overrides.'cfg(target_os = "windows")']
+pkg-url = "{ repo }/releases/download/v{ version }/ghostsoap-{ version }-{ target }.zip"
+pkg-fmt = "zip"
 
 [dependencies]
 age = "0.12.1"
@@ -29,6 +40,12 @@ too_many_lines = "warn"
 [profile.release]
 lto = true
 codegen-units = 1
+strip = true
+
+# musl's default allocator is slower on allocation-heavy JSON and TOML
+# workloads; use mimalloc on musl targets only, without transparent huge pages.
+[target.'cfg(target_env = "musl")'.dependencies]
+mimalloc = { version = "0.1", features = ["no_thp"] }
 
 [dev-dependencies]
 tempfile = "3.27.0"

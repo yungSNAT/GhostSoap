@@ -7,6 +7,10 @@ use std::process::ExitCode;
 use clap::Parser;
 use ghostsoap::Cli;
 
+#[cfg(target_env = "musl")]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 fn main() -> ExitCode {
     ghostsoap::cli::run(Cli::parse())
 }

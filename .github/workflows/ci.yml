@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  schedule:
+    # Weekly, Sundays 21:17 UTC. The Cargo dependency audit also denies unmaintained crates on this run.
+    - cron: "17 21 * * 0"
 
 # On a pull request, a newer push cancels the older run. Every other run is keyed on
 # its commit, so a later push to main cannot replace a pending run of an earlier one.
@@ -18,6 +21,7 @@ permissions:
 
 jobs:
   rust:
+    if: github.event_name != 'schedule'
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -141,4 +145,6 @@ jobs:
         with:
           tool: cargo-audit@0.22.2
           fallback: none
-      - run: cargo audit --deny warnings
+      # A vulnerability, unsound or yanked crate fails every run; an unmaintained crate
+      # fails only the weekly scheduled run.
+      - run: cargo audit ${{ github.event_name == 'schedule' && '--deny warnings' || '--deny unsound --deny yanked' }}
