@@ -4,11 +4,12 @@ why = "If you hold or held an Australian business number (ABN), for example as a
 steps = [
   "Search ABN Lookup for your own name and read what each of your ABN records shows.",
   "To remove only a trading name from ABN Lookup, ask the ATO to end-date it; this needs no non-disclosure request.",
-  "Where publishing your details may be a risk to the personal safety of you or anyone associated with the business, or other exceptional circumstances exist, apply to the Australian Business Register for non-disclosure with the cover sheet Request for non-disclosure of ABN details (NAT 75641) and evidence such as a statutory declaration, a court order or a police report. The outcome usually comes by letter within 20 business days.",
-  "If a registered business name shows personal details, ask ASIC separately to suppress them on the business names register; it does so only where there is a risk to someone's personal safety or other exceptional circumstances, and asks for evidence.",
+  "To withhold only a former name, ask the Australian Business Register to withhold your historical name records from ABN Lookup and data.gov.au, with a statutory declaration.",
+  "Where publishing your details may be a risk to the personal safety of you or anyone associated with the business, or other exceptional circumstances exist, apply to the Australian Business Register for non-disclosure with the cover sheet Request for non-disclosure of ABN details (NAT 75641), a summary of your reasons and, where you have it, evidence such as a statutory declaration, a court order, a police report, or proof of silent elector status or a silent number. The outcome usually comes by letter within 20 business days.",
+  "If you hold a registered business name, ASIC can hide the holder's name, principal place of business address and ABN on the business names register, but never the business name itself or the service of documents address; it does so only where there is a risk to someone's personal safety or other exceptional circumstances, and asks for evidence.",
 ]
 applies = "Anyone who holds or held an ABN, especially as a sole trader"
-effort = "minutes"
+effort = "an-hour"
 recheck_months = 12
 
 [[links]]
