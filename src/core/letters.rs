@@ -121,7 +121,8 @@ const SMALL_BUSINESS_NOTE: &str = "If you consider that the Privacy Act does not
      advantage, or provides a benefit, service or advantage to collect such information from \
      anyone else. Section 6D(5) to (8) set out exceptions, including for some conduct outside \
      the course of a business and for such a disclosure or collection made with the \
-     individual's consent or as required or authorised by or under legislation.";
+     consent of the individual the information is about or as required or authorised by or \
+     under legislation.";
 
 /// Compose the message for `request` to `entry`. Only the entry's identity fields appear.
 pub fn compose(entry: &Entry, profile: &Profile, request: &Request) -> Result<Letter, String> {
