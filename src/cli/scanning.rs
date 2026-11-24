@@ -139,9 +139,13 @@ mod tests {
     #[test]
     fn each_platform_gets_the_url_as_one_argument_with_no_shell() {
         let url = "https://example.com/policies?name=privacy&modal=select";
-        let dir = std::env::temp_dir();
+        let dir = Path::new(if cfg!(windows) {
+            r"C:\Windows\System32"
+        } else {
+            "/sys32"
+        });
         assert_eq!(
-            opener("windows", url, Some(&dir)),
+            opener("windows", url, Some(dir)),
             Ok((
                 dir.join("rundll32.exe"),
                 vec!["url.dll,FileProtocolHandler".to_owned(), url.to_owned()]
