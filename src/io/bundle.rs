@@ -77,6 +77,18 @@ struct EscalationRecord<'a> {
     audit: Vec<&'a AuditEntry>,
 }
 
+fn create_private_dir(dir: &Path) -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        fs::DirBuilder::new().mode(0o700).create(dir)
+    }
+    #[cfg(not(unix))]
+    {
+        fs::DirBuilder::new().create(dir)
+    }
+}
+
 /// Write a self-contained OAIC escalation bundle for `tag` in a new directory `dir`,
 /// including `summary.txt`, `record.toml` and `manifest.sha256`.
 pub fn write_escalation_bundle(
@@ -106,10 +118,7 @@ pub fn write_escalation_bundle(
             .collect(),
     };
     let record_text = toml::to_string(&record).map_err(io::Error::other)?;
-    let mut builder = fs::DirBuilder::new();
-    #[cfg(unix)]
-    std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
-    builder.create(dir).map_err(|e| match e.kind() {
+    create_private_dir(dir).map_err(|e| match e.kind() {
         io::ErrorKind::AlreadyExists => io::Error::new(
             e.kind(),
             format!("{} already exists; nothing was exported", dir.display()),
