@@ -1,0 +1,27 @@
+rank = 35
+title = "If your identity is stolen"
+why = "Identity theft is when someone steals your personal information and pretends to be you, for example to receive payments, make purchases or travel overseas. The Australian Cyber Security Centre (ACSC) says acting quickly can help reduce the impact."
+steps = [
+  "Check your bank, credit card and financial accounts for transactions you don't recognise, and contact your bank immediately if you notice suspicious activity so it can block, freeze or investigate it.",
+  "Contact IDCARE, Australia and New Zealand's national identity and cyber support service, through its Get Help form or its individual helpline, 1800 595 160. An identity and cyber security case manager can help you create a response plan for your situation and support you through the process.",
+  "Report the identity theft to the ACSC through ReportCyber. Its Australian Cyber Security Hotline, 1300 CYBER1 (1300 292 371), is open 24 hours a day, 7 days a week.",
+  "Ask for a free credit report and dispute anything you don't recognise; if concerned, ban your credit report. See the credit report and credit ban items.",
+  "The ACSC page lists where else to report: Scamwatch if an online scam caused the theft, the Australian Taxation Office if it involves your tax file number or other tax details, and ASIC for financial fraud such as superannuation or crypto scams.",
+]
+applies = "Only if someone has stolen your identity, or you see signs of it, such as transactions you don't recognise, missing identity documents, mail that stops arriving or debt collectors contacting you about loans you didn't take out"
+effort = "longer"
+
+[[links]]
+name = "ACSC: Recover from identity theft"
+url = "https://www.cyber.gov.au/guidance/recover-from-identity-theft"
+checked = 2026-11-24
+
+[[links]]
+name = "IDCARE: Get help"
+url = "https://www.idcare.org/get_help/help_main"
+checked = 2026-11-24
+
+[[links]]
+name = "ReportCyber: Report as an individual"
+url = "https://reportapp.cyber.gov.au/person"
+checked = 2026-11-24
