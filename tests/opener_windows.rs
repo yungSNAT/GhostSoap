@@ -24,8 +24,9 @@ fn the_windows_opener_hands_a_page_to_the_default_browser() {
     thread::spawn(move || {
         let _ = sender.send(listener.accept().is_ok());
     });
-    let system_root = std::env::var("SystemRoot").expect("SystemRoot is set on Windows");
-    let status = Command::new(format!(r"{system_root}\System32\rundll32.exe"))
+    let system_dir = known_folders::get_known_folder_path(known_folders::KnownFolder::System)
+        .expect("the system directory is known on Windows");
+    let status = Command::new(system_dir.join("rundll32.exe"))
         .args(["url.dll,FileProtocolHandler", &url])
         .status()
         .expect("run rundll32.exe");
