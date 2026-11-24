@@ -443,6 +443,25 @@ fn forget_cleans_default_escalation_bundle_and_keeps_unrelated_files() {
     assert!(forgot_out.contains("kept    extra-note.txt"));
     assert!(bundle_dir.join("extra-note.txt").is_file());
     assert!(!bundle_dir.join("record.toml").exists());
+
+    // A default escalation bundle dated on the 20th with a GS-20... tag is also forgotten cleanly.
+    let day20 = home.join("ghostsoap-escalation-GS-20ABC-2026-11-20");
+    fs::create_dir(&day20).unwrap();
+    fs::write(
+        day20.join("manifest.sha256"),
+        "# GhostSoap SHA-256 manifest of 2026-11-20\n",
+    )
+    .unwrap();
+    fs::write(day20.join("summary.txt"), "s").unwrap();
+    fs::write(day20.join("record.toml"), "r").unwrap();
+    let forgot20 = ghostsoap(&home, &["forget", "--no-passphrase", "--yes"], "");
+    assert_eq!(
+        forgot20.status.code(),
+        Some(0),
+        "{}",
+        text(&forgot20.stderr)
+    );
+    assert!(!day20.exists());
 }
 
 #[test]

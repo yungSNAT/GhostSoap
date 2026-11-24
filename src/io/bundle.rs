@@ -25,6 +25,13 @@ const BUNDLE_FILES: [&str; 3] = ["record.toml", "summary.txt", "manifest.sha256"
 const AUDIT_EXCERPT_NOTE: &str = "Tag-filtered excerpt from the global audit chain; integrity \
     is verified via manifest.sha256 rather than as a standalone chain.";
 
+#[cfg(all(target_os = "linux", any(target_arch = "x86_64", target_arch = "x86")))]
+const UNIX_NOFOLLOW_NONBLOCK: i32 = 0x20000 | 0x800; // O_NOFOLLOW | O_NONBLOCK
+#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+const UNIX_NOFOLLOW_NONBLOCK: i32 = 0x8000 | 0x800; // O_NOFOLLOW | O_NONBLOCK
+#[cfg(target_os = "macos")]
+const UNIX_NOFOLLOW_NONBLOCK: i32 = 0x0100 | 0x0004; // O_NOFOLLOW | O_NONBLOCK
+
 /// Companion manifest path for an export file (`<path>.sha256`).
 pub fn manifest_path(path: &Path) -> PathBuf {
     let mut name = OsString::from(path.as_os_str());
@@ -52,22 +59,21 @@ pub fn validate_export_basename(path: &Path) -> io::Result<String> {
     Ok(name.to_owned())
 }
 
-/// Open and read a regular file fail-closed without following symlinks or blocking on FIFOs.
-pub(crate) fn read_regular_file(path: &Path) -> io::Result<Vec<u8>> {
-    #[cfg(not(unix))]
-    if !fs::symlink_metadata(path)?.is_file() {
-        return Err(io::Error::other("not a regular file"));
-    }
+#[cfg(all(
+    unix,
+    any(
+        all(
+            target_os = "linux",
+            any(target_arch = "x86_64", target_arch = "x86", target_arch = "aarch64")
+        ),
+        target_os = "macos"
+    )
+))]
+fn open_regular_file(path: &Path) -> io::Result<fs::File> {
     let mut options = OpenOptions::new();
     options.read(true);
-    // O_NOFOLLOW | O_NONBLOCK: reject symlinks atomically and never hang on FIFOs.
-    #[cfg(all(target_os = "linux", any(target_arch = "x86_64", target_arch = "x86")))]
-    std::os::unix::fs::OpenOptionsExt::custom_flags(&mut options, 0x20000 | 0x800);
-    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
-    std::os::unix::fs::OpenOptionsExt::custom_flags(&mut options, 0x10000 | 0x800);
-    #[cfg(target_os = "macos")]
-    std::os::unix::fs::OpenOptionsExt::custom_flags(&mut options, 0x0100 | 0x0004);
-    let mut file = options.open(path).map_err(|e| {
+    std::os::unix::fs::OpenOptionsExt::custom_flags(&mut options, UNIX_NOFOLLOW_NONBLOCK);
+    let file = options.open(path).map_err(|e| {
         if e.raw_os_error()
             .is_some_and(|code| code == 40 || code == 62)
         {
@@ -79,9 +85,84 @@ pub(crate) fn read_regular_file(path: &Path) -> io::Result<Vec<u8>> {
     if !file.metadata()?.is_file() {
         return Err(io::Error::other("not a regular file"));
     }
+    Ok(file)
+}
+
+#[cfg(all(
+    unix,
+    not(any(
+        all(
+            target_os = "linux",
+            any(target_arch = "x86_64", target_arch = "x86", target_arch = "aarch64")
+        ),
+        target_os = "macos"
+    ))
+))]
+fn open_regular_file(_path: &Path) -> io::Result<fs::File> {
+    Err(io::Error::other(
+        "unsupported Unix target for safe O_NOFOLLOW file open",
+    ))
+}
+
+#[cfg(windows)]
+fn open_regular_file(path: &Path) -> io::Result<fs::File> {
+    use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
+    const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
+    let file = OpenOptions::new()
+        .read(true)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
+        .open(path)
+        .map_err(|e| {
+            if fs::symlink_metadata(path).is_ok_and(|meta| !meta.is_file()) {
+                io::Error::other("not a regular file")
+            } else {
+                e
+            }
+        })?;
+    let meta = file.metadata()?;
+    if meta.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 || !meta.is_file() {
+        return Err(io::Error::other("not a regular file"));
+    }
+    Ok(file)
+}
+
+/// Open and read a regular file fail-closed without following symlinks or blocking on FIFOs.
+pub(crate) fn read_regular_file(path: &Path) -> io::Result<Vec<u8>> {
+    let mut file = open_regular_file(path)?;
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes)?;
     Ok(bytes)
+}
+
+/// Create a new file (never replacing an existing file or link) and write to it via `write`.
+/// On error, returns `(error, created)` where `created` is true iff `create_new` created `path`.
+fn create_new_file_with(
+    path: &Path,
+    private: bool,
+    write: impl FnOnce(&mut fs::File) -> io::Result<()>,
+) -> Result<(), (io::Error, bool)> {
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    if private {
+        std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+    }
+    #[cfg(not(unix))]
+    let _ = private;
+    let mut file = options.open(path).map_err(|e| {
+        let mapped = match e.kind() {
+            io::ErrorKind::AlreadyExists => io::Error::new(
+                e.kind(),
+                format!("{} already exists; nothing was written", path.display()),
+            ),
+            _ => e,
+        };
+        (mapped, false)
+    })?;
+    let written = write(&mut file);
+    drop(file);
+    written.map_err(|e| (e, true))
 }
 
 /// Write bytes to a new file (never replacing an existing file or link), setting mode 600
@@ -97,25 +178,11 @@ fn write_new_file_with(
     private: bool,
     write: impl FnOnce(&mut fs::File) -> io::Result<()>,
 ) -> io::Result<()> {
-    let mut options = OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    if private {
-        std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
-    }
-    #[cfg(not(unix))]
-    let _ = private;
-    let mut file = options.open(path).map_err(|e| match e.kind() {
-        io::ErrorKind::AlreadyExists => io::Error::new(
-            e.kind(),
-            format!("{} already exists; nothing was written", path.display()),
-        ),
-        _ => e,
-    })?;
-    let written = write(&mut file);
-    drop(file);
-    written.inspect_err(|_| {
-        let _ = fs::remove_file(path);
+    create_new_file_with(path, private, write).map_err(|(err, created)| {
+        if created {
+            let _ = fs::remove_file(path);
+        }
+        err
     })
 }
 
@@ -191,7 +258,9 @@ pub fn write_escalation_bundle(
     today: Date,
 ) -> io::Result<BundleReceipt> {
     write_escalation_bundle_with(dir, state, tag, entry, today, |path, bytes| {
-        write_new_file(path, bytes, true)
+        create_new_file_with(path, true, |file| {
+            file.write_all(bytes).and_then(|()| file.sync_all())
+        })
     })
 }
 
@@ -241,7 +310,7 @@ fn write_escalation_bundle_with(
     tag: &str,
     entry: Option<&Entry>,
     today: Date,
-    mut write_file: impl FnMut(&Path, &[u8]) -> io::Result<()>,
+    mut write_file: impl FnMut(&Path, &[u8]) -> Result<(), (io::Error, bool)>,
 ) -> io::Result<BundleReceipt> {
     let (audit_summary, record_text, summary_text, manifest_text) =
         prepare_bundle_texts(state, tag, entry, today)?;
@@ -259,10 +328,15 @@ fn write_escalation_bundle_with(
     ];
     let mut created = Vec::new();
     for (path, bytes) in items {
-        if let Err(err) = write_file(&path, bytes) {
-            return Err(rollback_bundle(dir, &created, err));
+        match write_file(&path, bytes) {
+            Ok(()) => created.push(path),
+            Err((err, was_created)) => {
+                if was_created {
+                    created.push(path);
+                }
+                return Err(rollback_bundle(dir, &created, err));
+            }
         }
-        created.push(path);
     }
     Ok(BundleReceipt {
         dir: dir.to_owned(),
@@ -272,17 +346,25 @@ fn write_escalation_bundle_with(
     })
 }
 
+/// Split `ghostsoap-escalation-<TAG>-YYYY-MM-DD` on its fixed 11-byte `-YYYY-MM-DD` suffix.
+fn split_escalation_dir_name(name: &str) -> Option<(&str, &str)> {
+    let rest = name.strip_prefix("ghostsoap-escalation-")?;
+    if rest.len() <= 11 {
+        return None;
+    }
+    let split_at = rest.len() - 11;
+    if !rest.is_char_boundary(split_at) || rest.as_bytes()[split_at] != b'-' {
+        return None;
+    }
+    let tag = &rest[..split_at];
+    let date = &rest[split_at + 1..];
+    (letters::is_tag(tag) && Date::strptime("%Y-%m-%d", date).is_ok()).then_some((tag, date))
+}
+
 /// Whether `path` is a default-named GhostSoap escalation bundle folder inside the data dir.
 pub fn is_escalation_bundle_dir(path: &Path) -> bool {
     let name = path.file_name().unwrap_or_default().to_string_lossy();
-    let Some(rest) = name.strip_prefix("ghostsoap-escalation-") else {
-        return false;
-    };
-    let Some((tag, date)) = rest.rsplit_once("-20") else {
-        return false;
-    };
-    let date = format!("20{date}");
-    if !letters::is_tag(tag) || Date::strptime("%Y-%m-%d", &date).is_err() {
+    if split_escalation_dir_name(&name).is_none() {
         return false;
     }
     if !fs::symlink_metadata(path).is_ok_and(|meta| meta.is_dir()) {

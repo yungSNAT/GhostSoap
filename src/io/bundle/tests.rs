@@ -134,6 +134,7 @@ fn escalation_bundle_emits_audit_excerpt_for_interleaved_tags() {
 fn escalation_bundle_rolls_back_cleanly_and_reports_leftovers() {
     let tmp = tempfile::tempdir().unwrap();
     let state = sample_state();
+    // Failure after create_new succeeded (was_created = true) removes the failing member too.
     let fail_clean = tmp.path().join("fail-clean");
     let mut calls = 0usize;
     let err = write_escalation_bundle_with(
@@ -145,9 +146,9 @@ fn escalation_bundle_rolls_back_cleanly_and_reports_leftovers() {
         |p, b| {
             calls += 1;
             if calls == 2 {
-                Err(io::Error::other("simulated disk full"))
+                create_new_file_with(p, true, |_| Err(io::Error::other("simulated disk full")))
             } else {
-                write_new_file(p, b, true)
+                create_new_file_with(p, true, |f| f.write_all(b))
             }
         },
     )
@@ -155,6 +156,8 @@ fn escalation_bundle_rolls_back_cleanly_and_reports_leftovers() {
     assert!(err.to_string().contains("was deleted"), "{err}");
     assert!(!fail_clean.exists());
 
+    // Failure where create_new did not create the 2nd member (was_created = false) still rolls
+    // back the 1st member and reports leftovers if removal fails.
     let fail_leftover = tmp.path().join("fail-leftover");
     let mut step = 0usize;
     let err = write_escalation_bundle_with(
@@ -166,12 +169,12 @@ fn escalation_bundle_rolls_back_cleanly_and_reports_leftovers() {
         |p, b| {
             step += 1;
             if step == 1 {
-                write_new_file(p, b, true)?;
-                fs::remove_file(p)?;
-                fs::write(fail_leftover.join("stray.txt"), "x")?;
+                create_new_file_with(p, true, |f| f.write_all(b))?;
+                fs::remove_file(p).unwrap();
+                fs::write(fail_leftover.join("stray.txt"), "x").unwrap();
                 Ok(())
             } else {
-                Err(io::Error::other("disk full"))
+                Err((io::Error::other("create failed"), false))
             }
         },
     )
@@ -444,4 +447,44 @@ fn write_failure_removes_partial_file_and_missing_parent_bundle_errors() {
             .iter()
             .any(|problem| problem.contains("audit chain is invalid"))
     );
+}
+
+#[test]
+fn escalation_dir_matcher_handles_day_20_and_gs20_tags() {
+    assert_eq!(
+        split_escalation_dir_name("ghostsoap-escalation-GS-TEST1-2026-11-19"),
+        Some(("GS-TEST1", "2026-11-19"))
+    );
+    assert_eq!(
+        split_escalation_dir_name("ghostsoap-escalation-GS-TEST1-2026-11-20"),
+        Some(("GS-TEST1", "2026-11-20"))
+    );
+    assert_eq!(
+        split_escalation_dir_name("ghostsoap-escalation-GS-TEST1-2026-11-21"),
+        Some(("GS-TEST1", "2026-11-21"))
+    );
+    assert_eq!(
+        split_escalation_dir_name("ghostsoap-escalation-GS-20ABC-2026-11-20"),
+        Some(("GS-20ABC", "2026-11-20"))
+    );
+    assert_eq!(
+        split_escalation_dir_name("ghostsoap-escalation-short"),
+        None
+    );
+    assert_eq!(
+        split_escalation_dir_name("ghostsoap-escalation-GS-TEST1_2026-11-20"),
+        None
+    );
+
+    let tmp = tempfile::tempdir().unwrap();
+    let mut state = sample_state();
+    state.messages[0].tag = "GS-20ABC".to_owned();
+    let on_20th = tmp.path().join("ghostsoap-escalation-GS-20ABC-2026-11-20");
+    write_escalation_bundle(&on_20th, &state, "GS-20ABC", None, date(2026, 11, 20)).unwrap();
+    assert_eq!(
+        own_escalation_bundles(tmp.path()).unwrap(),
+        vec![on_20th.clone()]
+    );
+    clean_escalation_bundle(&on_20th).unwrap();
+    assert!(!on_20th.exists());
 }

@@ -54,7 +54,8 @@ fn collect_planned<'a>(steps: &'a [Step<'a>], raw_eml: bool) -> Result<Vec<Plann
     }
     if raw_eml && planned.len() > 1 {
         return Err(
-            "`draft --format eml --copy` outputs one raw .eml message at a time; select a              single entry and channel"
+            "`draft --format eml --copy` outputs one raw .eml message at a time; select a \
+             single entry and channel"
                 .to_owned(),
         );
     }
