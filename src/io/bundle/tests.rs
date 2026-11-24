@@ -488,3 +488,23 @@ fn escalation_dir_matcher_handles_day_20_and_gs20_tags() {
     clean_escalation_bundle(&on_20th).unwrap();
     assert!(!on_20th.exists());
 }
+
+#[test]
+fn own_escalation_bundles_propagates_unsupported_and_skips_missing_manifest() {
+    let tmp = tempfile::tempdir().unwrap();
+    let candidate = tmp.path().join("ghostsoap-escalation-GS-TEST1-2026-11-24");
+    fs::create_dir(&candidate).unwrap();
+
+    // Missing manifest inside a matching directory name is ignored cleanly.
+    assert!(own_escalation_bundles(tmp.path()).unwrap().is_empty());
+
+    // Unsupported platform open error propagates fail-closed rather than returning empty.
+    let err = own_escalation_bundles_with(tmp.path(), &|_| {
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "unsupported target",
+        ))
+    })
+    .unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::Unsupported);
+}

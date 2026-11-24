@@ -99,7 +99,8 @@ fn open_regular_file(path: &Path) -> io::Result<fs::File> {
     ))
 ))]
 fn open_regular_file(_path: &Path) -> io::Result<fs::File> {
-    Err(io::Error::other(
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
         "unsupported Unix target for safe O_NOFOLLOW file open",
     ))
 }
@@ -362,20 +363,34 @@ fn split_escalation_dir_name(name: &str) -> Option<(&str, &str)> {
 }
 
 /// Whether `path` is a default-named GhostSoap escalation bundle folder inside the data dir.
-pub fn is_escalation_bundle_dir(path: &Path) -> bool {
+/// Fails closed (`Err`) if safe manifest opening is unsupported on this platform.
+fn is_escalation_bundle_dir_with(
+    path: &Path,
+    read_manifest: &impl Fn(&Path) -> io::Result<Vec<u8>>,
+) -> io::Result<bool> {
     let name = path.file_name().unwrap_or_default().to_string_lossy();
     if split_escalation_dir_name(&name).is_none() {
-        return false;
+        return Ok(false);
     }
     if !fs::symlink_metadata(path).is_ok_and(|meta| meta.is_dir()) {
-        return false;
+        return Ok(false);
     }
-    let manifest = path.join("manifest.sha256");
-    read_regular_file(&manifest).is_ok_and(|bytes| bytes.starts_with(MANIFEST_HEADER.as_bytes()))
+    match read_manifest(&path.join("manifest.sha256")) {
+        Ok(bytes) => Ok(bytes.starts_with(MANIFEST_HEADER.as_bytes())),
+        Err(e) if e.kind() == io::ErrorKind::Unsupported => Err(e),
+        Err(_) => Ok(false),
+    }
 }
 
 /// Default-named GhostSoap escalation bundle folders in `dir`.
 pub fn own_escalation_bundles(dir: &Path) -> io::Result<Vec<PathBuf>> {
+    own_escalation_bundles_with(dir, &read_regular_file)
+}
+
+fn own_escalation_bundles_with(
+    dir: &Path,
+    read_manifest: &impl Fn(&Path) -> io::Result<Vec<u8>>,
+) -> io::Result<Vec<PathBuf>> {
     let items = match fs::read_dir(dir) {
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
         items => items?,
@@ -383,7 +398,7 @@ pub fn own_escalation_bundles(dir: &Path) -> io::Result<Vec<PathBuf>> {
     let mut bundles = Vec::new();
     for item in items {
         let path = item?.path();
-        if is_escalation_bundle_dir(&path) {
+        if is_escalation_bundle_dir_with(&path, read_manifest)? {
             bundles.push(path);
         }
     }
