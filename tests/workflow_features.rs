@@ -122,13 +122,13 @@ fn draft_format_text_writes_plain_text_for_email_entries() {
         &pass,
     );
     assert_eq!(txt_out.status.code(), Some(0), "{}", text(&txt_out.stderr));
-    let txt_file = fs::read_dir(&text_dir)
+    let txt_files: Vec<_> = fs::read_dir(&text_dir)
         .unwrap()
-        .next()
-        .unwrap()
-        .unwrap()
-        .path();
-    assert_eq!(txt_file.extension().and_then(|e| e.to_str()), Some("txt"));
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.extension().and_then(|e| e.to_str()) == Some("txt"))
+        .collect();
+    assert_eq!(txt_files.len(), 1);
+    assert!(emls(&text_dir).is_empty());
 }
 
 #[test]
