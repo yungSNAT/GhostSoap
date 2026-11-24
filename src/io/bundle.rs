@@ -106,18 +106,16 @@ pub fn write_escalation_bundle(
             .collect(),
     };
     let record_text = toml::to_string(&record).map_err(io::Error::other)?;
-    fs::create_dir(dir).map_err(|e| match e.kind() {
+    let mut builder = fs::DirBuilder::new();
+    #[cfg(unix)]
+    std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+    builder.create(dir).map_err(|e| match e.kind() {
         io::ErrorKind::AlreadyExists => io::Error::new(
             e.kind(),
             format!("{} already exists; nothing was exported", dir.display()),
         ),
         _ => e,
     })?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(dir, fs::Permissions::from_mode(0o700))?;
-    }
     let record_sha = sha256(record_text.as_bytes());
     let summary_sha = sha256(summary_text.as_bytes());
     let date = today.to_string();
@@ -147,6 +145,14 @@ pub struct ManifestCheck {
 
 /// Verify every file listed in a GhostSoap SHA-256 manifest against its SHA-256 digest.
 pub fn verify_manifest_file(manifest: &Path) -> Result<ManifestCheck, String> {
+    let meta = fs::symlink_metadata(manifest)
+        .map_err(|e| format!("cannot read manifest {}: {e}", manifest.display()))?;
+    if !meta.is_file() {
+        return Err(format!(
+            "manifest {} is not a regular file",
+            manifest.display()
+        ));
+    }
     let text = fs::read_to_string(manifest)
         .map_err(|e| format!("cannot read manifest {}: {e}", manifest.display()))?;
     let entries = audit::parse_manifest(&text)?;
@@ -199,10 +205,22 @@ pub fn verify_export_file(export_path: &Path) -> Result<ExportCheck, String> {
         .map_err(|e| format!("export {} is not valid TOML: {e}", export_path.display()))?;
     let summary = audit::verify_chain(&parsed.audit)?;
     let companion = manifest_path(export_path);
-    let manifest = if companion.exists() {
-        Some(verify_manifest_file(&companion)?)
-    } else {
-        None
+    let manifest = match fs::symlink_metadata(&companion) {
+        Err(e) if e.kind() == io::ErrorKind::NotFound => None,
+        _ => {
+            let checked = verify_manifest_file(&companion)?;
+            let expected = export_path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            if !checked.files.iter().any(|name| name == &expected) {
+                return Err(format!(
+                    "companion manifest {} does not cover {expected}",
+                    companion.display()
+                ));
+            }
+            Some(checked)
+        }
     };
     Ok(ExportCheck {
         summary,

@@ -187,3 +187,52 @@ fn write_failure_removes_partial_file_and_missing_parent_bundle_errors() {
             .any(|problem| problem.contains("audit chain is invalid"))
     );
 }
+
+#[test]
+fn manifest_checks_reject_non_regular_manifests_and_unbound_companions() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir_manifest = tmp.path().join("dir.sha256");
+    fs::create_dir(&dir_manifest).unwrap();
+    assert!(
+        verify_manifest_file(&dir_manifest)
+            .unwrap_err()
+            .contains("is not a regular file")
+    );
+
+    let state = sample_state();
+    let export_path = tmp.path().join("export.toml");
+    let other_path = tmp.path().join("other.toml");
+    fs::write(&export_path, toml::to_string(&state).unwrap()).unwrap();
+    fs::write(&other_path, "unrelated").unwrap();
+
+    // Companion manifest that hashes another file instead of export.toml must be rejected.
+    let summary = audit::verify_chain(&state.audit).unwrap();
+    let other_sha = sha256(b"unrelated");
+    let companion = manifest_path(&export_path);
+    let substituted = audit::format_manifest("2026-11-24", &summary, &[("other.toml", &other_sha)]);
+    fs::write(&companion, substituted).unwrap();
+    let err = verify_export_file(&export_path).unwrap_err();
+    assert!(err.contains("does not cover export.toml"), "{err}");
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        // Symlinked companion manifest must be rejected rather than followed.
+        let real_manifest = tmp.path().join("real.sha256");
+        let export_sha = sha256(&fs::read(&export_path).unwrap());
+        let valid = audit::format_manifest("2026-11-24", &summary, &[("export.toml", &export_sha)]);
+        fs::write(&real_manifest, valid).unwrap();
+        fs::remove_file(&companion).unwrap();
+        std::os::unix::fs::symlink(&real_manifest, &companion).unwrap();
+        let err = verify_export_file(&export_path).unwrap_err();
+        assert!(err.contains("is not a regular file"), "{err}");
+
+        // Atomic 0o700 mode on escalation bundle directory.
+        let bundle_dir = tmp.path().join("private-bundle");
+        write_escalation_bundle(&bundle_dir, &state, "GS-TEST1", None, date(2026, 11, 24)).unwrap();
+        assert_eq!(
+            fs::metadata(&bundle_dir).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+    }
+}
