@@ -9,10 +9,95 @@ use super::*;
 /// How `draft` hands over its letters.
 #[derive(Clone, Copy)]
 pub(super) struct Output {
+    /// Output format (`auto`, `eml` or `text`).
+    pub(super) format: DraftFormat,
     /// Print them instead of writing files.
     pub(super) copy: bool,
     /// Also print mailto: links.
     pub(super) mailto: bool,
+}
+
+impl Output {
+    /// Raw `.eml` to stdout: one message only, with all CLI notes routed to stderr.
+    pub(super) fn is_raw_eml(self) -> bool {
+        self.copy && self.format == DraftFormat::Eml
+    }
+}
+
+fn emit_note(raw_eml: bool, line: std::fmt::Arguments) {
+    if raw_eml {
+        eprintln!("{line}");
+    } else {
+        println!("{line}");
+    }
+}
+
+fn collect_planned<'a>(steps: &'a [Step<'a>], raw_eml: bool) -> Result<Vec<Planned<'a>>, String> {
+    let mut planned = Vec::new();
+    for step in steps {
+        match step {
+            Step::Letter {
+                entry,
+                channel,
+                levers,
+            } => planned.push(Planned {
+                entry,
+                channel,
+                levers,
+            }),
+            Step::Overseas { entry } if !raw_eml => print_overseas(entry),
+            Step::Overseas { entry } => eprintln!("manual  {}: overseas entry", entry.id),
+            Step::Skip { entry, reason } => {
+                emit_note(raw_eml, format_args!("skip    {}: {reason}", entry.id))
+            }
+        }
+    }
+    if raw_eml && planned.len() > 1 {
+        return Err(
+            "`draft --format eml --copy` outputs one raw .eml message at a time; select a \
+             single entry and channel"
+                .to_owned(),
+        );
+    }
+    Ok(planned)
+}
+
+fn report_draft_notes(drafted: &Drafted, raw_eml: bool) {
+    let Drafted { entry, tag, .. } = drafted;
+    for &field in &drafted.missing {
+        emit_note(
+            raw_eml,
+            format_args!(
+                "note    {}: your profile has no {}, so the letter leaves it out",
+                entry.id,
+                field_name(field)
+            ),
+        );
+    }
+    if let Some(earlier) = &drafted.replaces {
+        let dropped: Vec<&str> = drafted.dropped.iter().map(|l| l.name()).collect();
+        let dropped = match dropped.as_slice() {
+            [] => String::new(),
+            names => format!(" and no longer asks for {}", names.join(", ")),
+        };
+        if earlier == tag {
+            emit_note(
+                raw_eml,
+                format_args!(
+                    "note    {}: this draft replaces the earlier one under {tag}{dropped}",
+                    entry.id
+                ),
+            );
+        } else {
+            emit_note(
+                raw_eml,
+                format_args!(
+                    "note    {}: draft {tag} replaces {earlier}{dropped}; the earlier record stays as history",
+                    entry.id
+                ),
+            );
+        }
+    }
 }
 
 pub(super) fn draft(
@@ -25,22 +110,8 @@ pub(super) fn draft(
     let steps = plan::plan(&register, selection)?;
     let dir = drafts_dir(out.as_deref())?;
     warn_about_out(&dir, out.is_some(), output);
-    let mut planned = Vec::new();
-    for step in &steps {
-        match step {
-            Step::Letter {
-                entry,
-                channel,
-                levers,
-            } => planned.push(Planned {
-                entry,
-                channel,
-                levers,
-            }),
-            Step::Overseas { entry } => print_overseas(entry),
-            Step::Skip { entry, reason } => println!("skip    {}: {reason}", entry.id),
-        }
-    }
+    let raw_eml = output.is_raw_eml();
+    let planned = collect_planned(&steps, raw_eml)?;
     if !planned.is_empty() {
         let folder = if output.copy {
             None
@@ -52,24 +123,30 @@ pub(super) fn draft(
         // The state records every letter before one is written or shown, so a letter the
         // user can send always has a record for `sent` to find. Each is marked unfinished
         // until all are handed over, so a run that fails or stops leaves `sent` refusing them.
+        let format = output.format;
         let drafted = update_state(
             passphrase_stdin,
-            |state| record_drafts(state, &planned, detail, folder.as_deref(), today()),
+            |state| record_drafts(state, &planned, detail, folder.as_deref(), format, today()),
             |(_, redraft)| redraft.commit(),
             |(drafted, redraft), state| {
                 publish_drafts(destination, drafted, output, redraft, state)
             },
         )?;
         let tags: Vec<&str> = drafted.iter().map(|d| d.tag.as_str()).collect();
-        println!(
-            "After you send a letter, record it: ghostsoap sent {}",
-            tags.join(" ")
+        emit_note(
+            raw_eml,
+            format_args!(
+                "After you send a letter, record it: ghostsoap sent {}",
+                tags.join(" ")
+            ),
         );
         if !output.copy {
             print_clean_reminder();
         }
     }
-    access_warning(selection);
+    if let Some(text) = access_warning_text(selection) {
+        emit_note(raw_eml, format_args!("warning: {text}"));
+    }
     Ok(())
 }
 
@@ -141,6 +218,7 @@ pub(super) fn record_drafts<'a>(
     planned: &[Planned<'a>],
     detail: Option<&str>,
     folder: Option<&str>,
+    format: DraftFormat,
     today: Date,
 ) -> Result<(Vec<Drafted<'a>>, io::drafts::Redraft), String> {
     // Every letter is composed first: one that cannot be written changes nothing.
@@ -164,7 +242,7 @@ pub(super) fn record_drafts<'a>(
             drafted: today,
             draft: folder.map(|folder| DraftFile {
                 folder: folder.to_owned(),
-                name: draft_name(plan.entry, &letter.tag, plan.channel.kind),
+                name: draft_name(plan.entry, &letter.tag, plan.channel.kind, format),
             }),
             superseded: false,
             unfinished: true,
@@ -278,36 +356,16 @@ pub(super) fn hand_over(dir: &Path, drafted: &Drafted, output: Output) -> Result
     let Drafted {
         entry, tag, letter, ..
     } = drafted;
-    for &field in &drafted.missing {
-        println!(
-            "note    {}: your profile has no {}, so the letter leaves it out",
-            entry.id,
-            field_name(field)
-        );
-    }
-    if let Some(earlier) = &drafted.replaces {
-        let dropped: Vec<&str> = drafted.dropped.iter().map(|l| l.name()).collect();
-        let dropped = match dropped.as_slice() {
-            [] => String::new(),
-            names => format!(" and no longer asks for {}", names.join(", ")),
-        };
-        if earlier == tag {
-            println!(
-                "note    {}: this draft replaces the earlier one under {tag}{dropped}",
-                entry.id
-            );
-        } else {
-            println!(
-                "note    {}: draft {tag} replaces {earlier}{dropped}; the earlier record stays as history",
-                entry.id
-            );
-        }
-    }
+    report_draft_notes(drafted, output.is_raw_eml());
     if output.copy {
-        print_copy(entry, letter);
+        if output.format == DraftFormat::Eml {
+            write_stdout(letters::eml(letter).as_bytes());
+        } else {
+            print_copy(entry, letter);
+        }
         return Ok(());
     }
-    write_draft(dir, entry, tag, letter, output.mailto).map_err(|e| {
+    write_draft(dir, entry, tag, letter, output).map_err(|e| {
         format!(
             "{e}; {tag} and the other letters of this run are recorded as unfinished, so `sent` \
              refuses them until you draft them again. If GhostSoap cannot confirm a file it \
@@ -387,12 +445,20 @@ pub(super) fn unused_tag(used: &[String], candidate: impl Fn(u64) -> String) -> 
     }
 }
 
+fn uses_eml(kind: ChannelKind, format: DraftFormat) -> bool {
+    match format {
+        DraftFormat::Auto => kind == ChannelKind::Email,
+        DraftFormat::Eml => true,
+        DraftFormat::Text => false,
+    }
+}
+
 pub(super) fn write_draft(
     dir: &Path,
     entry: &Entry,
     tag: &str,
     letter: &Letter,
-    mailto: bool,
+    output: Output,
 ) -> Result<(), String> {
     let how = match letter.kind {
         ChannelKind::Email => format!("email to {}", letter.to),
@@ -400,18 +466,19 @@ pub(super) fn write_draft(
         ChannelKind::WebForm => format!("paste into the form at {}", letter.to),
         ChannelKind::Phone => return Err("plans never send letters by phone".to_owned()),
     };
-    let text = match letter.kind {
-        ChannelKind::Email => letters::eml(letter),
-        _ => format!("{}\n", letter.body),
+    let text = if uses_eml(letter.kind, output.format) {
+        letters::eml(letter)
+    } else {
+        format!("{}\n", letter.body)
     };
-    let name = draft_name(entry, tag, letter.kind);
+    let name = draft_name(entry, tag, letter.kind, output.format);
     let path = io::drafts::write(dir, &name, &text).map_err(|e| e.to_string())?;
     println!(
         "draft   {}  {how}: {}",
         entry.id,
         io::exposure::display(&path)
     );
-    if mailto && letter.kind == ChannelKind::Email {
+    if output.mailto && letter.kind == ChannelKind::Email {
         match letters::mailto(letter) {
             Some(link) => println!("        or open: {link}"),
             None => println!("        too long for a mailto: link; open the draft instead"),
@@ -420,13 +487,14 @@ pub(super) fn write_draft(
     Ok(())
 }
 
-/// The file a draft is written to: an email as `.eml`, anything else as text.
-pub(super) fn draft_name(entry: &Entry, tag: &str, kind: ChannelKind) -> String {
-    let extension = if kind == ChannelKind::Email {
-        "eml"
-    } else {
-        "txt"
-    };
+/// The file a draft is written to, matching the channel and chosen `--format`.
+pub(super) fn draft_name(
+    entry: &Entry,
+    tag: &str,
+    kind: ChannelKind,
+    format: DraftFormat,
+) -> String {
+    let extension = if uses_eml(kind, format) { "eml" } else { "txt" };
     format!("{}-{tag}.{extension}", entry.id)
 }
 

@@ -4,9 +4,13 @@
 
 //! Pure logic over values: no files, network or terminal.
 
+use sha2::{Digest, Sha256};
+
+pub mod audit;
 pub mod check;
 pub mod checklist;
 pub mod deadline;
+pub mod demo;
 pub mod embedded;
 pub mod law;
 pub mod letters;
@@ -14,6 +18,14 @@ pub mod plan;
 pub mod profile;
 pub mod register;
 pub mod tracker;
+
+/// The SHA-256 of `bytes` in lowercase hex.
+pub fn sha256(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
 
 /// The name the state file gives `value`, such as `refused-with-reasons`.
 pub(crate) fn named(value: impl serde::Serialize) -> String {

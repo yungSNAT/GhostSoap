@@ -44,14 +44,18 @@ macro_rules! println {
 }
 
 mod args;
+mod auditing;
 mod cleanup;
+mod demo;
 mod drafting;
 mod planning;
 mod records;
 mod scanning;
 
 pub use args::*;
+use auditing::*;
 use cleanup::*;
+use demo::*;
 use drafting::*;
 use planning::*;
 use records::*;
@@ -124,19 +128,25 @@ pub fn run(cli: Cli) -> ExitCode {
         Some(Command::Draft {
             selection,
             out,
+            format,
             copy,
             mailto,
             passphrase_stdin,
         }) => draft(
             &selection.selection(),
             out,
-            Output { copy, mailto },
+            Output {
+                format,
+                copy,
+                mailto,
+            },
             passphrase_stdin,
         ),
         Some(Command::Export {
             out,
+            escalation,
             passphrase_stdin,
-        }) => export(out, passphrase_stdin),
+        }) => export(out, escalation, passphrase_stdin),
         Some(Command::Forget {
             no_passphrase,
             yes,
@@ -165,6 +175,8 @@ pub fn run(cli: Cli) -> ExitCode {
         Some(Command::Registry {
             command: RegistryCommand::List { json },
         }) => list_register(json),
+        Some(Command::Demo(args)) => run_demo(&args),
+        Some(Command::Audit(args)) => audit_command(&args),
         Some(Command::Completions { shell }) => {
             print_completions(shell);
             Ok(())

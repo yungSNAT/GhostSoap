@@ -305,7 +305,7 @@ Ryan approved draft 2 on 24 October 2026 and decided:
 1. **Licences:** Apache-2.0 for code, CC0-1.0 for register and checklist data. On 26 October 2026 the code was relicensed under FSL-1.1-ALv2 (pull request 5, merged by Ryan); the data stays CC0-1.0.
 2. **Visibility:** the repository stays private until M1.
 3. **Interface:** decided at M7, from a static WebAssembly web app (no install; data in the browser, like datenanfragen), a local web UI served by the CLI, or a desktop app.
-4. **Branding:** the name and tagline only; no Call of Duty art, logos or fonts; the README disclaims any affiliation.
+4. **Branding:** the name and tagline only; no Call of Duty art, logos or fonts.
 5. **Register quality (24 October 2026, at M1):** `verified` covers a check against the entity's own pages with recorded evidence, made by a person or an AI agent; provenance says which.
 6. **Evidence coverage (24 October 2026, at M1):** an entry records `[[evidence]]` for each source page that gives the same hash on 2 fetches and a hash no other source shares. Pages that return bot checks, errors or browser-only content stay untracked, and provenance lists them; at M1, 22 of 29 entries carry evidence and 7 have none.
 7. **Letters and drafts (25 October 2026, at M2, agent's choices within the approved plan):** the law table is Rust code with one match arm per lever, so a missing row or letter fails to compile; a message bundles an entry's levers per channel rather than one message per lever; the default round is the 3 APP 7 levers; drafts are cleaned by a `clean` command; the encrypted profile arrives in M2 (`init`), with requests and events added in M3. Ryan kept Locate Family as an overseas entry although its operator is not named.

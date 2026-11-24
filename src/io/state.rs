@@ -17,11 +17,14 @@ use std::time::Duration;
 use age::secrecy::SecretString;
 use serde::Deserialize;
 
+use crate::core::audit::{self, AuditSummary, MANIFEST_HEADER};
 use crate::core::law::{self, Deadline};
 use crate::core::profile::Profile;
 use crate::core::register::Lever;
+use crate::core::sha256;
 use crate::core::tracker::FORMAT;
 pub use crate::core::tracker::State;
+use crate::io::bundle;
 
 const STATE_FILE: &str = "state.age";
 const LOCK_FILE: &str = "state.lock";
@@ -203,10 +206,38 @@ fn export_text(state: &State, date: &str) -> io::Result<String> {
     ))
 }
 
+/// Paths and digests written by `export`.
+#[derive(Debug, Clone)]
+pub struct ExportReceipt {
+    pub manifest: PathBuf,
+    pub sha256: String,
+    pub audit: AuditSummary,
+}
+
 /// Write the state, read with `passphrase`, to a new file at `path` as plaintext (mode 600
-/// on Unix). A file or link already at `path` is refused, never replaced.
-pub fn export(dir: &Path, passphrase: SecretString, path: &Path, date: &str) -> io::Result<()> {
-    let text = export_text(&load(dir, passphrase)?, date)?;
+/// on Unix) alongside a companion SHA-256 manifest `<path>.sha256`. A file or link already
+/// at either destination is refused, never replaced.
+pub fn export(
+    dir: &Path,
+    passphrase: SecretString,
+    path: &Path,
+    date: &str,
+) -> io::Result<ExportReceipt> {
+    let name = bundle::validate_export_basename(path)?;
+    let state = load(dir, passphrase)?;
+    let audit = audit::verify_chain(&state.audit).map_err(io::Error::other)?;
+    let text = export_text(&state, date)?;
+    let digest = sha256(text.as_bytes());
+    let manifest = bundle::manifest_path(path);
+    if fs::symlink_metadata(&manifest).is_ok() {
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            format!(
+                "{} already exists; nothing was exported",
+                manifest.display()
+            ),
+        ));
+    }
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
     #[cfg(unix)]
@@ -222,7 +253,16 @@ pub fn export(dir: &Path, passphrase: SecretString, path: &Path, date: &str) -> 
         .write_all(text.as_bytes())
         .and_then(|()| file.sync_all());
     drop(file);
-    written.map_err(|e| discard(path, &e))
+    written.map_err(|e| discard(path, &e))?;
+
+    let manifest_text = audit::format_manifest(date, &audit, &[(&name, &digest)]);
+    bundle::write_new_file(&manifest, manifest_text.as_bytes(), true)
+        .map_err(|e| discard(path, &e))?;
+    Ok(ExportReceipt {
+        manifest,
+        sha256: digest,
+        audit,
+    })
 }
 
 /// The error for an export whose write failed, after deleting the plaintext it left, so
@@ -242,20 +282,28 @@ fn discard(path: &Path, error: &io::Error) -> io::Error {
 /// Whether `path` is an export GhostSoap wrote under its default name: a regular file (never
 /// a link, pipe or folder), dated, and starting with the line `export` writes. Only that
 /// line's first bytes are read.
-fn is_export(path: &Path) -> bool {
+fn has_dated_prefix_and_header(path: &Path, suffix: &str, header: &str) -> bool {
     let name = path.file_name().unwrap_or_default().to_string_lossy();
     let dated = name
         .strip_prefix("ghostsoap-export-")
-        .and_then(|rest| rest.strip_suffix(".toml"))
+        .and_then(|rest| rest.strip_suffix(suffix))
         .is_some_and(|date| jiff::civil::Date::strptime("%Y-%m-%d", date).is_ok());
     if !dated || !fs::symlink_metadata(path).is_ok_and(|meta| meta.is_file()) {
         return false;
     }
     let mut start = Vec::new();
-    let header = EXPORT_HEADER.as_bytes();
+    let bytes = header.as_bytes();
     fs::File::open(path)
-        .and_then(|file| file.take(header.len() as u64).read_to_end(&mut start))
-        .is_ok_and(|_| start == header)
+        .and_then(|file| file.take(bytes.len() as u64).read_to_end(&mut start))
+        .is_ok_and(|_| start == bytes)
+}
+
+fn is_export(path: &Path) -> bool {
+    has_dated_prefix_and_header(path, ".toml", EXPORT_HEADER)
+}
+
+fn is_export_manifest(path: &Path) -> bool {
+    has_dated_prefix_and_header(path, ".toml.sha256", MANIFEST_HEADER)
 }
 
 /// The files in the data folder `forget` deletes: the state file, a temporary file an
@@ -271,7 +319,7 @@ pub fn own_files(dir: &Path) -> io::Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     for item in items {
         let path = item?.path();
-        if path == state || path == tmp || is_export(&path) {
+        if path == state || path == tmp || is_export(&path) || is_export_manifest(&path) {
             files.push(path);
         }
     }

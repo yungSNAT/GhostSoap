@@ -4,6 +4,7 @@
 
 //! Files and the terminal.
 
+pub mod bundle;
 pub mod drafts;
 pub mod exposure;
 pub mod prompt;

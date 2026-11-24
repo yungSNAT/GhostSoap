@@ -43,7 +43,13 @@ pub enum Command {
         /// the folder is private.
         #[arg(long)]
         out: Option<PathBuf>,
-        /// Print each letter's To, Subject and body instead of writing files (for webmail).
+        /// Output format: `auto` writes `.eml` for email and `.txt` for post/web form,
+        /// `eml` writes RFC 5322 `.eml` drafts (with `X-Unsent: 1`), and `text` writes
+        /// plain text.
+        #[arg(long, value_enum, default_value_t = DraftFormat::Auto)]
+        format: DraftFormat,
+        /// Print each letter's To, Subject and body (or raw `.eml` with `--format eml`)
+        /// instead of writing files.
         #[arg(long)]
         copy: bool,
         /// Also print a mailto: link for each email letter short enough for one. The link
@@ -54,13 +60,17 @@ pub enum Command {
         #[arg(long)]
         passphrase_stdin: bool,
     },
-    /// Write your profile and every letter's record to a new plaintext file, so they
-    /// survive a lost device. Keep it private and delete it when you no longer need it.
+    /// Write your profile and every letter's record to a new plaintext file alongside a
+    /// SHA-256 manifest, or write an OAIC escalation bundle for one tag with `--escalation`.
     Export {
-        /// The file to write; it must not exist yet. Defaults to
-        /// `ghostsoap-export-<date>.toml` in GhostSoap's data folder.
+        /// The file (or directory with `--escalation`) to write; it must not exist yet.
+        /// Defaults to `ghostsoap-export-<date>.toml` in GhostSoap's data folder.
         #[arg(long)]
         out: Option<PathBuf>,
+        /// Export a self-contained OAIC escalation bundle (summary, record and SHA-256
+        /// manifest) for one request tag, such as GS-7K3QX.
+        #[arg(long)]
+        escalation: Option<String>,
         /// Read the passphrase from standard input instead of the terminal (for scripts).
         #[arg(long)]
         passphrase_stdin: bool,
@@ -135,11 +145,66 @@ pub enum Command {
         #[command(subcommand)]
         command: RegistryCommand,
     },
+    /// Run a zero-PII synthetic dry-run demo (status, checklist, audit chain and HTML
+    /// preview) using example.com fixtures without touching your vault.
+    Demo(DemoArgs),
+    /// Verify and inspect the tamper-evident SHA-256 OAIC audit chain and export manifests.
+    Audit(AuditArgs),
     /// Generate shell completions for bash, elvish, fish, powershell or zsh.
     Completions {
         /// Shell to generate completions for.
         shell: clap_complete::Shell,
     },
+}
+
+/// Output format for `ghostsoap draft`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, clap::ValueEnum)]
+pub enum DraftFormat {
+    /// `.eml` for email channels and `.txt` for post or web form.
+    #[default]
+    Auto,
+    /// RFC 5322 `.eml` with `X-Unsent: 1` and header sanitisation.
+    Eml,
+    /// Plain text (`.txt`).
+    Text,
+}
+
+/// Output format for `ghostsoap demo`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, clap::ValueEnum)]
+pub enum DemoFormat {
+    #[default]
+    Text,
+    Html,
+}
+
+#[derive(Debug, Args)]
+pub struct DemoArgs {
+    /// Print terminal text or self-contained HTML to standard output.
+    #[arg(long, value_enum, default_value_t = DemoFormat::Text)]
+    pub(super) format: DemoFormat,
+    /// Write the self-contained HTML preview to a new file instead of standard output.
+    #[arg(long)]
+    pub(super) html: Option<PathBuf>,
+}
+
+#[derive(Debug, Args)]
+pub struct AuditArgs {
+    /// Verify the audit chain in a plaintext export file (and its companion `.sha256`
+    /// manifest if present) without unlocking the vault.
+    #[arg(long, conflicts_with = "manifest")]
+    pub(super) export: Option<PathBuf>,
+    /// Verify every SHA-256 digest listed in an export or escalation manifest file.
+    #[arg(long, conflicts_with = "export")]
+    pub(super) manifest: Option<PathBuf>,
+    /// Print every entry in the verified audit chain.
+    #[arg(long)]
+    pub(super) list: bool,
+    /// Print JSON for scripts and AI agents.
+    #[arg(long)]
+    pub(super) json: bool,
+    /// Read the passphrase from standard input instead of the terminal (for scripts).
+    #[arg(long, conflicts_with_all = ["export", "manifest"])]
+    pub(super) passphrase_stdin: bool,
 }
 
 /// Which entities and requests.

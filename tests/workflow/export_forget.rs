@@ -6,6 +6,21 @@
 
 use super::*;
 
+fn count_default_exports(dir: &Path, suffix: &str) -> usize {
+    fs::read_dir(dir)
+        .unwrap()
+        .filter(|e| {
+            let n = e
+                .as_ref()
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .into_owned();
+            n.starts_with("ghostsoap-export-") && n.ends_with(suffix)
+        })
+        .count()
+}
+
 #[test]
 fn export_writes_the_state_as_plaintext_once_and_never_over_a_file() {
     let tmp = tempfile::tempdir().unwrap();
@@ -50,13 +65,13 @@ fn export_writes_the_state_as_plaintext_once_and_never_over_a_file() {
     assert!(!nowhere.exists());
     let default = ghostsoap(tmp.path(), &["export", "--passphrase-stdin"], &input);
     assert_eq!(default.status.code(), Some(0), "{}", text(&default.stderr));
-    let named = |e: &fs::DirEntry| {
-        e.file_name()
-            .to_string_lossy()
-            .starts_with("ghostsoap-export-")
-    };
-    let entries = fs::read_dir(tmp.path()).unwrap().map(Result::unwrap);
-    assert_eq!(entries.filter(named).count(), 1);
+    assert_eq!(
+        (
+            count_default_exports(tmp.path(), ".toml"),
+            count_default_exports(tmp.path(), ".toml.sha256"),
+        ),
+        (1, 1)
+    );
 }
 
 #[cfg(unix)]
