@@ -84,7 +84,16 @@ fn draft_files_match_the_written_channel_and_never_use_phone() {
         subject: "Test letter".to_owned(),
         body: "Test body".to_owned(),
     };
-    let err = write_draft(&drafts, entry, "GS-01234", &phone, false).unwrap_err();
+    let auto_out = Output {
+        format: DraftFormat::Auto,
+        copy: false,
+        mailto: false,
+    };
+    let auto_mailto = Output {
+        mailto: true,
+        ..auto_out
+    };
+    let err = write_draft(&drafts, entry, "GS-01234", &phone, auto_out).unwrap_err();
     assert_eq!(err, "plans never send letters by phone");
     assert!(!drafts.exists());
 
@@ -102,7 +111,7 @@ fn draft_files_match_the_written_channel_and_never_use_phone() {
             subject: "Test letter".to_owned(),
             body: "Test body".to_owned(),
         };
-        write_draft(&drafts, entry, tag, &letter, true).unwrap();
+        write_draft(&drafts, entry, tag, &letter, auto_mailto).unwrap();
         let path = drafts.join(format!("australia-post-au-{tag}.txt"));
         assert_eq!(std::fs::read_to_string(path).unwrap(), "Test body\n");
     }
@@ -111,7 +120,7 @@ fn draft_files_match_the_written_channel_and_never_use_phone() {
         to: "privacy@example.invalid".to_owned(),
         ..phone
     };
-    write_draft(&drafts, entry, "GS-56789", &email, true).unwrap();
+    write_draft(&drafts, entry, "GS-56789", &email, auto_mailto).unwrap();
     assert!(drafts.join("australia-post-au-GS-56789.eml").is_file());
 }
 
@@ -240,4 +249,17 @@ fn lever_and_channel_names_parse_as_the_register_writes_them() {
         parse_channel("Email"),
         Err("use email, web-form, post or phone".to_owned())
     );
+}
+
+#[test]
+fn audit_command_rejects_export_and_manifest_together() {
+    let args = AuditArgs {
+        export: Some(PathBuf::from("a.toml")),
+        manifest: Some(PathBuf::from("b.sha256")),
+        list: false,
+        json: false,
+        passphrase_stdin: false,
+    };
+    let err = audit_command(&args).unwrap_err();
+    assert!(err.contains("cannot be used together"), "{err}");
 }

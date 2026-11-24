@@ -19,6 +19,7 @@ ghostsoap registry list --json            # the packs and businesses to choose f
 ghostsoap scan                            # people-search sites' own pages, for the person to search
 ghostsoap checklist --no-passphrase       # data hygiene steps beyond letters, with official pages
 ghostsoap checklist --next --no-passphrase # the first step in full
+ghostsoap demo                            # zero-PII synthetic dry-run preview (example.com fixtures)
 ```
 
 These commands need no profile and no passphrase. Errors go to standard error with a non-zero exit code. `plan` steps have an `action`:
@@ -40,6 +41,7 @@ ghostsoap sent GS-7K3QX            # records a letter as sent, by the tag in its
 ghostsoap reply GS-7K3QX refused   # records an answer; --lever names one request
 ghostsoap status                   # lists what to do next, overdue first, with dates
 ghostsoap clean                    # deletes the drafts once sent
+ghostsoap audit --list             # verifies the SHA-256 hash-chained OAIC audit log
 ghostsoap checklist done do-not-call  # records a checklist step as done
 ```
 

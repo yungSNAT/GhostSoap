@@ -6,21 +6,70 @@
 
 use super::*;
 
-pub(super) fn export(out: Option<PathBuf>, passphrase_stdin: bool) -> Result<(), String> {
+pub(super) fn export(
+    out: Option<PathBuf>,
+    escalation: Option<String>,
+    passphrase_stdin: bool,
+) -> Result<(), String> {
+    if let Some(typed) = escalation {
+        return export_escalation(out, &typed, passphrase_stdin);
+    }
     let dir = state::data_dir().map_err(|e| e.to_string())?;
     let date = today().to_string();
     let path = out.unwrap_or_else(|| dir.join(format!("ghostsoap-export-{date}.toml")));
     let passphrase = Input::new(passphrase_stdin)
         .passphrase("Passphrase: ")
         .map_err(|e| e.to_string())?;
-    state::export(&dir, passphrase, &path, &date).map_err(|e| e.to_string())?;
+    let receipt = state::export(&dir, passphrase, &path, &date).map_err(|e| e.to_string())?;
     println!("Exported your profile and records to {}.", path.display());
+    println!(
+        "Manifest: {} (sha256: {}, audit chain: {}).",
+        receipt.manifest.display(),
+        receipt.sha256,
+        receipt.audit
+    );
     let folder = path.parent().unwrap_or(Path::new("."));
     warn_exposed(folder, ("the export's folder", "the plaintext export"));
     eprintln!(
         "warning: {} is plaintext: anyone who can open it can read your profile and every \
          letter's record. Keep it private, and delete it when you no longer need it.",
         path.display()
+    );
+    Ok(())
+}
+
+fn export_escalation(
+    out: Option<PathBuf>,
+    typed_tag: &str,
+    passphrase_stdin: bool,
+) -> Result<(), String> {
+    let dir = state::data_dir().map_err(|e| e.to_string())?;
+    let day = today();
+    let tag = letters::normalise_tag(typed_tag);
+    let bundle_dir = out.unwrap_or_else(|| dir.join(format!("ghostsoap-escalation-{tag}-{day}")));
+    let passphrase = Input::new(passphrase_stdin)
+        .passphrase("Passphrase: ")
+        .map_err(|e| e.to_string())?;
+    let state = state::load(&dir, passphrase).map_err(|e| e.to_string())?;
+    let register = built_in_register()?;
+    let entry = state
+        .message(&tag)
+        .and_then(|message| register.entries.get(&message.entry));
+    let receipt = io::bundle::write_escalation_bundle(&bundle_dir, &state, &tag, entry, day)
+        .map_err(|e| e.to_string())?;
+    println!(
+        "Exported OAIC escalation bundle to {}.",
+        receipt.dir.display()
+    );
+    println!(
+        "Manifest: {} ({} files, audit chain: {}).",
+        receipt.manifest.display(),
+        receipt.files.len(),
+        receipt.audit
+    );
+    warn_exposed(
+        &receipt.dir,
+        ("the escalation bundle's folder", "the escalation bundle"),
     );
     Ok(())
 }
@@ -39,14 +88,15 @@ pub(super) fn forget(no_passphrase: bool, yes: bool, passphrase_stdin: bool) -> 
     let dir = state::data_dir().map_err(|e| e.to_string())?;
     let mut input = Input::new(passphrase_stdin);
     let files = state::own_files(&dir).map_err(|e| e.to_string())?;
+    let bundles = io::bundle::own_escalation_bundles(&dir).map_err(|e| e.to_string())?;
     let mut folders = draft_folders(&dir, no_passphrase, &mut input)?;
     folders.retain(|folder| folder.exists());
-    if files.is_empty() && folders.is_empty() {
+    if files.is_empty() && bundles.is_empty() && folders.is_empty() {
         println!("GhostSoap has nothing to delete in {}.", dir.display());
         return Ok(());
     }
     let lock = state::lock(&dir).map_err(|e| e.to_string())?;
-    list_forgotten(&files, &folders, no_passphrase);
+    list_forgotten(&files, &bundles, &folders, no_passphrase);
     if !yes
         && input
             .line("Type forget to delete them: ")
@@ -60,6 +110,14 @@ pub(super) fn forget(no_passphrase: bool, yes: bool, passphrase_stdin: bool) -> 
     for file in &files {
         let deleted = std::fs::remove_file(file).map(|()| println!("Deleted {}.", file.display()));
         tally(file, deleted, &mut failed);
+    }
+    for bundle in &bundles {
+        let cleaned = io::bundle::clean_escalation_bundle(bundle);
+        tally(
+            bundle,
+            cleaned.map(|c| report_cleaned_bundle(bundle, &c)),
+            &mut failed,
+        );
     }
     for folder in &folders {
         let cleaned = refuse_link(folder).and_then(|()| io::drafts::clean(folder, *folder == own));
@@ -79,10 +137,21 @@ pub(super) fn forget(no_passphrase: bool, yes: bool, passphrase_stdin: bool) -> 
 }
 
 /// Show what `forget` will delete, and what it cannot look for.
-pub(super) fn list_forgotten(files: &[PathBuf], folders: &[PathBuf], no_passphrase: bool) {
+pub(super) fn list_forgotten(
+    files: &[PathBuf],
+    bundles: &[PathBuf],
+    folders: &[PathBuf],
+    no_passphrase: bool,
+) {
     println!("GhostSoap will delete:");
     for file in files {
         println!("    {}", file.display());
+    }
+    for bundle in bundles {
+        println!(
+            "    the escalation bundle in {} (known bundle files only; other files stay)",
+            bundle.display()
+        );
     }
     for folder in folders {
         println!(
@@ -144,6 +213,17 @@ pub(super) fn tally(path: &Path, result: std::io::Result<()>, failed: &mut usize
     if let Err(e) = result {
         *failed += 1;
         eprintln!("error: cannot delete {}: {e}", path.display());
+    }
+}
+
+fn report_cleaned_bundle(dir: &Path, cleaned: &io::bundle::CleanedBundle) {
+    println!(
+        "Deleted {} escalation bundle files from {}.",
+        cleaned.deleted,
+        dir.display()
+    );
+    for name in &cleaned.kept {
+        println!("kept    {name}: unrelated file left in {}", dir.display());
     }
 }
 

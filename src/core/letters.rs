@@ -278,16 +278,9 @@ pub fn wrap(text: &str, width: usize) -> String {
     out.join("\n")
 }
 
-/// An `.eml` draft. `X-Unsent: 1` makes Outlook open it as a draft; there is no `From`, so
-/// the mail client fills in the user's own address.
-pub fn eml(letter: &Letter) -> String {
-    let body = letter.body.replace('\n', "\r\n");
-    format!(
-        "To: {}\r\nSubject: {}\r\nX-Unsent: 1\r\nMIME-Version: 1.0\r\n\
-         Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n{body}\r\n",
-        letter.to, letter.subject
-    )
-}
+mod eml;
+
+pub use eml::eml;
 
 /// A `mailto:` link (RFC 6068), or `None` when it would be longer than mail clients and
 /// browsers reliably accept.

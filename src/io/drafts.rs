@@ -19,8 +19,6 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use sha2::{Digest, Sha256};
-
 use crate::io::state::{Lock, create_private_dir};
 
 const MANIFEST: &str = ".ghostsoap-drafts";
@@ -212,10 +210,7 @@ fn sync_dir(dir: &Path) -> io::Result<()> {
 
 /// The SHA-256 of `bytes` in lowercase hex.
 pub fn sha256(bytes: &[u8]) -> String {
-    Sha256::digest(bytes)
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect()
+    crate::core::sha256(bytes)
 }
 
 /// Open options for a file only the user can read (mode 600 on Unix).
