@@ -9,6 +9,8 @@ use super::*;
 /// How `draft` hands over its letters.
 #[derive(Clone, Copy)]
 pub(super) struct Output {
+    /// Output format (`auto`, `eml` or `text`).
+    pub(super) format: DraftFormat,
     /// Print them instead of writing files.
     pub(super) copy: bool,
     /// Also print mailto: links.
@@ -52,9 +54,10 @@ pub(super) fn draft(
         // The state records every letter before one is written or shown, so a letter the
         // user can send always has a record for `sent` to find. Each is marked unfinished
         // until all are handed over, so a run that fails or stops leaves `sent` refusing them.
+        let format = output.format;
         let drafted = update_state(
             passphrase_stdin,
-            |state| record_drafts(state, &planned, detail, folder.as_deref(), today()),
+            |state| record_drafts(state, &planned, detail, folder.as_deref(), format, today()),
             |(_, redraft)| redraft.commit(),
             |(drafted, redraft), state| {
                 publish_drafts(destination, drafted, output, redraft, state)
@@ -141,6 +144,7 @@ pub(super) fn record_drafts<'a>(
     planned: &[Planned<'a>],
     detail: Option<&str>,
     folder: Option<&str>,
+    format: DraftFormat,
     today: Date,
 ) -> Result<(Vec<Drafted<'a>>, io::drafts::Redraft), String> {
     // Every letter is composed first: one that cannot be written changes nothing.
@@ -164,7 +168,7 @@ pub(super) fn record_drafts<'a>(
             drafted: today,
             draft: folder.map(|folder| DraftFile {
                 folder: folder.to_owned(),
-                name: draft_name(plan.entry, &letter.tag, plan.channel.kind),
+                name: draft_name(plan.entry, &letter.tag, plan.channel.kind, format),
             }),
             superseded: false,
             unfinished: true,
@@ -304,10 +308,14 @@ pub(super) fn hand_over(dir: &Path, drafted: &Drafted, output: Output) -> Result
         }
     }
     if output.copy {
-        print_copy(entry, letter);
+        if output.format == DraftFormat::Eml {
+            write_stdout(letters::eml(letter).as_bytes());
+        } else {
+            print_copy(entry, letter);
+        }
         return Ok(());
     }
-    write_draft(dir, entry, tag, letter, output.mailto).map_err(|e| {
+    write_draft(dir, entry, tag, letter, output).map_err(|e| {
         format!(
             "{e}; {tag} and the other letters of this run are recorded as unfinished, so `sent` \
              refuses them until you draft them again. If GhostSoap cannot confirm a file it \
@@ -387,12 +395,20 @@ pub(super) fn unused_tag(used: &[String], candidate: impl Fn(u64) -> String) -> 
     }
 }
 
+fn uses_eml(kind: ChannelKind, format: DraftFormat) -> bool {
+    match format {
+        DraftFormat::Auto => kind == ChannelKind::Email,
+        DraftFormat::Eml => true,
+        DraftFormat::Text => false,
+    }
+}
+
 pub(super) fn write_draft(
     dir: &Path,
     entry: &Entry,
     tag: &str,
     letter: &Letter,
-    mailto: bool,
+    output: Output,
 ) -> Result<(), String> {
     let how = match letter.kind {
         ChannelKind::Email => format!("email to {}", letter.to),
@@ -400,18 +416,19 @@ pub(super) fn write_draft(
         ChannelKind::WebForm => format!("paste into the form at {}", letter.to),
         ChannelKind::Phone => return Err("plans never send letters by phone".to_owned()),
     };
-    let text = match letter.kind {
-        ChannelKind::Email => letters::eml(letter),
-        _ => format!("{}\n", letter.body),
+    let text = if uses_eml(letter.kind, output.format) {
+        letters::eml(letter)
+    } else {
+        format!("{}\n", letter.body)
     };
-    let name = draft_name(entry, tag, letter.kind);
+    let name = draft_name(entry, tag, letter.kind, output.format);
     let path = io::drafts::write(dir, &name, &text).map_err(|e| e.to_string())?;
     println!(
         "draft   {}  {how}: {}",
         entry.id,
         io::exposure::display(&path)
     );
-    if mailto && letter.kind == ChannelKind::Email {
+    if output.mailto && letter.kind == ChannelKind::Email {
         match letters::mailto(letter) {
             Some(link) => println!("        or open: {link}"),
             None => println!("        too long for a mailto: link; open the draft instead"),
@@ -420,13 +437,14 @@ pub(super) fn write_draft(
     Ok(())
 }
 
-/// The file a draft is written to: an email as `.eml`, anything else as text.
-pub(super) fn draft_name(entry: &Entry, tag: &str, kind: ChannelKind) -> String {
-    let extension = if kind == ChannelKind::Email {
-        "eml"
-    } else {
-        "txt"
-    };
+/// The file a draft is written to, matching the channel and chosen `--format`.
+pub(super) fn draft_name(
+    entry: &Entry,
+    tag: &str,
+    kind: ChannelKind,
+    format: DraftFormat,
+) -> String {
+    let extension = if uses_eml(kind, format) { "eml" } else { "txt" };
     format!("{}-{tag}.{extension}", entry.id)
 }
 

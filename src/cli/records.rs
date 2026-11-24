@@ -5,6 +5,7 @@
 //! `sent`, `reply`, `status` and `checklist`: what was sent, what came back and what is due.
 
 use super::*;
+use crate::core::audit::{self, AuditKind};
 
 pub(super) fn sent(args: &SentArgs) -> Result<(), String> {
     let today = today();
@@ -13,12 +14,20 @@ pub(super) fn sent(args: &SentArgs) -> Result<(), String> {
         |state| {
             let mut lines = Vec::new();
             for typed in &args.tags {
-                let message = message_for(state, typed)?;
-                let recorded = record_sending(message, args, today)?;
-                lines.push(format!(
-                    "sent    {}  {}  {recorded}",
-                    message.tag, message.entry
-                ));
+                let (tag, entry, recorded, audit_event) = {
+                    let message = message_for(state, typed)?;
+                    let (recorded, audit_event) = record_sending(message, args, today)?;
+                    (
+                        message.tag.clone(),
+                        message.entry.clone(),
+                        recorded,
+                        audit_event,
+                    )
+                };
+                if let Some((kind, detail)) = audit_event {
+                    audit::append(&mut state.audit, today, &tag, &entry, kind, detail);
+                }
+                lines.push(format!("sent    {tag}  {entry}  {recorded}"));
             }
             Ok(lines)
         },
@@ -48,40 +57,21 @@ pub(super) fn reply(args: &ReplyArgs) -> Result<(), String> {
     let line = update_state(
         args.passphrase_stdin,
         |state| {
-            let message = message_for(state, &args.tag)?;
-            let note = args.note.clone();
-            let done = if let Some(of) = args.withdraw {
-                message.withdraw_event(&args.lever, of, note)?;
-                let what = match of {
-                    tracker::Withdrawn::Status => "answer",
-                    tracker::Withdrawn::Extension => "longer period",
-                };
-                format!("the latest {what} is withdrawn")
-            } else if let Some(until) = args.agreed_until {
-                let extension = tracker::Extension { on, until, note };
-                let new = message.record_extension(&args.lever, extension, today)?;
-                format!("{} a longer period to {until}", recorded(new))
-            } else {
-                let status = args.status.expect("clap requires a status");
-                let event = tracker::StatusEvent {
-                    on,
-                    status,
-                    reason: args.reason,
-                    source: args.source.clone(),
-                    note,
-                };
-                let new = message.record_status(&args.lever, event, today)?;
-                let report = if new && status == tracker::Status::Bounced {
-                    bounce_report(&message.entry, message.channel)
-                } else {
-                    String::new()
-                };
-                format!("{} {} on {on}{report}", recorded(new), named(status))
+            let (tag, entry, done, audit_event) = {
+                let message = message_for(state, &args.tag)?;
+                let levers = affected_levers(message, &args.lever);
+                let (done, audit_event) = apply_reply(message, args, on, today, &levers)?;
+                (
+                    message.tag.clone(),
+                    message.entry.clone(),
+                    done,
+                    audit_event,
+                )
             };
-            Ok(format!(
-                "reply   {}  {}  {done}",
-                message.tag, message.entry
-            ))
+            if let Some((kind, detail)) = audit_event {
+                audit::append(&mut state.audit, today, &tag, &entry, kind, detail);
+            }
+            Ok(format!("reply   {tag}  {entry}  {done}"))
         },
         |_| {},
         |line, _| Ok(line),
@@ -378,28 +368,129 @@ pub(super) fn status_line(
     )
 }
 
-/// Apply `sent`'s flags to one message and say what is now recorded.
+/// The levers a `reply` applies to: the explicit list or all of the message's levers.
+fn affected_levers(message: &Message, chosen: &[Lever]) -> Vec<Lever> {
+    if chosen.is_empty() {
+        message.requests.iter().map(|r| r.lever).collect()
+    } else {
+        chosen.to_vec()
+    }
+}
+
+/// Apply `reply`'s flags to one message, returning the summary and any new audit event.
+fn apply_reply(
+    message: &mut Message,
+    args: &ReplyArgs,
+    on: Date,
+    today: Date,
+    levers: &[Lever],
+) -> Result<(String, Option<(AuditKind, String)>), String> {
+    if let Some(of) = args.withdraw {
+        message.withdraw_event(&args.lever, of, args.note.clone())?;
+        let what = match of {
+            tracker::Withdrawn::Status => "answer",
+            tracker::Withdrawn::Extension => "longer period",
+        };
+        let detail = audit::withdrawal_detail(of, levers, args.note.as_deref());
+        return Ok((
+            format!("the latest {what} is withdrawn"),
+            Some((AuditKind::Withdrawal, detail)),
+        ));
+    }
+    if let Some(until) = args.agreed_until {
+        let extension = tracker::Extension {
+            on,
+            until,
+            note: args.note.clone(),
+        };
+        let new = message.record_extension(&args.lever, extension, today)?;
+        let event = new.then(|| {
+            let detail = audit::extension_detail(on, until, levers, args.note.as_deref());
+            (AuditKind::Extension, detail)
+        });
+        return Ok((
+            format!("{} a longer period to {until}", recorded(new)),
+            event,
+        ));
+    }
+    apply_status_reply(message, args, on, today, levers)
+}
+
+fn apply_status_reply(
+    message: &mut Message,
+    args: &ReplyArgs,
+    on: Date,
+    today: Date,
+    levers: &[Lever],
+) -> Result<(String, Option<(AuditKind, String)>), String> {
+    let status = args.status.expect("clap requires a status");
+    let event = tracker::StatusEvent {
+        on,
+        status,
+        reason: args.reason,
+        source: args.source.clone(),
+        note: args.note.clone(),
+    };
+    let new = message.record_status(&args.lever, event, today)?;
+    let report = if new && status == tracker::Status::Bounced {
+        bounce_report(&message.entry, message.channel)
+    } else {
+        String::new()
+    };
+    let audit_event = new.then(|| {
+        let kind = if status == tracker::Status::Escalated {
+            AuditKind::Escalation
+        } else {
+            AuditKind::Reply
+        };
+        let detail = audit::reply_detail(
+            on,
+            status,
+            levers,
+            args.reason,
+            args.source.as_deref(),
+            args.note.as_deref(),
+        );
+        (kind, detail)
+    });
+    Ok((
+        format!("{} {} on {on}{report}", recorded(new), named(status)),
+        audit_event,
+    ))
+}
+
+/// Apply `sent`'s flags to one message and say what is now recorded, plus any new audit event.
 pub(super) fn record_sending(
     message: &mut Message,
     args: &SentArgs,
     today: Date,
-) -> Result<String, String> {
+) -> Result<(String, Option<(AuditKind, String)>), String> {
     if args.withdraw {
         message.withdraw_sent(args.note.clone())?;
-        return Ok("no longer recorded as sent".to_owned());
+        let detail = audit::send_withdrawn_detail(args.note.as_deref());
+        return Ok((
+            "no longer recorded as sent".to_owned(),
+            Some((AuditKind::SentWithdrawn, detail)),
+        ));
     }
     let send = Send {
         on: args.on.unwrap_or(today),
         channel: args.channel.unwrap_or(message.channel),
     };
-    let recorded = if message.record_sent(send, args.correct, today)? {
+    let new = message.record_sent(send, args.correct, today)?;
+    let recorded = if new {
         "recorded as sent"
     } else {
         "already recorded as sent"
     };
-    Ok(format!(
-        "{recorded} on {} by {}",
-        send.on,
-        send.channel.label()
+    let event = new.then(|| {
+        (
+            AuditKind::Sent,
+            audit::send_detail(send.on, send.channel, args.correct),
+        )
+    });
+    Ok((
+        format!("{recorded} on {} by {}", send.on, send.channel.label()),
+        event,
     ))
 }

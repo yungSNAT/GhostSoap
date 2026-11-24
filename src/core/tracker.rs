@@ -11,6 +11,7 @@
 use jiff::civil::Date;
 use serde::{Deserialize, Serialize};
 
+use crate::core::audit::{self, AuditEntry};
 use crate::core::checklist::Mark;
 use crate::core::law::{self, Deadline};
 use crate::core::letters;
@@ -36,6 +37,9 @@ pub struct State {
     /// The user's checklist marks, one per item at most.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub checklist: Vec<Mark>,
+    /// Tamper-evident SHA-256 hash-chained OAIC audit log of sent, reply and escalation events.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub audit: Vec<AuditEntry>,
 }
 
 /// One letter to one entry through one channel, carrying one request per lever.
@@ -471,6 +475,7 @@ impl State {
             profile,
             messages: Vec::new(),
             checklist: Vec::new(),
+            audit: Vec::new(),
         }
     }
 
@@ -531,6 +536,9 @@ impl State {
             if self.checklist[..index].iter().any(|m| m.item == mark.item) {
                 problems.push(format!("checklist item {} is marked twice", mark.item));
             }
+        }
+        if let Err(problem) = audit::verify_chain(&self.audit) {
+            problems.push(format!("audit chain is invalid: {problem}"));
         }
         problems
     }

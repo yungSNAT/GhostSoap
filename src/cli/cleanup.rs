@@ -6,21 +6,70 @@
 
 use super::*;
 
-pub(super) fn export(out: Option<PathBuf>, passphrase_stdin: bool) -> Result<(), String> {
+pub(super) fn export(
+    out: Option<PathBuf>,
+    escalation: Option<String>,
+    passphrase_stdin: bool,
+) -> Result<(), String> {
+    if let Some(typed) = escalation {
+        return export_escalation(out, &typed, passphrase_stdin);
+    }
     let dir = state::data_dir().map_err(|e| e.to_string())?;
     let date = today().to_string();
     let path = out.unwrap_or_else(|| dir.join(format!("ghostsoap-export-{date}.toml")));
     let passphrase = Input::new(passphrase_stdin)
         .passphrase("Passphrase: ")
         .map_err(|e| e.to_string())?;
-    state::export(&dir, passphrase, &path, &date).map_err(|e| e.to_string())?;
+    let receipt = state::export(&dir, passphrase, &path, &date).map_err(|e| e.to_string())?;
     println!("Exported your profile and records to {}.", path.display());
+    println!(
+        "Manifest: {} (sha256: {}, audit chain: {}).",
+        receipt.manifest.display(),
+        receipt.sha256,
+        receipt.audit
+    );
     let folder = path.parent().unwrap_or(Path::new("."));
     warn_exposed(folder, ("the export's folder", "the plaintext export"));
     eprintln!(
         "warning: {} is plaintext: anyone who can open it can read your profile and every \
          letter's record. Keep it private, and delete it when you no longer need it.",
         path.display()
+    );
+    Ok(())
+}
+
+fn export_escalation(
+    out: Option<PathBuf>,
+    typed_tag: &str,
+    passphrase_stdin: bool,
+) -> Result<(), String> {
+    let dir = state::data_dir().map_err(|e| e.to_string())?;
+    let day = today();
+    let tag = letters::normalise_tag(typed_tag);
+    let bundle_dir = out.unwrap_or_else(|| dir.join(format!("ghostsoap-escalation-{tag}-{day}")));
+    let passphrase = Input::new(passphrase_stdin)
+        .passphrase("Passphrase: ")
+        .map_err(|e| e.to_string())?;
+    let state = state::load(&dir, passphrase).map_err(|e| e.to_string())?;
+    let register = built_in_register()?;
+    let entry = state
+        .message(&tag)
+        .and_then(|message| register.entries.get(&message.entry));
+    let receipt = io::bundle::write_escalation_bundle(&bundle_dir, &state, &tag, entry, day)
+        .map_err(|e| e.to_string())?;
+    println!(
+        "Exported OAIC escalation bundle to {}.",
+        receipt.dir.display()
+    );
+    println!(
+        "Manifest: {} ({} files, audit chain: {}).",
+        receipt.manifest.display(),
+        receipt.files.len(),
+        receipt.audit
+    );
+    warn_exposed(
+        &receipt.dir,
+        ("the escalation bundle's folder", "the escalation bundle"),
     );
     Ok(())
 }
