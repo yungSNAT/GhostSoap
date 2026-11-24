@@ -139,11 +139,7 @@ mod tests {
     #[test]
     fn each_platform_gets_the_url_as_one_argument_with_no_shell() {
         let url = "https://example.com/policies?name=privacy&modal=select";
-        let dir = Path::new(if cfg!(windows) {
-            r"C:\Windows\System32"
-        } else {
-            "/sys32"
-        });
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")); // absolute on every platform
         assert_eq!(
             opener("windows", url, Some(dir)),
             Ok((
