@@ -13,10 +13,11 @@ use std::process::Output;
 
 use common::{PASSPHRASE, ghostsoap, init, text};
 
-const ITEMS: [&str; 13] = [
+const ITEMS: [&str; 14] = [
     "breach-check",
     "credit-reports",
     "credit-ban",
+    "identity-theft",
     "do-not-call",
     "silent-number",
     "silent-elector",
