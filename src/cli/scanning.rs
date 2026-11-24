@@ -62,33 +62,39 @@ pub(super) fn scan(args: &ScanArgs) -> Result<(), String> {
 
 /// The program and arguments that open `url` in the default browser on `os`
 /// (`std::env::consts::OS`). No shell runs, so `?` and `&` in the URL stay as they are.
-/// `system_root` is Windows' `SystemRoot`: `rundll32.exe` runs from its `System32`, never
-/// from a `PATH` search or the current directory, and a missing or relative root is an error.
+/// `system_dir` is Windows' System32 directory as the system reports it
+/// (`system_directory`). `rundll32.exe` runs from there by absolute path, never by a name
+/// that a search could resolve to another file, and a missing or relative directory is an error.
 pub(super) fn opener(
     os: &str,
     url: &str,
-    system_root: Option<&str>,
-) -> Result<(String, Vec<String>), String> {
+    system_dir: Option<&Path>,
+) -> Result<(PathBuf, Vec<String>), String> {
+    let one = vec![url.to_owned()];
     Ok(match os {
-        "windows" => (
-            rundll32_path(system_root)?,
-            vec!["url.dll,FileProtocolHandler".to_owned(), url.to_owned()],
-        ),
-        "macos" => ("open".to_owned(), vec![url.to_owned()]),
-        _ => ("xdg-open".to_owned(), vec![url.to_owned()]),
+        "windows" => {
+            let dir = system_dir
+                .filter(|dir| dir.is_absolute())
+                .ok_or("the system directory is unknown, so rundll32.exe cannot be found safely")?;
+            (
+                dir.join("rundll32.exe"),
+                vec!["url.dll,FileProtocolHandler".to_owned(), url.to_owned()],
+            )
+        }
+        "macos" => (PathBuf::from("open"), one),
+        _ => (PathBuf::from("xdg-open"), one),
     })
 }
 
-/// `<SystemRoot>\System32\rundll32.exe` for an absolute drive or UNC `SystemRoot`.
-fn rundll32_path(system_root: Option<&str>) -> Result<String, String> {
-    let root = system_root.unwrap_or("").trim_end_matches(['\\', '/']);
-    let b = root.as_bytes();
-    let drive = b.len() > 2 && b[0].is_ascii_alphabetic() && b[1] == b':' && b[2] == b'\\';
-    if drive || root.starts_with(r"\\") {
-        Ok(format!(r"{root}\System32\rundll32.exe"))
-    } else {
-        Err("SystemRoot is not an absolute path, so rundll32.exe cannot be found safely".to_owned())
-    }
+/// The System32 directory from the Windows known-folder API, not from an environment variable.
+#[cfg(windows)]
+fn system_directory() -> Option<PathBuf> {
+    known_folders::get_known_folder_path(known_folders::KnownFolder::System)
+}
+
+#[cfg(not(windows))]
+fn system_directory() -> Option<PathBuf> {
+    None
 }
 
 fn open_page(url: &str) -> Result<(), String> {
@@ -97,10 +103,11 @@ fn open_page(url: &str) -> Result<(), String> {
     if !url.starts_with("https://") || url.contains(char::is_whitespace) {
         return Err(format!("could not open {url}: not an https:// URL"));
     }
-    let system_root = std::env::var("SystemRoot").ok();
-    let (program, args) = opener(std::env::consts::OS, url, system_root.as_deref())
+    let (program, args) = opener(std::env::consts::OS, url, system_directory().as_deref())
         .map_err(|e| format!("could not open {url}: {e}"))?;
-    match std::process::Command::new(&program).args(&args).status() {
+    let status = std::process::Command::new(&program).args(&args).status();
+    let program = program.display();
+    match status {
         Ok(status) if status.success() => Ok(()),
         Ok(status) => Err(format!(
             "could not open {url}: {program} exited with {status}"
@@ -112,6 +119,7 @@ fn open_page(url: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::{open_page, opener};
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn only_an_https_page_reaches_the_opener() {
@@ -131,48 +139,47 @@ mod tests {
     #[test]
     fn each_platform_gets_the_url_as_one_argument_with_no_shell() {
         let url = "https://example.com/policies?name=privacy&modal=select";
-        let args = vec!["url.dll,FileProtocolHandler".to_owned(), url.to_owned()];
+        let dir = std::env::temp_dir();
         assert_eq!(
-            opener("windows", url, Some(r"C:\Windows")),
-            Ok((r"C:\Windows\System32\rundll32.exe".to_owned(), args))
+            opener("windows", url, Some(&dir)),
+            Ok((
+                dir.join("rundll32.exe"),
+                vec!["url.dll,FileProtocolHandler".to_owned(), url.to_owned()]
+            ))
         );
         let one = vec![url.to_owned()];
-        assert_eq!(
-            opener("macos", url, None),
-            Ok(("open".to_owned(), one.clone()))
-        );
-        assert_eq!(
-            opener("linux", url, None),
-            Ok(("xdg-open".to_owned(), one.clone()))
-        );
-        assert_eq!(
-            opener("freebsd", url, None),
-            Ok(("xdg-open".to_owned(), one))
-        );
+        for (os, program) in [
+            ("macos", "open"),
+            ("linux", "xdg-open"),
+            ("freebsd", "xdg-open"),
+        ] {
+            assert_eq!(
+                opener(os, url, None),
+                Ok((PathBuf::from(program), one.clone()))
+            );
+        }
     }
 
     #[test]
     fn windows_runs_rundll32_from_an_absolute_system_directory_or_not_at_all() {
         let url = "https://example.com/";
-        let path = |root| opener("windows", url, root).map(|(program, _)| program);
-        assert_eq!(
-            path(Some(r"D:\WINNT\")),
-            Ok(r"D:\WINNT\System32\rundll32.exe".to_owned())
-        );
-        assert_eq!(
-            path(Some(r"\\server\share\Windows")),
-            Ok(r"\\server\share\Windows\System32\rundll32.exe".to_owned())
-        );
         for bad in [
             None,
-            Some(""),
-            Some("."),
-            Some("Windows"),
-            Some(r"\Windows"),
-            Some("C:Windows"),
-            Some("/"),
+            Some(Path::new("")),
+            Some(Path::new("System32")),
+            Some(Path::new(".")),
         ] {
-            assert!(path(bad).is_err(), "{bad:?}");
+            assert!(opener("windows", url, bad).is_err(), "{bad:?}");
         }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn the_system_directory_is_absolute_and_holds_rundll32() {
+        let dir = super::system_directory().expect("the known-folder API answers");
+        assert!(
+            dir.is_absolute() && dir.join("rundll32.exe").is_file(),
+            "{dir:?}"
+        );
     }
 }
