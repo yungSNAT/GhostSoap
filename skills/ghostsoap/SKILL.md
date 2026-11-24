@@ -58,6 +58,7 @@ If you can read their files, tell them so before they run `draft`: these rules a
 - Make access requests only about the person themselves: requesting someone else's information may be an offence.
 - Do not promise deletion. Australian law has no general right to erasure.
 - If the person edits a draft or writes their own words, tell them `ghostsoap check <file>` warns of claims the law table does not support, and let them run it. No warning does not mean a letter is sound, so never say it does.
+- Report a removal or opt-out as confirmed only when `ghostsoap status` output the person shares for that request records `fulfilled` or `no-record` (or `suppressed` for `app7-no-marketing`, `app7-no-facilitation` or `spam-unsubscribe`, never `app11-destroy`, as suppression is not erasure) and has not later moved to `relisted`. Report `drafted`, `sent`, `acknowledged`, `id-requested`, `charge-quoted`, `partial`, `suppressed` on `app11-destroy` or any other lever, `refused-with-reasons`, `refused`, `exempt-claimed`, `bounced`, `relisted`, `escalated`, `abandoned`, `closed` (shown as `done`) without a recorded confirming answer, `DEGRADED` (unreadable state) or any unread entry as 'requested, not confirmed' (naming the recorded status if shared); never infer removal from `plan`, `draft`, `sent` or `clean`.
 
 ## On a cloud computer
 
