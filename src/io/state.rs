@@ -223,6 +223,7 @@ pub fn export(
     path: &Path,
     date: &str,
 ) -> io::Result<ExportReceipt> {
+    let name = bundle::validate_export_basename(path)?;
     let state = load(dir, passphrase)?;
     let audit = audit::verify_chain(&state.audit).map_err(io::Error::other)?;
     let text = export_text(&state, date)?;
@@ -253,10 +254,7 @@ pub fn export(
         .and_then(|()| file.sync_all());
     drop(file);
     written.map_err(|e| discard(path, &e))?;
-    let name = path
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "export.toml".to_owned());
+
     let manifest_text = audit::format_manifest(date, &audit, &[(&name, &digest)]);
     bundle::write_new_file(&manifest, manifest_text.as_bytes(), true)
         .map_err(|e| discard(path, &e))?;

@@ -2,26 +2,86 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Additional terms under AGPL-3.0 section 7(b): see NOTICE.
 
-//! SHA-256 export manifests, OAIC escalation bundles and integrity verification.
+//! SHA-256 export manifests, OAIC escalation bundles, rollback and integrity verification.
 
 use std::ffi::OsString;
 use std::fs::{self, OpenOptions};
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 
 use jiff::civil::Date;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
-use crate::core::audit::{self, AuditEntry, AuditSummary};
+use crate::core::audit::{self, AuditEntry, AuditSummary, MANIFEST_HEADER};
+use crate::core::letters;
 use crate::core::register::Entry;
 use crate::core::sha256;
 use crate::core::tracker::{Message, State};
+
+mod verify;
+pub use verify::{ExportCheck, ManifestCheck, verify_export_file, verify_manifest_file};
+
+const BUNDLE_FILES: [&str; 3] = ["record.toml", "summary.txt", "manifest.sha256"];
+const AUDIT_EXCERPT_NOTE: &str = "Tag-filtered excerpt from the global audit chain; integrity \
+    is verified via manifest.sha256 rather than as a standalone chain.";
 
 /// Companion manifest path for an export file (`<path>.sha256`).
 pub fn manifest_path(path: &Path) -> PathBuf {
     let mut name = OsString::from(path.as_os_str());
     name.push(".sha256");
     PathBuf::from(name)
+}
+
+/// Validate that `path`'s basename is valid UTF-8 and safe to record in a SHA-256 manifest.
+pub fn validate_export_basename(path: &Path) -> io::Result<String> {
+    let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "export filename must be valid UTF-8; nothing was exported",
+        ));
+    };
+    if !audit::is_safe_filename(name) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!(
+                "export filename `{name}` cannot be safely recorded in a SHA-256 manifest; \
+                 nothing was exported"
+            ),
+        ));
+    }
+    Ok(name.to_owned())
+}
+
+/// Open and read a regular file fail-closed without following symlinks or blocking on FIFOs.
+pub(crate) fn read_regular_file(path: &Path) -> io::Result<Vec<u8>> {
+    #[cfg(not(unix))]
+    if !fs::symlink_metadata(path)?.is_file() {
+        return Err(io::Error::other("not a regular file"));
+    }
+    let mut options = OpenOptions::new();
+    options.read(true);
+    // O_NOFOLLOW | O_NONBLOCK: reject symlinks atomically and never hang on FIFOs.
+    #[cfg(all(target_os = "linux", any(target_arch = "x86_64", target_arch = "x86")))]
+    std::os::unix::fs::OpenOptionsExt::custom_flags(&mut options, 0x20000 | 0x800);
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+    std::os::unix::fs::OpenOptionsExt::custom_flags(&mut options, 0x10000 | 0x800);
+    #[cfg(target_os = "macos")]
+    std::os::unix::fs::OpenOptionsExt::custom_flags(&mut options, 0x0100 | 0x0004);
+    let mut file = options.open(path).map_err(|e| {
+        if e.raw_os_error()
+            .is_some_and(|code| code == 40 || code == 62)
+        {
+            io::Error::other("not a regular file (symlink refused)")
+        } else {
+            e
+        }
+    })?;
+    if !file.metadata()?.is_file() {
+        return Err(io::Error::other("not a regular file"));
+    }
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)?;
+    Ok(bytes)
 }
 
 /// Write bytes to a new file (never replacing an existing file or link), setting mode 600
@@ -72,9 +132,12 @@ pub struct BundleReceipt {
 struct EscalationRecord<'a> {
     tag: &'a str,
     exported_on: Date,
+    global_audit_count: usize,
+    global_audit_head: &'a str,
+    audit_excerpt_note: &'static str,
     message: &'a Message,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    audit: Vec<&'a AuditEntry>,
+    audit_excerpt: Vec<&'a AuditEntry>,
 }
 
 fn create_private_dir(dir: &Path) -> io::Result<()> {
@@ -89,6 +152,35 @@ fn create_private_dir(dir: &Path) -> io::Result<()> {
     }
 }
 
+fn rollback_bundle(dir: &Path, created: &[PathBuf], error: io::Error) -> io::Error {
+    let mut leftovers = Vec::new();
+    for path in created.iter().rev() {
+        if let Err(e) = fs::remove_file(path) {
+            leftovers.push(format!("{} ({e})", path.display()));
+        }
+    }
+    if let Err(e) = fs::remove_dir(dir) {
+        leftovers.push(format!("{} ({e})", dir.display()));
+    }
+    if leftovers.is_empty() {
+        io::Error::new(
+            error.kind(),
+            format!(
+                "{error}; partial escalation bundle at {} was deleted",
+                dir.display()
+            ),
+        )
+    } else {
+        io::Error::new(
+            error.kind(),
+            format!(
+                "{error}; could not clean up partial escalation bundle paths: {}",
+                leftovers.join(", ")
+            ),
+        )
+    }
+}
+
 /// Write a self-contained OAIC escalation bundle for `tag` in a new directory `dir`,
 /// including `summary.txt`, `record.toml` and `manifest.sha256`.
 pub fn write_escalation_bundle(
@@ -98,6 +190,17 @@ pub fn write_escalation_bundle(
     entry: Option<&Entry>,
     today: Date,
 ) -> io::Result<BundleReceipt> {
+    write_escalation_bundle_with(dir, state, tag, entry, today, |path, bytes| {
+        write_new_file(path, bytes, true)
+    })
+}
+
+fn prepare_bundle_texts(
+    state: &State,
+    tag: &str,
+    entry: Option<&Entry>,
+    today: Date,
+) -> io::Result<(AuditSummary, String, String, String)> {
     let message = state.message(tag).ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::NotFound,
@@ -110,21 +213,17 @@ pub fn write_escalation_bundle(
     let record = EscalationRecord {
         tag: &message.tag,
         exported_on: today,
+        global_audit_count: audit_summary.count,
+        global_audit_head: &audit_summary.head_hash,
+        audit_excerpt_note: AUDIT_EXCERPT_NOTE,
         message,
-        audit: state
+        audit_excerpt: state
             .audit
             .iter()
             .filter(|item| item.tag == message.tag)
             .collect(),
     };
     let record_text = toml::to_string(&record).map_err(io::Error::other)?;
-    create_private_dir(dir).map_err(|e| match e.kind() {
-        io::ErrorKind::AlreadyExists => io::Error::new(
-            e.kind(),
-            format!("{} already exists; nothing was exported", dir.display()),
-        ),
-        _ => e,
-    })?;
     let record_sha = sha256(record_text.as_bytes());
     let summary_sha = sha256(summary_text.as_bytes());
     let date = today.to_string();
@@ -133,109 +232,117 @@ pub fn write_escalation_bundle(
         &audit_summary,
         &[("record.toml", &record_sha), ("summary.txt", &summary_sha)],
     );
-    let manifest = dir.join("manifest.sha256");
-    write_new_file(&dir.join("record.toml"), record_text.as_bytes(), true)?;
-    write_new_file(&dir.join("summary.txt"), summary_text.as_bytes(), true)?;
-    write_new_file(&manifest, manifest_text.as_bytes(), true)?;
+    Ok((audit_summary, record_text, summary_text, manifest_text))
+}
+
+fn write_escalation_bundle_with(
+    dir: &Path,
+    state: &State,
+    tag: &str,
+    entry: Option<&Entry>,
+    today: Date,
+    mut write_file: impl FnMut(&Path, &[u8]) -> io::Result<()>,
+) -> io::Result<BundleReceipt> {
+    let (audit_summary, record_text, summary_text, manifest_text) =
+        prepare_bundle_texts(state, tag, entry, today)?;
+    create_private_dir(dir).map_err(|e| match e.kind() {
+        io::ErrorKind::AlreadyExists => io::Error::new(
+            e.kind(),
+            format!("{} already exists; nothing was exported", dir.display()),
+        ),
+        _ => e,
+    })?;
+    let items = [
+        (dir.join("record.toml"), record_text.as_bytes()),
+        (dir.join("summary.txt"), summary_text.as_bytes()),
+        (dir.join("manifest.sha256"), manifest_text.as_bytes()),
+    ];
+    let mut created = Vec::new();
+    for (path, bytes) in items {
+        if let Err(err) = write_file(&path, bytes) {
+            return Err(rollback_bundle(dir, &created, err));
+        }
+        created.push(path);
+    }
     Ok(BundleReceipt {
         dir: dir.to_owned(),
-        manifest,
+        manifest: dir.join("manifest.sha256"),
         files: vec!["record.toml".to_owned(), "summary.txt".to_owned()],
         audit: audit_summary,
     })
 }
 
-/// Verified files in a GhostSoap SHA-256 manifest.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ManifestCheck {
-    pub manifest: PathBuf,
-    pub files: Vec<String>,
+/// Whether `path` is a default-named GhostSoap escalation bundle folder inside the data dir.
+pub fn is_escalation_bundle_dir(path: &Path) -> bool {
+    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    let Some(rest) = name.strip_prefix("ghostsoap-escalation-") else {
+        return false;
+    };
+    let Some((tag, date)) = rest.rsplit_once("-20") else {
+        return false;
+    };
+    let date = format!("20{date}");
+    if !letters::is_tag(tag) || Date::strptime("%Y-%m-%d", &date).is_err() {
+        return false;
+    }
+    if !fs::symlink_metadata(path).is_ok_and(|meta| meta.is_dir()) {
+        return false;
+    }
+    let manifest = path.join("manifest.sha256");
+    read_regular_file(&manifest).is_ok_and(|bytes| bytes.starts_with(MANIFEST_HEADER.as_bytes()))
 }
 
-/// Verify every file listed in a GhostSoap SHA-256 manifest against its SHA-256 digest.
-pub fn verify_manifest_file(manifest: &Path) -> Result<ManifestCheck, String> {
-    let meta = fs::symlink_metadata(manifest)
-        .map_err(|e| format!("cannot read manifest {}: {e}", manifest.display()))?;
-    if !meta.is_file() {
-        return Err(format!(
-            "manifest {} is not a regular file",
-            manifest.display()
+/// Default-named GhostSoap escalation bundle folders in `dir`.
+pub fn own_escalation_bundles(dir: &Path) -> io::Result<Vec<PathBuf>> {
+    let items = match fs::read_dir(dir) {
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        items => items?,
+    };
+    let mut bundles = Vec::new();
+    for item in items {
+        let path = item?.path();
+        if is_escalation_bundle_dir(&path) {
+            bundles.push(path);
+        }
+    }
+    bundles.sort();
+    Ok(bundles)
+}
+
+/// Outcome of cleaning one GhostSoap escalation bundle directory during `forget`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CleanedBundle {
+    pub deleted: usize,
+    pub kept: Vec<String>,
+}
+
+/// Delete only GhostSoap's 3 known bundle files from `dir` (never following symlinks) and
+/// remove `dir` only when empty. Any unrelated files are left untouched and reported.
+pub fn clean_escalation_bundle(dir: &Path) -> io::Result<CleanedBundle> {
+    if !fs::symlink_metadata(dir)?.is_dir() {
+        return Err(io::Error::other(
+            "it is no longer a folder, so GhostSoap leaves it alone",
         ));
     }
-    let text = fs::read_to_string(manifest)
-        .map_err(|e| format!("cannot read manifest {}: {e}", manifest.display()))?;
-    let entries = audit::parse_manifest(&text)?;
-    let folder = manifest.parent().unwrap_or_else(|| Path::new("."));
-    let mut verified = Vec::with_capacity(entries.len());
-    for item in entries {
-        let target = folder.join(&item.name);
-        let meta = fs::symlink_metadata(&target)
-            .map_err(|e| format!("manifest file {} is unreadable: {e}", item.name))?;
-        if !meta.is_file() {
-            return Err(format!("manifest file {} is not a regular file", item.name));
+    let mut deleted = 0usize;
+    for name in BUNDLE_FILES {
+        let file = dir.join(name);
+        if let Ok(meta) = fs::symlink_metadata(&file)
+            && meta.is_file()
+        {
+            fs::remove_file(&file)?;
+            deleted += 1;
         }
-        let bytes =
-            fs::read(&target).map_err(|e| format!("cannot read {}: {e}", target.display()))?;
-        let actual = sha256(&bytes);
-        if actual != item.sha256 {
-            return Err(format!(
-                "SHA-256 mismatch for {}: expected {}, got {actual}",
-                item.name, item.sha256
-            ));
-        }
-        verified.push(item.name);
     }
-    Ok(ManifestCheck {
-        manifest: manifest.to_owned(),
-        files: verified,
-    })
-}
-
-#[derive(Deserialize)]
-struct ExportAudit {
-    #[serde(default)]
-    audit: Vec<AuditEntry>,
-}
-
-/// Outcome of verifying a plaintext export file and any companion manifest.
-#[derive(Debug, Clone)]
-pub struct ExportCheck {
-    pub summary: AuditSummary,
-    pub entries: Vec<AuditEntry>,
-    pub manifest: Option<ManifestCheck>,
-}
-
-/// Verify the audit hash chain in a plaintext export file, plus its companion `.sha256`
-/// manifest when present.
-pub fn verify_export_file(export_path: &Path) -> Result<ExportCheck, String> {
-    let text = fs::read_to_string(export_path)
-        .map_err(|e| format!("cannot read export {}: {e}", export_path.display()))?;
-    let parsed: ExportAudit = toml::from_str(&text)
-        .map_err(|e| format!("export {} is not valid TOML: {e}", export_path.display()))?;
-    let summary = audit::verify_chain(&parsed.audit)?;
-    let companion = manifest_path(export_path);
-    let manifest = match fs::symlink_metadata(&companion) {
-        Err(e) if e.kind() == io::ErrorKind::NotFound => None,
-        _ => {
-            let checked = verify_manifest_file(&companion)?;
-            let expected = export_path
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            if !checked.files.iter().any(|name| name == &expected) {
-                return Err(format!(
-                    "companion manifest {} does not cover {expected}",
-                    companion.display()
-                ));
-            }
-            Some(checked)
-        }
-    };
-    Ok(ExportCheck {
-        summary,
-        entries: parsed.audit,
-        manifest,
-    })
+    let mut kept = Vec::new();
+    for entry in fs::read_dir(dir)? {
+        kept.push(entry?.file_name().to_string_lossy().into_owned());
+    }
+    kept.sort();
+    if kept.is_empty() {
+        fs::remove_dir(dir)?;
+    }
+    Ok(CleanedBundle { deleted, kept })
 }
 
 #[cfg(test)]

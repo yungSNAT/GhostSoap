@@ -256,7 +256,7 @@ pub fn format_manifest(date: &str, summary: &AuditSummary, files: &[(&str, &str)
 }
 
 /// Whether `name` is a single safe filename inside the manifest's own folder.
-fn is_safe_filename(name: &str) -> bool {
+pub fn is_safe_filename(name: &str) -> bool {
     !name.is_empty()
         && name != "."
         && name != ".."

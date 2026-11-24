@@ -50,7 +50,7 @@ fn setup_escalated_vault(home: &Path) -> (String, String) {
 }
 
 #[test]
-fn draft_format_eml_writes_unsent_eml_and_supports_copy_mode() {
+fn draft_format_eml_file_and_raw_copy_match_byte_for_byte() {
     let tmp = tempfile::tempdir().unwrap();
     let (home, eml_dir) = (tmp.path().join("home"), tmp.path().join("eml"));
     init(&home);
@@ -73,15 +73,15 @@ fn draft_format_eml_writes_unsent_eml_and_supports_copy_mode() {
     assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
     let files = emls(&eml_dir);
     assert_eq!(files.len(), 1);
-    let eml = fs::read_to_string(&files[0]).unwrap();
-    assert!(eml.contains("X-Unsent: 1\r\n") && eml.contains("MIME-Version: 1.0\r\n"));
+    let file_eml = fs::read_to_string(&files[0]).unwrap();
+    assert!(file_eml.contains("X-Unsent: 1\r\n") && file_eml.contains("MIME-Version: 1.0\r\n"));
 
     let copy_eml = ghostsoap(
         &home,
         &[
             "draft",
             "--entry",
-            "experian-marketing-au",
+            "cotality-au",
             "--format",
             "eml",
             "--copy",
@@ -95,9 +95,77 @@ fn draft_format_eml_writes_unsent_eml_and_supports_copy_mode() {
         "{}",
         text(&copy_eml.stderr)
     );
-    let copy_stdout = text(&copy_eml.stdout);
-    assert!(copy_stdout.contains("X-Unsent: 1"));
-    assert!(copy_stdout.contains("X-GhostSoap-Channel: web form"));
+    assert_eq!(text(&copy_eml.stdout), file_eml);
+    assert!(text(&copy_eml.stderr).contains("After you send a letter"));
+}
+
+#[test]
+fn draft_raw_eml_copy_refuses_multi_message_and_routes_overseas_to_stderr() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    init(&home);
+    let pass = format!("{PASSPHRASE}\n");
+    let before = fs::read(home.join("state.age")).unwrap();
+
+    let multi = ghostsoap(
+        &home,
+        &[
+            "draft",
+            "--entry",
+            "experian-marketing-au",
+            "--format",
+            "eml",
+            "--copy",
+            "--passphrase-stdin",
+        ],
+        &pass,
+    );
+    assert_eq!(multi.status.code(), Some(1));
+    assert!(text(&multi.stderr).contains("one raw .eml message at a time"));
+    assert_eq!(fs::read(home.join("state.age")).unwrap(), before);
+
+    let overseas = ghostsoap(
+        &home,
+        &[
+            "draft",
+            "--entry",
+            "infotracer-au",
+            "--format",
+            "eml",
+            "--copy",
+            "--passphrase-stdin",
+        ],
+        &pass,
+    );
+    assert_eq!(overseas.status.code(), Some(0));
+    assert!(overseas.stdout.is_empty());
+    assert!(text(&overseas.stderr).contains("manual  infotracer-au"));
+}
+
+#[test]
+fn draft_raw_eml_copy_routes_access_warning_to_stderr() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    init(&home);
+    let pass = format!("{PASSPHRASE}\n");
+    let access = ghostsoap(
+        &home,
+        &[
+            "draft",
+            "--entry",
+            "cotality-au",
+            "--lever",
+            "app12",
+            "--format",
+            "eml",
+            "--copy",
+            "--passphrase-stdin",
+        ],
+        &pass,
+    );
+    assert_eq!(access.status.code(), Some(0), "{}", text(&access.stderr));
+    assert!(text(&access.stdout).starts_with("To: "));
+    assert!(text(&access.stderr).contains("warning: access requests return personal information"));
 }
 
 #[test]
@@ -184,11 +252,22 @@ fn demo_renders_text_and_html_without_touching_the_vault() {
 }
 
 #[test]
-fn audit_verifies_encrypted_vault_text_and_json() {
+fn audit_verifies_encrypted_vault_empty_and_populated_states() {
     let tmp = tempfile::tempdir().unwrap();
+    let empty_home = tmp.path().join("empty");
+    init(&empty_home);
+    let pass = format!("{PASSPHRASE}\n");
+    let empty_audit = ghostsoap(&empty_home, &["audit", "--passphrase-stdin"], &pass);
+    assert_eq!(
+        empty_audit.status.code(),
+        Some(0),
+        "{}",
+        text(&empty_audit.stderr)
+    );
+    assert!(text(&empty_audit.stdout).contains("Audit chain: empty (0 recorded events"));
+
     let home = tmp.path().join("home");
     let (_tag, pass) = setup_escalated_vault(&home);
-
     let audit_list = ghostsoap(&home, &["audit", "--list", "--passphrase-stdin"], &pass);
     assert_eq!(
         audit_list.status.code(),
@@ -207,13 +286,14 @@ fn audit_verifies_encrypted_vault_text_and_json() {
     );
     assert_eq!(audit_json.status.code(), Some(0));
     let parsed: serde_json::Value = serde_json::from_slice(&audit_json.stdout).unwrap();
-    assert_eq!(parsed["verified"], true);
+    assert_eq!(parsed["chain_verified"], true);
+    assert_eq!(parsed["audit_entries_present"], true);
     assert_eq!(parsed["count"], 3);
     assert_eq!(parsed["escalations"], 1);
 }
 
 #[test]
-fn audit_verifies_plaintext_export_and_companion_manifest() {
+fn audit_verifies_plaintext_export_manifest_presence_and_flag_conflict() {
     let tmp = tempfile::tempdir().unwrap();
     let home = tmp.path().join("home");
     let (_tag, pass) = setup_escalated_vault(&home);
@@ -245,36 +325,53 @@ fn audit_verifies_plaintext_export_and_companion_manifest() {
         text(&verify_exp.stderr)
     );
     let exp_json: serde_json::Value = serde_json::from_slice(&verify_exp.stdout).unwrap();
-    assert_eq!(exp_json["manifest"]["files"][0], "backup.toml");
+    assert_eq!(
+        (
+            &exp_json["manifest_present"],
+            &exp_json["manifest_verified"]
+        ),
+        (&true.into(), &true.into())
+    );
 
-    let verify_both = ghostsoap(
+    let text_with = ghostsoap(
         &home,
-        &[
-            "audit",
-            "--export",
-            export_path.to_str().unwrap(),
-            "--manifest",
-            manifest_path.to_str().unwrap(),
-        ],
+        &["audit", "--export", export_path.to_str().unwrap()],
         "",
     );
-    assert_eq!(
-        verify_both.status.code(),
-        Some(0),
-        "{}",
-        text(&verify_both.stderr)
+    assert!(text(&text_with.stdout).contains("Companion manifest OK:"));
+    fs::remove_file(&manifest_path).unwrap();
+    let text_without = ghostsoap(
+        &home,
+        &["audit", "--export", export_path.to_str().unwrap()],
+        "",
     );
-    assert!(text(&verify_both.stdout).contains("Manifest OK:"));
+    assert!(text(&text_without.stdout).contains("Companion manifest: absent"));
 }
 
 #[test]
-fn escalation_bundle_manifest_verifies_and_detects_tampering() {
+fn audit_rejects_export_and_manifest_flags_together() {
+    let tmp = tempfile::tempdir().unwrap();
+    let conflict = ghostsoap(
+        tmp.path(),
+        &[
+            "audit",
+            "--export",
+            "backup.toml",
+            "--manifest",
+            "other.sha256",
+        ],
+        "",
+    );
+    assert_eq!(conflict.status.code(), Some(2));
+}
+
+#[test]
+fn escalation_bundle_verifies_and_detects_tampering() {
     let tmp = tempfile::tempdir().unwrap();
     let home = tmp.path().join("home");
     let (tag, pass) = setup_escalated_vault(&home);
-
     let bundle_dir = tmp.path().join("oaic-pack");
-    let bundle = ghostsoap(
+    let out = ghostsoap(
         &home,
         &[
             "export",
@@ -286,13 +383,12 @@ fn escalation_bundle_manifest_verifies_and_detects_tampering() {
         ],
         &pass,
     );
-    assert_eq!(bundle.status.code(), Some(0), "{}", text(&bundle.stderr));
-    let bundle_manifest = bundle_dir.join("manifest.sha256");
-    assert!(bundle_dir.join("summary.txt").is_file() && bundle_dir.join("record.toml").is_file());
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    let manifest = bundle_dir.join("manifest.sha256");
 
     let ok = ghostsoap(
         &home,
-        &["audit", "--manifest", bundle_manifest.to_str().unwrap()],
+        &["audit", "--manifest", manifest.to_str().unwrap()],
         "",
     );
     assert_eq!(ok.status.code(), Some(0), "{}", text(&ok.stderr));
@@ -300,12 +396,7 @@ fn escalation_bundle_manifest_verifies_and_detects_tampering() {
 
     let ok_json = ghostsoap(
         &home,
-        &[
-            "audit",
-            "--manifest",
-            bundle_manifest.to_str().unwrap(),
-            "--json",
-        ],
+        &["audit", "--manifest", manifest.to_str().unwrap(), "--json"],
         "",
     );
     assert_eq!(ok_json.status.code(), Some(0));
@@ -313,11 +404,45 @@ fn escalation_bundle_manifest_verifies_and_detects_tampering() {
     fs::write(bundle_dir.join("summary.txt"), "altered summary").unwrap();
     let tampered = ghostsoap(
         &home,
-        &["audit", "--manifest", bundle_manifest.to_str().unwrap()],
+        &["audit", "--manifest", manifest.to_str().unwrap()],
         "",
     );
     assert_eq!(tampered.status.code(), Some(1));
     assert!(text(&tampered.stderr).contains("SHA-256 mismatch"));
+}
+
+#[test]
+fn forget_cleans_default_escalation_bundle_and_keeps_unrelated_files() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    let (tag, pass) = setup_escalated_vault(&home);
+    let out = ghostsoap(
+        &home,
+        &["export", "--escalation", &tag, "--passphrase-stdin"],
+        &pass,
+    );
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+
+    let bundle_dir = fs::read_dir(&home)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .find(|p| {
+            p.file_name()
+                .unwrap()
+                .to_string_lossy()
+                .starts_with("ghostsoap-escalation-")
+        })
+        .expect("default escalation bundle");
+    fs::write(bundle_dir.join("extra-note.txt"), "user note").unwrap();
+
+    let forgot = ghostsoap(&home, &["forget", "--passphrase-stdin", "--yes"], &pass);
+    assert_eq!(forgot.status.code(), Some(0), "{}", text(&forgot.stderr));
+    let forgot_out = text(&forgot.stdout);
+    assert!(forgot_out.contains("the escalation bundle in"));
+    assert!(forgot_out.contains("Deleted 3 escalation bundle files"));
+    assert!(forgot_out.contains("kept    extra-note.txt"));
+    assert!(bundle_dir.join("extra-note.txt").is_file());
+    assert!(!bundle_dir.join("record.toml").exists());
 }
 
 #[test]

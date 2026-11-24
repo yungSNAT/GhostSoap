@@ -17,18 +17,24 @@ pub(super) struct Output {
     pub(super) mailto: bool,
 }
 
-pub(super) fn draft(
-    selection: &Selection,
-    out: Option<PathBuf>,
-    output: Output,
-    passphrase_stdin: bool,
-) -> Result<(), String> {
-    let register = built_in_register()?;
-    let steps = plan::plan(&register, selection)?;
-    let dir = drafts_dir(out.as_deref())?;
-    warn_about_out(&dir, out.is_some(), output);
+impl Output {
+    /// Raw `.eml` to stdout: one message only, with all CLI notes routed to stderr.
+    pub(super) fn is_raw_eml(self) -> bool {
+        self.copy && self.format == DraftFormat::Eml
+    }
+}
+
+fn emit_note(raw_eml: bool, line: std::fmt::Arguments) {
+    if raw_eml {
+        eprintln!("{line}");
+    } else {
+        println!("{line}");
+    }
+}
+
+fn collect_planned<'a>(steps: &'a [Step<'a>], raw_eml: bool) -> Result<Vec<Planned<'a>>, String> {
     let mut planned = Vec::new();
-    for step in &steps {
+    for step in steps {
         match step {
             Step::Letter {
                 entry,
@@ -39,10 +45,72 @@ pub(super) fn draft(
                 channel,
                 levers,
             }),
-            Step::Overseas { entry } => print_overseas(entry),
-            Step::Skip { entry, reason } => println!("skip    {}: {reason}", entry.id),
+            Step::Overseas { entry } if !raw_eml => print_overseas(entry),
+            Step::Overseas { entry } => eprintln!("manual  {}: overseas entry", entry.id),
+            Step::Skip { entry, reason } => {
+                emit_note(raw_eml, format_args!("skip    {}: {reason}", entry.id))
+            }
         }
     }
+    if raw_eml && planned.len() > 1 {
+        return Err(
+            "`draft --format eml --copy` outputs one raw .eml message at a time; select a              single entry and channel"
+                .to_owned(),
+        );
+    }
+    Ok(planned)
+}
+
+fn report_draft_notes(drafted: &Drafted, raw_eml: bool) {
+    let Drafted { entry, tag, .. } = drafted;
+    for &field in &drafted.missing {
+        emit_note(
+            raw_eml,
+            format_args!(
+                "note    {}: your profile has no {}, so the letter leaves it out",
+                entry.id,
+                field_name(field)
+            ),
+        );
+    }
+    if let Some(earlier) = &drafted.replaces {
+        let dropped: Vec<&str> = drafted.dropped.iter().map(|l| l.name()).collect();
+        let dropped = match dropped.as_slice() {
+            [] => String::new(),
+            names => format!(" and no longer asks for {}", names.join(", ")),
+        };
+        if earlier == tag {
+            emit_note(
+                raw_eml,
+                format_args!(
+                    "note    {}: this draft replaces the earlier one under {tag}{dropped}",
+                    entry.id
+                ),
+            );
+        } else {
+            emit_note(
+                raw_eml,
+                format_args!(
+                    "note    {}: draft {tag} replaces {earlier}{dropped}; the earlier record stays as history",
+                    entry.id
+                ),
+            );
+        }
+    }
+}
+
+pub(super) fn draft(
+    selection: &Selection,
+    out: Option<PathBuf>,
+    output: Output,
+    passphrase_stdin: bool,
+) -> Result<(), String> {
+    let register = built_in_register()?;
+    let steps = plan::plan(&register, selection)?;
+    let dir = drafts_dir(out.as_deref())?;
+    warn_about_out(&dir, out.is_some(), output);
+    let raw_eml = output.is_raw_eml();
+    let planned = collect_planned(&steps, raw_eml)?;
     if !planned.is_empty() {
         let folder = if output.copy {
             None
@@ -64,15 +132,20 @@ pub(super) fn draft(
             },
         )?;
         let tags: Vec<&str> = drafted.iter().map(|d| d.tag.as_str()).collect();
-        println!(
-            "After you send a letter, record it: ghostsoap sent {}",
-            tags.join(" ")
+        emit_note(
+            raw_eml,
+            format_args!(
+                "After you send a letter, record it: ghostsoap sent {}",
+                tags.join(" ")
+            ),
         );
         if !output.copy {
             print_clean_reminder();
         }
     }
-    access_warning(selection);
+    if let Some(text) = access_warning_text(selection) {
+        emit_note(raw_eml, format_args!("warning: {text}"));
+    }
     Ok(())
 }
 
@@ -282,31 +355,7 @@ pub(super) fn hand_over(dir: &Path, drafted: &Drafted, output: Output) -> Result
     let Drafted {
         entry, tag, letter, ..
     } = drafted;
-    for &field in &drafted.missing {
-        println!(
-            "note    {}: your profile has no {}, so the letter leaves it out",
-            entry.id,
-            field_name(field)
-        );
-    }
-    if let Some(earlier) = &drafted.replaces {
-        let dropped: Vec<&str> = drafted.dropped.iter().map(|l| l.name()).collect();
-        let dropped = match dropped.as_slice() {
-            [] => String::new(),
-            names => format!(" and no longer asks for {}", names.join(", ")),
-        };
-        if earlier == tag {
-            println!(
-                "note    {}: this draft replaces the earlier one under {tag}{dropped}",
-                entry.id
-            );
-        } else {
-            println!(
-                "note    {}: draft {tag} replaces {earlier}{dropped}; the earlier record stays as history",
-                entry.id
-            );
-        }
-    }
+    report_draft_notes(drafted, output.is_raw_eml());
     if output.copy {
         if output.format == DraftFormat::Eml {
             write_stdout(letters::eml(letter).as_bytes());

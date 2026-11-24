@@ -250,3 +250,16 @@ fn lever_and_channel_names_parse_as_the_register_writes_them() {
         Err("use email, web-form, post or phone".to_owned())
     );
 }
+
+#[test]
+fn audit_command_rejects_export_and_manifest_together() {
+    let args = AuditArgs {
+        export: Some(PathBuf::from("a.toml")),
+        manifest: Some(PathBuf::from("b.sha256")),
+        list: false,
+        json: false,
+        passphrase_stdin: false,
+    };
+    let err = audit_command(&args).unwrap_err();
+    assert!(err.contains("cannot be used together"), "{err}");
+}

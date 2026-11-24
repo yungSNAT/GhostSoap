@@ -191,10 +191,10 @@ pub struct DemoArgs {
 pub struct AuditArgs {
     /// Verify the audit chain in a plaintext export file (and its companion `.sha256`
     /// manifest if present) without unlocking the vault.
-    #[arg(long)]
+    #[arg(long, conflicts_with = "manifest")]
     pub(super) export: Option<PathBuf>,
     /// Verify every SHA-256 digest listed in an export or escalation manifest file.
-    #[arg(long)]
+    #[arg(long, conflicts_with = "export")]
     pub(super) manifest: Option<PathBuf>,
     /// Print every entry in the verified audit chain.
     #[arg(long)]

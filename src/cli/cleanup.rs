@@ -88,14 +88,15 @@ pub(super) fn forget(no_passphrase: bool, yes: bool, passphrase_stdin: bool) -> 
     let dir = state::data_dir().map_err(|e| e.to_string())?;
     let mut input = Input::new(passphrase_stdin);
     let files = state::own_files(&dir).map_err(|e| e.to_string())?;
+    let bundles = io::bundle::own_escalation_bundles(&dir).map_err(|e| e.to_string())?;
     let mut folders = draft_folders(&dir, no_passphrase, &mut input)?;
     folders.retain(|folder| folder.exists());
-    if files.is_empty() && folders.is_empty() {
+    if files.is_empty() && bundles.is_empty() && folders.is_empty() {
         println!("GhostSoap has nothing to delete in {}.", dir.display());
         return Ok(());
     }
     let lock = state::lock(&dir).map_err(|e| e.to_string())?;
-    list_forgotten(&files, &folders, no_passphrase);
+    list_forgotten(&files, &bundles, &folders, no_passphrase);
     if !yes
         && input
             .line("Type forget to delete them: ")
@@ -109,6 +110,14 @@ pub(super) fn forget(no_passphrase: bool, yes: bool, passphrase_stdin: bool) -> 
     for file in &files {
         let deleted = std::fs::remove_file(file).map(|()| println!("Deleted {}.", file.display()));
         tally(file, deleted, &mut failed);
+    }
+    for bundle in &bundles {
+        let cleaned = io::bundle::clean_escalation_bundle(bundle);
+        tally(
+            bundle,
+            cleaned.map(|c| report_cleaned_bundle(bundle, &c)),
+            &mut failed,
+        );
     }
     for folder in &folders {
         let cleaned = refuse_link(folder).and_then(|()| io::drafts::clean(folder, *folder == own));
@@ -128,10 +137,21 @@ pub(super) fn forget(no_passphrase: bool, yes: bool, passphrase_stdin: bool) -> 
 }
 
 /// Show what `forget` will delete, and what it cannot look for.
-pub(super) fn list_forgotten(files: &[PathBuf], folders: &[PathBuf], no_passphrase: bool) {
+pub(super) fn list_forgotten(
+    files: &[PathBuf],
+    bundles: &[PathBuf],
+    folders: &[PathBuf],
+    no_passphrase: bool,
+) {
     println!("GhostSoap will delete:");
     for file in files {
         println!("    {}", file.display());
+    }
+    for bundle in bundles {
+        println!(
+            "    the escalation bundle in {} (known bundle files only; other files stay)",
+            bundle.display()
+        );
     }
     for folder in folders {
         println!(
@@ -193,6 +213,17 @@ pub(super) fn tally(path: &Path, result: std::io::Result<()>, failed: &mut usize
     if let Err(e) = result {
         *failed += 1;
         eprintln!("error: cannot delete {}: {e}", path.display());
+    }
+}
+
+fn report_cleaned_bundle(dir: &Path, cleaned: &io::bundle::CleanedBundle) {
+    println!(
+        "Deleted {} escalation bundle files from {}.",
+        cleaned.deleted,
+        dir.display()
+    );
+    for name in &cleaned.kept {
+        println!("kept    {name}: unrelated file left in {}", dir.display());
     }
 }
 
