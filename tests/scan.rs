@@ -113,7 +113,7 @@ mod open {
             "https://au.infotracer.com/\n\
              https://privacy.peopledatalabs.com/policies?name=privacy-policy\n"
         );
-        assert!(text(&out.stdout).contains("Opened 2 pages"));
+        assert!(text(&out.stdout).contains("Handed 2 pages to your browser"));
     }
 
     #[test]

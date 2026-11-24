@@ -48,6 +48,11 @@ strip = true
 [target.'cfg(target_env = "musl")'.dependencies]
 mimalloc = { version = "0.1", features = ["no_thp"] }
 
+# Windows only: the System32 directory comes from the system, not from an environment
+# variable (`scan --open` runs rundll32.exe by absolute path).
+[target.'cfg(windows)'.dependencies]
+known-folders = "1.4.2"
+
 [dev-dependencies]
 tempfile = "3.27.0"
 
