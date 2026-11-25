@@ -226,7 +226,8 @@ pub(super) fn record_drafts<'a>(
     for letter in drafted.iter().filter(|d| uses_pdf(d.letter.kind, format)) {
         letters::pdf(&letter.letter).map_err(|c| {
             format!(
-                "the letter to {} holds '{c}' (U+{:04X}), which a PDF's standard font cannot                  show; draft it with --format text instead",
+                "the letter to {} holds '{c}' (U+{:04X}), which a PDF's standard font cannot \
+                 show; draft it with --format text instead",
                 letter.entry.id, c as u32
             )
         })?;

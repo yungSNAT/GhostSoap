@@ -9,7 +9,7 @@ mod common;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use common::{PASSPHRASE, ghostsoap, init, text};
+use common::{PASSPHRASE, emls, ghostsoap, init, text};
 
 fn files(dir: &Path) -> Vec<PathBuf> {
     let mut files: Vec<PathBuf> = fs::read_dir(dir)
@@ -44,6 +44,7 @@ fn a_postal_letter_is_written_as_a_pdf_that_clean_removes() {
     assert!(text(&out.stdout).contains("print and post to"));
     let written = files(&drafts);
     assert_eq!(written.len(), 1, "{written:?}");
+    assert!(emls(&drafts).is_empty());
     assert_eq!(written[0].extension().unwrap(), "pdf");
     let pdf = fs::read_to_string(&written[0]).unwrap();
     assert!(pdf.starts_with("%PDF-1.4\n") && pdf.contains("(Name: Lara Croft) Tj T*"));
@@ -84,10 +85,17 @@ fn a_name_the_pdf_font_cannot_show_stops_the_run_before_anything_is_recorded() {
     let refused = draft("pdf");
     assert_ne!(refused.status.code(), Some(0));
     let stderr = text(&refused.stderr);
-    assert!(stderr.contains("U+674E") && stderr.contains("--format text"), "{stderr}");
+    assert!(
+        stderr.contains("U+674E") && stderr.contains("--format text"),
+        "{stderr}"
+    );
     assert!(!drafts.exists() || files(&drafts).is_empty());
     let status = ghostsoap(&home, &["status", "--passphrase-stdin"], &pass);
-    assert!(!text(&status.stdout).contains("anz-au"), "{}", text(&status.stdout));
+    assert!(
+        !text(&status.stdout).contains("anz-au"),
+        "{}",
+        text(&status.stdout)
+    );
 
     let written = draft("text");
     assert_eq!(written.status.code(), Some(0), "{}", text(&written.stderr));

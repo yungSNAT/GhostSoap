@@ -17,6 +17,13 @@ const LINES_PER_PAGE: usize = 58;
 
 /// The PDF, all ASCII, or the first character the standard font cannot show.
 pub fn pdf(letter: &Letter) -> Result<String, char> {
+    let lines = layout(letter)?;
+    let pages: Vec<&[Vec<u8>]> = lines.chunks(LINES_PER_PAGE).collect();
+    Ok(serialise(&objects(&pages)))
+}
+
+/// The body's lines as WinAnsi bytes, each at most `COLUMNS` long.
+fn layout(letter: &Letter) -> Result<Vec<Vec<u8>>, char> {
     let mut lines = Vec::new();
     for line in letter.body.split('\n') {
         let mut bytes = Vec::new();
@@ -29,8 +36,11 @@ pub fn pdf(letter: &Letter) -> Result<String, char> {
             lines.extend(bytes.chunks(COLUMNS).map(<[u8]>::to_vec));
         }
     }
-    let pages: Vec<&[Vec<u8>]> = lines.chunks(LINES_PER_PAGE).collect();
-    // Objects: 1 catalogue, 2 page tree, 3 font, then a page and its content for each page.
+    Ok(lines)
+}
+
+/// Objects: 1 catalogue, 2 page tree, 3 font, then a page and its content for each page.
+fn objects(pages: &[&[Vec<u8>]]) -> Vec<String> {
     let mut objects = vec![
         "<< /Type /Catalog /Pages 2 0 R >>".to_owned(),
         format!(
@@ -62,6 +72,12 @@ pub fn pdf(letter: &Letter) -> Result<String, char> {
             content.len()
         ));
     }
+    objects
+}
+
+/// The file: header, numbered objects, the cross-reference table at their byte offsets and
+/// the trailer.
+fn serialise(objects: &[String]) -> String {
     let mut out = String::from("%PDF-1.4\n");
     let mut offsets = Vec::new();
     for (i, object) in objects.iter().enumerate() {
@@ -80,7 +96,7 @@ pub fn pdf(letter: &Letter) -> Result<String, char> {
         "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n",
         objects.len() + 1
     ));
-    Ok(out)
+    out
 }
 
 /// A PDF string's contents: printable ASCII as itself, with `(`, `)` and `\` escaped, and every
@@ -215,7 +231,13 @@ mod tests {
         let pdf = pdf(&letter(&body.repeat(30))).unwrap();
         let decoded: Vec<u8> = shown_lines(&pdf).join(&b'\n');
         let expected: Vec<u8> = (body.repeat(30).chars())
-            .map(|c| if c == '\n' { b'\n' } else { win_ansi(c).unwrap() })
+            .map(|c| {
+                if c == '\n' {
+                    b'\n'
+                } else {
+                    win_ansi(c).unwrap()
+                }
+            })
             .collect();
         assert_eq!(decoded, expected);
         assert!(pdf.contains(r"(Name: Zo\353 O\222Brien \(n\351e M\374ller\) \\ 50% \226 \2005"));
