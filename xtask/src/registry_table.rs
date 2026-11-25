@@ -11,9 +11,12 @@ use ghostsoap::core::register::Register;
 const START: &str = "<!-- entries:start -->";
 const END: &str = "<!-- entries:end -->";
 
-/// One row per entry, in id order, with the packs that name it and how a user reaches it.
+/// One row per entry, in id order, with the packs that name it, how a user reaches it and
+/// the day it was last verified.
 fn table(register: &Register) -> String {
-    let mut out = String::from("| Entry | Name | Kinds | Packs | Route |\n|---|---|---|---|---|\n");
+    let mut out = String::from(
+        "| Entry | Name | Kinds | Packs | Route | Verified |\n|---|---|---|---|---|---|\n",
+    );
     for entry in register.entries.values() {
         let kinds: Vec<String> = entry
             .kinds
@@ -37,12 +40,13 @@ fn table(register: &Register) -> String {
             None => "letter".to_owned(),
         };
         out.push_str(&format!(
-            "| `{}` | {} | {} | {} | {} |\n",
+            "| `{}` | {} | {} | {} | {} | {} |\n",
             entry.id,
             cell(&entry.name),
             kinds.join(", "),
             packs.join(", "),
-            route
+            route,
+            entry.verified_at
         ));
     }
     out
