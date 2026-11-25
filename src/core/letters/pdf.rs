@@ -119,9 +119,9 @@ fn escape(bytes: &[u8]) -> String {
 /// The WinAnsiEncoding byte for `c` (PDF 1.7, Annex D), if it has one.
 fn win_ansi(c: char) -> Option<u8> {
     let byte = match c {
-        // No-break space and soft hyphen are left out: the font draws them as an ordinary
-        // space and a visible hyphen.
-        ' '..='~' | '\u{A1}'..='\u{AC}' | '\u{AE}'..='\u{FF}' => c as u8,
+        // The soft hyphen is left out: the font would print it as a visible hyphen. A no-break
+        // space prints as a space, as it looks in the text.
+        ' '..='~' | '\u{A0}'..='\u{AC}' | '\u{AE}'..='\u{FF}' => c as u8,
         '€' => 0x80,
         '‚' => 0x82,
         'ƒ' => 0x83,
@@ -274,7 +274,7 @@ mod tests {
         for c in '\u{80}'..='\u{9F}' {
             assert_eq!(win_ansi(c), None);
         }
-        assert_eq!(win_ansi('\u{A0}'), None);
+        assert_eq!(win_ansi('\u{A0}'), Some(0xA0));
         assert_eq!(win_ansi('\u{AD}'), None);
         assert_eq!(win_ansi('\u{A1}'), Some(0xA1));
         assert_eq!(win_ansi('ÿ'), Some(0xFF));
