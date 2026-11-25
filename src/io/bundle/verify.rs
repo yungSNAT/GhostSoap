@@ -63,16 +63,11 @@ pub fn verify_manifest_file(manifest: &Path) -> Result<ManifestCheck, String> {
 
 /// Decode a GhostSoap `State` export without running `State::problems`, so a tampered
 /// `audit` chain still decodes for exact chain diagnosis whilst early format-2 `days`
-/// exports are accepted via `state::rename_days`.
+/// exports are accepted as `state::load` accepts them.
 fn parse_export_state(export_path: &Path, text: &str) -> Result<State, String> {
-    let mut table: toml::Table =
-        toml::from_str(text).map_err(|e| redact_toml_error(export_path, text, &e))?;
-    if state::rename_days(&mut table) {
-        table.try_into()
-    } else {
-        toml::from_str(text)
-    }
-    .map_err(|e| redact_toml_error(export_path, text, &e))
+    let redact = |e: toml::de::Error| redact_toml_error(export_path, text, &e);
+    let table: toml::Table = toml::from_str(text).map_err(redact)?;
+    state::decode_format2(table, text).map_err(redact)
 }
 
 /// Redact TOML parse errors so raw PII lines from an export never appear in stderr/logs.

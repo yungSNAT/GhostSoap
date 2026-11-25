@@ -320,22 +320,15 @@ fn format_due(due: Due) -> String {
     }
 }
 
-fn requires_s40_1a(lever: Lever) -> bool {
-    !matches!(
-        lever,
-        Lever::S20rAccess
-            | Lever::S20tCorrection
-            | Lever::S21tAccess
-            | Lever::S21vCorrection
-            | Lever::SpamUnsubscribe
-    )
-}
-
 fn is_s40_1b(lever: Lever) -> bool {
     matches!(
         lever,
         Lever::S20rAccess | Lever::S20tCorrection | Lever::S21tAccess | Lever::S21vCorrection
     )
+}
+
+fn requires_s40_1a(lever: Lever) -> bool {
+    !is_s40_1b(lever) && lever != Lever::SpamUnsubscribe
 }
 
 fn has_recorded_escalation(message: &Message) -> bool {
@@ -347,22 +340,30 @@ fn has_recorded_escalation(message: &Message) -> bool {
     })
 }
 
-/// Eligibility note under Privacy Act ss 40(1A)-(1B) or the Spam Act for `message`.
-pub fn escalation_eligibility(message: &Message) -> &'static str {
-    if message.requests.iter().any(|r| requires_s40_1a(r.lever)) {
-        if has_recorded_escalation(message) {
-            "Privacy Act s 40(1A): applies (confirm a prior complaint to the business was made \
-             and allowed about 30 days, unless not appropriate)"
+/// Eligibility notes under Privacy Act ss 40(1A)-(1B) and the Spam Act for `message`, one
+/// for each that applies to at least one of its requests.
+pub fn escalation_eligibility(message: &Message) -> Vec<&'static str> {
+    let any = |test: fn(Lever) -> bool| message.requests.iter().any(|r| test(r.lever));
+    let mut notes = Vec::new();
+    if any(requires_s40_1a) {
+        notes.push(if has_recorded_escalation(message) {
+            "Privacy Act s 40(1A): applies (confirm you complained to the business first, unless \
+             that was not appropriate; the OAIC's guidance gives the business 30 days to respond)"
         } else {
             "Privacy Act s 40(1A): applies (no complaint to the business or escalation recorded; \
              complain to the business first unless not appropriate)"
-        }
-    } else if message.requests.iter().any(|r| is_s40_1b(r.lever)) {
-        "Privacy Act s 40(1B): complain-first precondition does not apply to ss 20R, 20T, 21T or \
-         21V requests"
-    } else {
-        "Spam Act 2003: spam complaints go to the ACMA rather than the OAIC"
+        });
     }
+    if any(is_s40_1b) {
+        notes.push(
+            "Privacy Act s 40(1B): complain-first precondition does not apply to ss 20R, 20T, 21T \
+             or 21V requests",
+        );
+    }
+    if any(|lever| lever == Lever::SpamUnsubscribe) {
+        notes.push("Spam Act 2003: spam complaints go to the ACMA rather than the OAIC");
+    }
+    notes
 }
 
 /// State and Privacy Act s 40(1A) warnings to surface when exporting an escalation bundle.
@@ -393,8 +394,9 @@ pub fn escalation_notices(message: &Message) -> Vec<String> {
     {
         notices.push(
             "Privacy Act s 40(1A): no complaint to the business or escalation is recorded; the \
-             OAIC generally must not investigate unless you complained to the business first \
-             (allow about 30 days) or complaining to it was not appropriate"
+             OAIC must not investigate unless you complained to the business first or it \
+             decides complaining to the business was not appropriate; its guidance gives the \
+             business 30 days to respond"
                 .to_owned(),
         );
     }
@@ -425,10 +427,9 @@ fn append_escalation_header(out: &mut String, message: &Message, entry: Option<&
         Some(sent) => out.push_str(&format!("Sent: {} by {}\n", sent.on, sent.channel.label())),
         None => out.push_str("Sent: not recorded\n"),
     }
-    out.push_str(&format!(
-        "Eligibility: {}\n",
-        escalation_eligibility(message)
-    ));
+    for note in escalation_eligibility(message) {
+        out.push_str(&format!("Eligibility: {note}\n"));
+    }
     let notices = escalation_notices(message);
     if !notices.is_empty() {
         out.push_str("\nNotices:\n");

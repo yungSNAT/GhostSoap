@@ -293,7 +293,7 @@ fn escalation_notices_and_eligibility_cover_state_flags_and_s40_provisions() {
     assert!(escalation_notices(&escalated).is_empty());
     let esc_summary =
         format_escalation_summary(&escalated, None, &[], &empty_summary, date(2026, 11, 25));
-    assert!(esc_summary.contains("confirm a prior complaint to the business"));
+    assert!(esc_summary.contains("confirm you complained to the business first"));
     assert!(!esc_summary.contains("\nNotices:\n"));
 
     // Part IIIA s 40(1B) credit requests need no prior complaint to the business.
@@ -304,13 +304,21 @@ fn escalation_notices_and_eligibility_cover_state_flags_and_s40_provisions() {
     }));
     credit.requests = vec![Request::new(Lever::S20rAccess)];
     assert!(escalation_notices(&credit).is_empty());
-    assert!(escalation_eligibility(&credit).contains("Privacy Act s 40(1B)"));
+    let notes = escalation_eligibility(&credit);
+    assert!(
+        notes.len() == 1 && notes[0].starts_with("Privacy Act s 40(1B)"),
+        "{notes:?}"
+    );
 
     // Spam Act requests route to the ACMA rather than the OAIC.
     let mut spam = credit;
     spam.requests = vec![Request::new(Lever::SpamUnsubscribe)];
     assert!(escalation_notices(&spam).is_empty());
-    assert!(escalation_eligibility(&spam).contains("Spam Act 2003"));
+    let notes = escalation_eligibility(&spam);
+    assert!(
+        notes.len() == 1 && notes[0].starts_with("Spam Act 2003"),
+        "{notes:?}"
+    );
 }
 
 #[test]
@@ -341,10 +349,16 @@ fn escalation_summary_names_every_route_a_mixed_message_needs() {
     for (levers, present, absent) in cases {
         let summary = summary_for(levers);
         for needle in present {
-            assert!(summary.contains(needle), "{needle} missing for {levers:?}:\n{summary}");
+            assert!(
+                summary.contains(needle),
+                "{needle} missing for {levers:?}:\n{summary}"
+            );
         }
         for needle in absent {
-            assert!(!summary.contains(needle), "{needle} wrongly shown for {levers:?}:\n{summary}");
+            assert!(
+                !summary.contains(needle),
+                "{needle} wrongly shown for {levers:?}:\n{summary}"
+            );
         }
     }
 }
