@@ -142,7 +142,7 @@ fn decode(text: &str) -> io::Result<State> {
 /// to the kind its lever's law gives, so the typed read sees only the kinds' own names and
 /// refuses a kind written by its name for a lever whose law does not give it. Whether any
 /// was renamed.
-fn rename_days(table: &mut toml::Table) -> bool {
+pub(crate) fn rename_days(table: &mut toml::Table) -> bool {
     let mut renamed = false;
     let messages = table
         .get_mut("messages")

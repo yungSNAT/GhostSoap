@@ -249,3 +249,66 @@ fn escalation_summary_covers_unsent_and_sent_states() {
         assert!(sent.contains(needle), "{needle} missing from {sent}");
     }
 }
+
+#[test]
+fn escalation_notices_and_eligibility_cover_state_flags_and_s40_provisions() {
+    use crate::core::tracker::{Event, StatusEvent};
+
+    // Unsent, unfinished, superseded and unescalated s 40(1A) message flags all 4 notices.
+    let mut flagged = sample_message();
+    flagged.unfinished = true;
+    flagged.superseded = true;
+    let notices = escalation_notices(&flagged);
+    assert_eq!(notices.len(), 4, "{notices:?}");
+    assert!(
+        notices
+            .iter()
+            .any(|n| n.contains("draft run did not finish"))
+    );
+    assert!(notices.iter().any(|n| n.contains("superseded")));
+    assert!(notices.iter().any(|n| n.contains("not recorded as sent")));
+    assert!(notices.iter().any(|n| n.contains("Privacy Act s 40(1A)")));
+
+    let empty_summary = verify_chain(&[]).unwrap();
+    let flagged_summary =
+        format_escalation_summary(&flagged, None, &[], &empty_summary, date(2026, 11, 25));
+    assert!(flagged_summary.contains("Eligibility: Privacy Act s 40(1A): applies (no complaint"));
+    assert!(flagged_summary.contains("\nNotices:\n"));
+
+    // Sent and escalated s 40(1A) message has no notices and confirms s 40(1A) applies.
+    let mut escalated = sample_message();
+    escalated.sends.push(SendRecord::Sent(Send {
+        on: date(2026, 10, 10),
+        channel: ChannelKind::Email,
+    }));
+    escalated.requests[0]
+        .events
+        .push(Event::Status(StatusEvent {
+            on: date(2026, 11, 15),
+            status: Status::Escalated,
+            reason: None,
+            source: None,
+            note: None,
+        }));
+    assert!(escalation_notices(&escalated).is_empty());
+    let esc_summary =
+        format_escalation_summary(&escalated, None, &[], &empty_summary, date(2026, 11, 25));
+    assert!(esc_summary.contains("confirm a prior complaint to the business"));
+    assert!(!esc_summary.contains("\nNotices:\n"));
+
+    // Part IIIA s 40(1B) credit requests need no prior complaint to the business.
+    let mut credit = sample_message();
+    credit.sends.push(SendRecord::Sent(Send {
+        on: date(2026, 10, 10),
+        channel: ChannelKind::Email,
+    }));
+    credit.requests = vec![Request::new(Lever::S20rAccess)];
+    assert!(escalation_notices(&credit).is_empty());
+    assert!(escalation_eligibility(&credit).contains("Privacy Act s 40(1B)"));
+
+    // Spam Act requests route to the ACMA rather than the OAIC.
+    let mut spam = credit;
+    spam.requests = vec![Request::new(Lever::SpamUnsubscribe)];
+    assert!(escalation_notices(&spam).is_empty());
+    assert!(escalation_eligibility(&spam).contains("Spam Act 2003"));
+}
