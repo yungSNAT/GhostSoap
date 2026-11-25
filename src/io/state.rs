@@ -114,13 +114,7 @@ fn decode(text: &str) -> io::Result<State> {
             Ok(State::new(old.profile))
         }
         Some(2) => {
-            let mut table = table;
-            // Parsing the text, not the table, keeps the line of an error.
-            let state: State = if rename_days(&mut table) {
-                table.try_into().map_err(unreadable)?
-            } else {
-                toml::from_str(text).map_err(unreadable)?
-            };
+            let state = decode_format2(table, text).map_err(unreadable)?;
             match state.problems().first() {
                 None => Ok(state),
                 Some(problem) => Err(io::Error::other(format!(
@@ -135,6 +129,17 @@ fn decode(text: &str) -> io::Result<State> {
         _ => Err(io::Error::other(
             "cannot read the state: it has no format this version knows",
         )),
+    }
+}
+
+/// Read `text`, already parsed as `table`, as a format 2 state, accepting the early `days`
+/// key. It does not check `State::problems`.
+pub(crate) fn decode_format2(mut table: toml::Table, text: &str) -> Result<State, toml::de::Error> {
+    if rename_days(&mut table) {
+        table.try_into()
+    } else {
+        // Parsing the text, not the table, keeps the line of an error.
+        toml::from_str(text)
     }
 }
 
