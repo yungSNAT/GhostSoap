@@ -1,0 +1,16 @@
+rank = 115
+title = "Turn off AI training on what you post or type"
+why = "Some services use what you post, upload or type into their AI features to train AI models. The OAIC's guidance for AI developers says that where a developer cannot clearly show such a use was within your reasonable expectations, to avoid regulatory risk it should seek your consent or offer you a meaningful and informed way to opt out."
+steps = [
+  "In each service you use that has AI features, such as social media, chat assistants and writing or photo apps, look in its privacy or data settings for an option about using your content to train or improve AI models, and turn it off where one exists.",
+  "Not every service offers this choice. Where none exists, think about what you post, upload or type into that service.",
+  "Check the settings again when a service announces new AI features or changes its privacy policy.",
+]
+applies = "Everyone who uses online services with AI features"
+effort = "an-hour"
+recheck_months = 6
+
+[[links]]
+name = "OAIC: Guidance on privacy and developing and training generative AI models"
+url = "https://www.oaic.gov.au/privacy/privacy-guidance-for-organisations-and-government-agencies/guidance-on-privacy-and-developing-and-training-generative-ai-models"
+checked = 2026-11-25
