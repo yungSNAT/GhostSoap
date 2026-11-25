@@ -62,7 +62,7 @@ fn row(entry: &Entry) -> String {
         "      <tr><td>{name}</td><td>{}</td><td>{}</td><td>{}</td><td class=\"date\">{}</td></tr>\n",
         kinds.join(", "),
         escape(&route(entry)),
-        named(serde_json::to_value(entry.effort)),
+        format!("{:?}", entry.effort).to_lowercase(),
         entry.verified_at
     )
 }
