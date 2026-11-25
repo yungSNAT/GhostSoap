@@ -169,6 +169,13 @@ pub(super) fn status(due_only: bool, passphrase_stdin: bool) -> Result<(), Strin
         "{}",
         counts(|a| rows.iter().filter(|r| r.0 == a).count().to_string())
     );
+    if rows.is_empty() {
+        println!(
+            "Nothing tracked yet: no letter has been drafted, so these counts are not an \
+             all-clear. `ghostsoap plan` shows the letters it would draft."
+        );
+        return Ok(());
+    }
     if due_only {
         rows.retain(|row| due_date(row.1).is_some());
         rows.sort_by_key(|row| due_date(row.1));
