@@ -13,7 +13,7 @@ use std::process::Output;
 
 use common::{PASSPHRASE, ghostsoap, init, text};
 
-const ITEMS: [&str; 14] = [
+const ITEMS: [&str; 15] = [
     "breach-check",
     "credit-reports",
     "credit-ban",
@@ -27,6 +27,7 @@ const ITEMS: [&str; 14] = [
     "my-health-record",
     "loyalty-marketing",
     "social-media",
+    "ai-training",
     "doxxing",
 ];
 
