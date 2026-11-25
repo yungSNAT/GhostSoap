@@ -19,9 +19,9 @@
 
 _GhostSoap at no Price._
 
-GhostSoap is a free, local-first tool that helps people in Australia reclaim their privacy. It prepares Privacy Act requests to data brokers, recruiters and other businesses for you to send from your own mailbox, tracks each deadline and reply, and guides you through the data hygiene steps email cannot fix. A planned milestone adds an escalation file when a business does not respond.
+GhostSoap is a free, local-first tool that helps people in Australia reclaim their privacy. It prepares Privacy Act requests to data brokers, recruiters and other businesses for you to send from your own mailbox, tracks each deadline and reply, guides you through the data hygiene steps email cannot fix, and exports a tamper-evident OAIC escalation bundle when a business does not respond.
 
-**Status: milestones M2 and M4, with M3a under way.** GhostSoap has a sourced [register](registry/README.md) of Australian entities, prepares request letters for you to send yourself and records each letter, the day you sent it and each answer, lists what to do next with each request's dates, and keeps a checklist of data hygiene steps with your progress. The [plan](docs/plan.md) sets out what comes next.
+**Status: milestones M0 to M2, M3a and M4 complete.** GhostSoap has a sourced [register](registry/README.md) of Australian entities, prepares request letters for you to send yourself, opens people-search pages with `scan`, runs a zero-PII `demo`, records each letter, the day you sent it and each answer, lists what to do next with each request's dates, verifies its hash-chained log with `audit`, exports plaintext backups and OAIC escalation bundles (`export --escalation`), and keeps a checklist of data hygiene steps with your progress. The [plan](docs/plan.md) sets out what comes next.
 
 ## Install
 
@@ -119,9 +119,9 @@ GhostSoap provides information and templates, not legal advice. For advice, cont
 
 GhostSoap suits you if you want to keep your details on your own computer and send each request yourself. Other options fit other needs:
 
-- **Someone else does the work:** [ClearTrace AU](https://cleartrace.au/) and [Optery's paid plans](https://www.optery.com/pricing-australia/) handle removals for you, which means giving them your details.
-- **A guide rather than a tool:** [Serus's Australian guide](https://www.serus.ai/privacy-laws/remove-your-data-australia/) is free and covers opt-outs site by site. Serus also sells removal tools.
-- **The tool sends and follows up for you, or you live outside Australia:** [Stealth](https://github.com/Anish25012/stealth) (MIT) also runs on your own computer, and it sends letters from your mailbox and reads the replies, which GhostSoap does not. From its README, read on 24 November 2026 at commit [`7e9ef644`](https://github.com/Anish25012/stealth/tree/7e9ef644b66f9f43f8eacdb2593aa8eddc4cac99) (22 November 2026): it is built for the UK and drafts complaints to the UK's Information Commissioner's Office; it also writes lighter letters for the EU and EEA, Switzerland, California, Canada and Australia, which it says have not yet been used for real; for Australia it opts out of marketing or withdraws consent instead of asking for erasure; it sends a formal complaint to a business that misses its deadline and drafts answers to requests for ID; you can add a business by its website; its default list is counted for a UK user (75 contacts, with 517 optional, mostly US firms), and Australian contacts are not mentioned there; and breach monitoring and a recovery playbook are on its roadmap, not yet built.
+- **Someone else does the work:** paid data-removal services handle removals for you, which means giving them your details.
+- **A guide rather than a tool:** free Australian opt-out guides walk through removals site by site without installing software.
+- **The tool sends and follows up for you, or you live outside Australia:** comparable open source tools also run on your own computer, and some send letters from your mailbox and read the replies, which GhostSoap does not. They are built mainly for UK, EU or US privacy law, though some also write Australian letters.
 - **A result gone from Google:** [Results about you](https://support.google.com/websearch/answer/12719076) asks Google to drop a result from Search. The information stays on the source page, so it complements a request to the site.
 - **Whether a breach exposed you:** [Have I Been Pwned](https://haveibeenpwned.com/) checks whether your email address is in a known data breach. If identity documents leaked, [IDCARE](https://www.idcare.org/), Australia's national identity and cyber incident support service, offers free support.
 - **Fewer telemarketing calls:** the ACMA's [Do Not Call Register](https://www.donotcall.gov.au/) lets you register an Australian phone, mobile or fax number to opt out of most unsolicited telemarketing calls and faxes.

@@ -508,3 +508,89 @@ fn own_escalation_bundles_propagates_unsupported_and_skips_missing_manifest() {
     .unwrap_err();
     assert_eq!(err.kind(), io::ErrorKind::Unsupported);
 }
+
+#[test]
+fn escalation_bundle_records_state_and_s40_notices_and_omits_when_clear() {
+    use crate::core::tracker::{Event, Status, StatusEvent};
+
+    let tmp = tempfile::tempdir().unwrap();
+    let mut state = sample_state();
+    state.messages[0].sends.clear();
+    state.messages[0].unfinished = true;
+    state.messages[0].superseded = true;
+    let flagged_dir = tmp.path().join("flagged");
+    let receipt =
+        write_escalation_bundle(&flagged_dir, &state, "GS-TEST1", None, date(2026, 11, 25))
+            .unwrap();
+    assert_eq!(receipt.notices.len(), 4);
+    let record_toml = fs::read_to_string(flagged_dir.join("record.toml")).unwrap();
+    assert!(record_toml.contains("notices = ["));
+    let summary_txt = fs::read_to_string(flagged_dir.join("summary.txt")).unwrap();
+    assert!(summary_txt.contains("Privacy Act s 40(1A)"));
+
+    // Sent + escalated message produces zero notices and omits `notices` from record.toml.
+    let mut clean = sample_state();
+    clean.messages[0].requests[0]
+        .events
+        .push(Event::Status(StatusEvent {
+            on: date(2026, 11, 20),
+            status: Status::Escalated,
+            reason: None,
+            source: None,
+            note: None,
+        }));
+    let clean_dir = tmp.path().join("clean");
+    let clean_receipt =
+        write_escalation_bundle(&clean_dir, &clean, "GS-TEST1", None, date(2026, 11, 25)).unwrap();
+    assert!(clean_receipt.notices.is_empty());
+    let clean_toml = fs::read_to_string(clean_dir.join("record.toml")).unwrap();
+    assert!(!clean_toml.contains("notices ="));
+}
+
+#[test]
+fn verify_export_accepts_early_format_2_days_and_rejects_malformed_toml() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut state = sample_state();
+    state.messages[0].requests = vec![
+        Request::new(Lever::S20rAccess),
+        Request::new(Lever::S20tCorrection),
+    ];
+    let text = toml::to_string(&state).unwrap();
+    let early = text.replacen("days-after = 10", "days = 10", 1).replacen(
+        "days-starting = 30",
+        "days = 30",
+        1,
+    );
+    assert_eq!(early.matches("\ndays = ").count(), 2, "{early}");
+
+    let export_path = tmp.path().join("early-format-2.toml");
+    fs::write(&export_path, &early).unwrap();
+    let summary = audit::verify_chain(&state.audit).unwrap();
+    let digest = sha256(early.as_bytes());
+    fs::write(
+        manifest_path(&export_path),
+        audit::format_manifest("2026-11-25", &summary, &[("early-format-2.toml", &digest)]),
+    )
+    .unwrap();
+    let checked = verify_export_file(&export_path).expect("early format-2 days export verifies");
+    assert_eq!(checked.summary, summary);
+    assert!(checked.manifest.is_some());
+
+    // Early format-2 export with an unknown field still fails cleanly without leaking PII.
+    let early_bad = tmp.path().join("early-bad.toml");
+    fs::write(
+        &early_bad,
+        format!("{early}\nextra = \"SENTINEL-PII-EARLY\"\n"),
+    )
+    .unwrap();
+    let err = verify_export_file(&early_bad).unwrap_err();
+    assert!(err.contains("not a valid GhostSoap state export"), "{err}");
+    assert!(!err.contains("SENTINEL-PII-EARLY"), "PII leaked: {err}");
+
+    // Syntactically malformed TOML is also rejected and redacted.
+    let malformed = tmp.path().join("malformed.toml");
+    fs::write(&malformed, "format = [\"SENTINEL-SYNTAX-PII\"\n").unwrap();
+    let err = verify_export_file(&malformed).unwrap_err();
+    assert!(err.contains("not a valid GhostSoap state export"), "{err}");
+    assert!(!err.contains("SENTINEL-SYNTAX-PII"), "PII leaked: {err}");
+}

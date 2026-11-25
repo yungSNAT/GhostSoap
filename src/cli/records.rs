@@ -59,8 +59,7 @@ pub(super) fn reply(args: &ReplyArgs) -> Result<(), String> {
         |state| {
             let (tag, entry, done, audit_event) = {
                 let message = message_for(state, &args.tag)?;
-                let levers = affected_levers(message, &args.lever);
-                let (done, audit_event) = apply_reply(message, args, on, today, &levers)?;
+                let (done, audit_event) = apply_reply(message, args, on, today)?;
                 (
                     message.tag.clone(),
                     message.entry.clone(),
@@ -368,30 +367,20 @@ pub(super) fn status_line(
     )
 }
 
-/// The levers a `reply` applies to: the explicit list or all of the message's levers.
-fn affected_levers(message: &Message, chosen: &[Lever]) -> Vec<Lever> {
-    if chosen.is_empty() {
-        message.requests.iter().map(|r| r.lever).collect()
-    } else {
-        chosen.to_vec()
-    }
-}
-
 /// Apply `reply`'s flags to one message, returning the summary and any new audit event.
 fn apply_reply(
     message: &mut Message,
     args: &ReplyArgs,
     on: Date,
     today: Date,
-    levers: &[Lever],
 ) -> Result<(String, Option<(AuditKind, String)>), String> {
     if let Some(of) = args.withdraw {
-        message.withdraw_event(&args.lever, of, args.note.clone())?;
+        let applied = message.withdraw_event(&args.lever, of, args.note.clone())?;
         let what = match of {
             tracker::Withdrawn::Status => "answer",
             tracker::Withdrawn::Extension => "longer period",
         };
-        let detail = audit::withdrawal_detail(of, levers, args.note.as_deref());
+        let detail = audit::withdrawal_detail(of, &applied, args.note.as_deref());
         return Ok((
             format!("the latest {what} is withdrawn"),
             Some((AuditKind::Withdrawal, detail)),
@@ -403,9 +392,10 @@ fn apply_reply(
             until,
             note: args.note.clone(),
         };
-        let new = message.record_extension(&args.lever, extension, today)?;
+        let applied = message.record_extension(&args.lever, extension, today)?;
+        let new = !applied.is_empty();
         let event = new.then(|| {
-            let detail = audit::extension_detail(on, until, levers, args.note.as_deref());
+            let detail = audit::extension_detail(on, until, &applied, args.note.as_deref());
             (AuditKind::Extension, detail)
         });
         return Ok((
@@ -413,7 +403,7 @@ fn apply_reply(
             event,
         ));
     }
-    apply_status_reply(message, args, on, today, levers)
+    apply_status_reply(message, args, on, today)
 }
 
 fn apply_status_reply(
@@ -421,7 +411,6 @@ fn apply_status_reply(
     args: &ReplyArgs,
     on: Date,
     today: Date,
-    levers: &[Lever],
 ) -> Result<(String, Option<(AuditKind, String)>), String> {
     let status = args.status.expect("clap requires a status");
     let event = tracker::StatusEvent {
@@ -431,7 +420,8 @@ fn apply_status_reply(
         source: args.source.clone(),
         note: args.note.clone(),
     };
-    let new = message.record_status(&args.lever, event, today)?;
+    let applied = message.record_status(&args.lever, event, today)?;
+    let new = !applied.is_empty();
     let report = if new && status == tracker::Status::Bounced {
         bounce_report(&message.entry, message.channel)
     } else {
@@ -446,7 +436,7 @@ fn apply_status_reply(
         let detail = audit::reply_detail(
             on,
             status,
-            levers,
+            &applied,
             args.reason,
             args.source.as_deref(),
             args.note.as_deref(),
