@@ -28,6 +28,8 @@ mod forms;
 mod no_network;
 #[cfg(test)]
 mod registry_table;
+#[cfg(test)]
+mod site_register;
 mod text;
 
 use std::collections::BTreeMap;
