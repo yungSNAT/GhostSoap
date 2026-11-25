@@ -249,6 +249,7 @@ Data under `checklist/au/`, one TOML file per item, with why it matters, the ste
 - My Health Record privacy settings
 - Loyalty programme marketing opt-outs (feeds APP 7 requests)
 - Social media profile audit
+- AI training settings: turn off the use of what the user posts or types for training AI models, where a service offers it (added 26 November 2026, citing the OAIC's guidance for AI developers)
 - ASIC director address: under ASIC's CP 391 proposal (11 September 2026), an officeholder could lodge a service address from 1 July 2027, and from 1 August 2028 an officeholder's residential address would be open to general access (free and paid extracts) unless a service address is lodged; ASIC plans its report on submissions, with a draft legislative instrument, for March 2027 (confirm the final position before inclusion)
 - Doxxing or serious invasion of privacy: report to police and eSafety; a community legal centre for the statutory tort
 
