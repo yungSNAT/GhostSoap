@@ -482,8 +482,7 @@ pub(super) fn write_draft(
     let text = if uses_eml(letter.kind, output.format) {
         letters::eml(letter)
     } else if uses_pdf(letter.kind, output.format) {
-        // `record_drafts` refused any letter the font cannot show.
-        letters::pdf(letter).map_err(|c| format!("cannot write U+{:04X} to a PDF", c as u32))?
+        letters::pdf(letter).expect("record_drafts refuses a letter the font cannot show")
     } else {
         format!("{}\n", letter.body)
     };

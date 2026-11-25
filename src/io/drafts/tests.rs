@@ -12,7 +12,7 @@ mod remove;
 fn drafts_ignore_other_extensions_and_report_filesystem_errors() {
     let dir = tempfile::tempdir().unwrap();
     let drafts = dir.path().join("drafts");
-    let err = write(&drafts, "example-au-GS-ABCDE.pdf", "text").unwrap_err();
+    let err = write(&drafts, "example-au-GS-ABCDE.docx", "text").unwrap_err();
     assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
     assert!(!drafts.exists());
 

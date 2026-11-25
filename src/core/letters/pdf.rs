@@ -257,6 +257,20 @@ mod tests {
     }
 
     #[test]
+    fn win_ansi_maps_its_0x80_to_0x9f_slots_and_leaves_c1_controls_out() {
+        let specials = "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ";
+        let bytes: Vec<u8> = specials.chars().map(|c| win_ansi(c).unwrap()).collect();
+        let undefined = [0x81, 0x8D, 0x8F, 0x90, 0x9D];
+        let expected: Vec<u8> = (0x80..=0x9F).filter(|b| !undefined.contains(b)).collect();
+        assert_eq!(bytes, expected);
+        for c in '\u{80}'..='\u{9F}' {
+            assert_eq!(win_ansi(c), None);
+        }
+        assert_eq!(win_ansi('\u{A0}'), Some(0xA0));
+        assert_eq!(win_ansi('ÿ'), Some(0xFF));
+    }
+
+    #[test]
     fn a_character_the_font_cannot_show_is_refused() {
         for (body, refused) in [
             ("Name: 李小龙", '李'),
