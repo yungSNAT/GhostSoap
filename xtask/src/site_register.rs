@@ -60,12 +60,17 @@ fn row(entry: &Entry) -> String {
         .collect();
     // Validation gives every entry at least one source.
     let url = entry.sources.first().expect("an entry has a source");
-    let name = format!("<a href=\"{}\">{}</a>", escape(url), escape(&entry.name));
+    // `noreferrer noopener`: the business is not told its visitor came from this register.
+    let name = format!(
+        "<a href=\"{}\" rel=\"noreferrer noopener\">{}</a>",
+        escape(url),
+        escape(&entry.name)
+    );
     format!(
         "      <tr><td>{name}</td><td>{}</td><td>{}</td><td>{}</td><td class=\"date\">{}</td></tr>\n",
-        kinds.join(", "),
+        escape(&kinds.join(", ")),
         escape(&route(entry)),
-        format!("{:?}", entry.effort).to_lowercase(),
+        escape(&format!("{:?}", entry.effort).to_lowercase()),
         entry.verified_at
     )
 }
@@ -80,6 +85,8 @@ fn page(register: &Register) -> String {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'">
 <title>GhostSoap register: {count} Australian businesses that hold personal information</title>
 <meta name="description" content="Search GhostSoap's public register of {count} Australian businesses that hold personal information, with how to reach each one and the date it was last checked.">
 <link rel="stylesheet" href="style.css">
@@ -136,9 +143,8 @@ mod tests {
             std::fs::write(path, &current).unwrap();
             return;
         }
-        let html = std::fs::read_to_string(path)
-            .unwrap_or_default()
-            .replace("\r\n", "\n");
+        // `.gitattributes` keeps the page LF on every checkout, so any byte difference fails.
+        let html = std::fs::read_to_string(path).unwrap_or_default();
         assert!(
             html == current,
             "site/register.html is out of date; run UPDATE_SITE_REGISTER=1 cargo test -p xtask"
@@ -160,6 +166,12 @@ mod tests {
         assert!(stale.is_err(), "a missing page is out of date");
         check_page(&path, true);
         check_page(&path, false);
+        let crlf = std::fs::read_to_string(&path)
+            .unwrap()
+            .replace('\n', "\r\n");
+        std::fs::write(&path, crlf).unwrap();
+        let converted = std::panic::catch_unwind(|| check_page(&path, false));
+        assert!(converted.is_err(), "a line-ending change is out of date");
     }
 
     #[test]
@@ -202,6 +214,25 @@ reason = "closed"
         assert!(html.contains("id=\"register-shown\" aria-live=\"polite\""));
         assert!(html.contains("<p id=\"register-none\" hidden>"));
         assert!(html.contains("<script src=\"register.js\" defer></script>"));
+    }
+
+    #[test]
+    fn the_page_tells_no_business_where_its_visitor_came_from() {
+        let register = parse_register(&embedded::register()).unwrap();
+        let html = page(&register);
+        assert!(html.contains("<meta name=\"referrer\" content=\"no-referrer\">"));
+        assert!(html.contains("content=\"default-src 'self'\""));
+        let links = html.matches("<td><a href=").count();
+        assert_eq!(links, register.entries.len());
+        assert_eq!(
+            html.matches("\" rel=\"noreferrer noopener\">").count(),
+            links
+        );
+        let home = std::fs::read_to_string(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../site/index.html"),
+        )
+        .unwrap();
+        assert!(home.contains("<meta name=\"referrer\" content=\"no-referrer\">"));
     }
 
     #[test]
@@ -248,7 +279,7 @@ levers = []
         let entry = &register.entries["quote-au"];
         assert_eq!(
             row(entry),
-            "      <tr><td><a href=\"https://example.com/privacy?a=1&amp;b=2\">PUBLIC &lt;Quote&gt; \
+            "      <tr><td><a href=\"https://example.com/privacy?a=1&amp;b=2\" rel=\"noreferrer noopener\">PUBLIC &lt;Quote&gt; \
              &amp; &quot;Co&quot; O&#39;Neil</a></td><td>marketing-list, directory</td><td>letter by email, \
              post</td><td>medium</td><td class=\"date\">2026-10-24</td></tr>\n"
         );
