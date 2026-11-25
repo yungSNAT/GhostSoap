@@ -159,8 +159,8 @@ reason = "closed"
         .unwrap();
         assert_eq!(
             table(&register),
-            "| Entry | Name | Kinds | Packs | Route |\n|---|---|---|---|---|\n\
-             | `closed-au` | PUBLIC Closed | marketing-list |  | obsolete (closed) |\n"
+            "| Entry | Name | Kinds | Packs | Route | Verified |\n|---|---|---|---|---|---|\n\
+             | `closed-au` | PUBLIC Closed | marketing-list |  | obsolete (closed) | 2026-10-24 |\n"
         );
     }
 
