@@ -312,3 +312,39 @@ fn escalation_notices_and_eligibility_cover_state_flags_and_s40_provisions() {
     assert!(escalation_notices(&spam).is_empty());
     assert!(escalation_eligibility(&spam).contains("Spam Act 2003"));
 }
+
+#[test]
+fn escalation_summary_names_every_route_a_mixed_message_needs() {
+    let empty_summary = verify_chain(&[]).unwrap();
+    let summary_for = |levers: &[Lever]| {
+        let mut message = sample_message();
+        message.requests = levers.iter().map(|&l| Request::new(l)).collect();
+        format_escalation_summary(&message, None, &[], &empty_summary, date(2026, 11, 25))
+    };
+    let cases: [(&[Lever], &[&str], &[&str]); 3] = [
+        (
+            &[Lever::App7NoMarketing, Lever::SpamUnsubscribe],
+            &["Privacy Act s 40(1A)", "Spam Act 2003"],
+            &["s 40(1B)"],
+        ),
+        (
+            &[Lever::S20rAccess, Lever::SpamUnsubscribe],
+            &["Privacy Act s 40(1B)", "Spam Act 2003"],
+            &["s 40(1A): applies"],
+        ),
+        (
+            &[Lever::App12, Lever::S21tAccess],
+            &["Privacy Act s 40(1A)", "Privacy Act s 40(1B)"],
+            &["Spam Act 2003"],
+        ),
+    ];
+    for (levers, present, absent) in cases {
+        let summary = summary_for(levers);
+        for needle in present {
+            assert!(summary.contains(needle), "{needle} missing for {levers:?}:\n{summary}");
+        }
+        for needle in absent {
+            assert!(!summary.contains(needle), "{needle} wrongly shown for {levers:?}:\n{summary}");
+        }
+    }
+}
