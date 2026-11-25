@@ -53,7 +53,11 @@ fn route(entry: &Entry) -> String {
 }
 
 fn row(entry: &Entry) -> String {
-    let kinds: Vec<String> = entry.kinds.iter().map(|k| named(serde_json::to_value(k))).collect();
+    let kinds: Vec<String> = entry
+        .kinds
+        .iter()
+        .map(|k| named(serde_json::to_value(k)))
+        .collect();
     let name = match entry.sources.first() {
         Some(url) => format!("<a href=\"{}\">{}</a>", escape(url), escape(&entry.name)),
         None => escape(&entry.name),
