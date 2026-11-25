@@ -295,7 +295,10 @@ fn escalation_notices_and_eligibility_cover_state_flags_and_s40_provisions() {
         format_escalation_summary(&escalated, None, &[], &empty_summary, date(2026, 11, 25));
     assert!(esc_summary.contains("confirm you complained to the business first"));
     assert!(!esc_summary.contains("\nNotices:\n"));
+}
 
+#[test]
+fn credit_access_and_spam_requests_need_no_complaint_to_the_business_first() {
     // Part IIIA s 40(1B) credit requests need no prior complaint to the business.
     let mut credit = sample_message();
     credit.sends.push(SendRecord::Sent(Send {
