@@ -1,6 +1,6 @@
 name: Pages
 
-# Builds the one-page site in site/ with the README banner and, on main, publishes it to
+# Builds the site in site/ (its home page and the register page xtask generates) with the README banner and, on main, publishes it to
 # GitHub Pages. Until Pages is enabled with GitHub Actions as its source, the deploy job
 # is skipped with a notice, so main's runs stay green.
 
@@ -39,7 +39,7 @@ jobs:
       - name: Assemble the site
         run: |
           mkdir _site
-          cp site/index.html site/style.css .github/assets/banner.svg .github/assets/banner-phone.svg _site/
+          cp site/index.html site/register.html site/register.js site/style.css .github/assets/banner.svg .github/assets/banner-phone.svg _site/
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: _site

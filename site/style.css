@@ -97,6 +97,64 @@ code {
   font-size: 0.95em;
 }
 
+/* The register page (register.html). */
+.search label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.search input {
+  width: 100%;
+  max-width: 24rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--platinum);
+  border-radius: 0.25rem;
+  background: var(--black);
+  color: var(--ivory);
+  font: inherit;
+}
+
+.search input:focus-visible,
+.table-wrap:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+caption {
+  padding-bottom: 0.5rem;
+  color: var(--platinum);
+  text-align: left;
+}
+
+th,
+td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--platinum);
+  text-align: left;
+  vertical-align: top;
+}
+
+thead th {
+  border-bottom-color: var(--gold);
+}
+
+td.date {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 footer {
   margin-top: 3rem;
   padding-bottom: 2rem;
