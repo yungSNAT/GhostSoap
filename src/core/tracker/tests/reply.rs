@@ -29,7 +29,10 @@ fn a_reply_needs_a_letter_sent_and_a_day_that_fits() {
         "GS-7K3QX was drafted on 2026-11-10, after 2026-11-09"
     );
     let given_up = status(day(10), Status::Abandoned);
-    assert_eq!(unsent.record_status(BOTH, given_up, today), Ok(true));
+    assert_eq!(
+        unsent.record_status(BOTH, given_up, today),
+        Ok(vec![Lever::App7NoMarketing, Lever::App7Source])
+    );
 
     let mut sent = sent_message("GS-7K3QX");
     let before = sent.clone();
@@ -74,15 +77,18 @@ fn a_reply_is_recorded_once_on_each_request_it_names() {
     let acknowledged = status(day(12), Status::Acknowledged);
     assert_eq!(
         sent.record_status(BOTH, acknowledged.clone(), today),
-        Ok(true)
+        Ok(vec![Lever::App7NoMarketing, Lever::App7Source])
     );
-    assert_eq!(sent.record_status(BOTH, acknowledged, today), Ok(false));
+    assert_eq!(sent.record_status(BOTH, acknowledged, today), Ok(vec![]));
     let twice = [Lever::App7Source, Lever::App7Source];
     let sourced = StatusEvent {
         source: Some("a list broker".to_owned()),
         ..status(day(13), Status::Fulfilled)
     };
-    assert_eq!(sent.record_status(&twice, sourced, today), Ok(true));
+    assert_eq!(
+        sent.record_status(&twice, sourced, today),
+        Ok(vec![Lever::App7Source])
+    );
     assert_eq!(
         statuses(&sent),
         [
@@ -121,14 +127,20 @@ fn a_reply_must_follow_what_is_already_recorded() {
     let relisted = status(day(13), Status::Relisted);
     assert!(sent.record_status(BOTH, relisted.clone(), today).is_err());
     assert_eq!(sent, before);
-    assert_eq!(sent.record_status(SOURCE, relisted, today), Ok(true));
+    assert_eq!(
+        sent.record_status(SOURCE, relisted, today),
+        Ok(vec![Lever::App7Source])
+    );
     let given_up = sent.record_status(SOURCE, status(day(14), Status::Abandoned), today);
     assert_eq!(
         given_up.unwrap_err(),
         "GS-7K3QX app7-source has an answer, so record it as closed"
     );
     let closed = status(day(14), Status::Closed);
-    assert_eq!(sent.record_status(SOURCE, closed, today), Ok(true));
+    assert_eq!(
+        sent.record_status(SOURCE, closed, today),
+        Ok(vec![Lever::App7Source])
+    );
 
     let marketing = &[Lever::App7NoMarketing];
     let bounced = status(day(12), Status::Bounced);
@@ -140,7 +152,10 @@ fn a_reply_must_follow_what_is_already_recorded() {
         )
     );
     let given_up = status(day(13), Status::Abandoned);
-    assert_eq!(sent.record_status(marketing, given_up, today), Ok(true));
+    assert_eq!(
+        sent.record_status(marketing, given_up, today),
+        Ok(vec![Lever::App7NoMarketing])
+    );
 }
 
 #[test]
@@ -175,15 +190,23 @@ fn a_closed_or_abandoned_request_takes_no_new_status() {
     }
     assert_eq!(sent, before);
     // A repeat records nothing, and the finishing status can still be withdrawn.
-    assert_eq!(sent.record_status(SOURCE, closed, today), Ok(false));
-    assert_eq!(sent.record_status(marketing, given_up, today), Ok(false));
-    sent.withdraw_event(marketing, Withdrawn::Status, None)
-        .unwrap();
+    assert_eq!(sent.record_status(SOURCE, closed, today), Ok(vec![]));
+    assert_eq!(sent.record_status(marketing, given_up, today), Ok(vec![]));
+    assert_eq!(
+        sent.withdraw_event(marketing, Withdrawn::Status, None),
+        Ok(vec![Lever::App7NoMarketing])
+    );
     let acknowledged = status(day(14), Status::Acknowledged);
-    assert_eq!(sent.record_status(marketing, acknowledged, today), Ok(true));
+    assert_eq!(
+        sent.record_status(marketing, acknowledged, today),
+        Ok(vec![Lever::App7NoMarketing])
+    );
     // Information on show again reopens a closed request.
     let relisted = status(day(14), Status::Relisted);
-    assert_eq!(sent.record_status(SOURCE, relisted, today), Ok(true));
+    assert_eq!(
+        sent.record_status(SOURCE, relisted, today),
+        Ok(vec![Lever::App7Source])
+    );
 }
 
 #[test]
@@ -216,8 +239,11 @@ fn a_longer_period_needs_a_credit_correction_and_a_later_day() {
          2026-12-10"
     );
     let longer = agreed(day(12), december(24));
-    assert_eq!(sent.record_extension(BOTH, longer.clone(), today), Ok(true));
-    assert_eq!(sent.record_extension(BOTH, longer, today), Ok(false));
+    assert_eq!(
+        sent.record_extension(BOTH, longer.clone(), today),
+        Ok(vec![Lever::S20tCorrection])
+    );
+    assert_eq!(sent.record_extension(BOTH, longer, today), Ok(vec![]));
 
     let mut marketing = sent_message("GS-7K3QX");
     let error = marketing.record_extension(SOURCE, agreed(day(12), december(24)), today);
@@ -319,4 +345,49 @@ fn each_status_falls_in_one_action_state() {
     ] {
         assert_eq!(action(stop, suppressed, ahead), Action::Done);
     }
+}
+
+#[test]
+fn partial_dedup_returns_only_actually_modified_levers() {
+    let today = day(20);
+    let mut sent = sent_message("GS-7K3QX");
+    let acknowledged = status(day(12), Status::Acknowledged);
+    assert_eq!(
+        sent.record_status(SOURCE, acknowledged.clone(), today),
+        Ok(vec![Lever::App7Source])
+    );
+    // Applying the same status to all levers skips app7-source and returns only app7-no-marketing.
+    assert_eq!(
+        sent.record_status(BOTH, acknowledged, today),
+        Ok(vec![Lever::App7NoMarketing])
+    );
+    assert_eq!(
+        sent.withdraw_event(
+            &[Lever::App7Source, Lever::App7Source],
+            Withdrawn::Status,
+            None
+        ),
+        Ok(vec![Lever::App7Source])
+    );
+
+    let december = |d: i8| jiff::civil::date(2026, 12, d);
+    let mut credit = message("GS-8M4RY");
+    credit.requests = vec![
+        Request::new(Lever::S20tCorrection),
+        Request::new(Lever::S21vCorrection),
+    ];
+    credit.sends = vec![SendRecord::Sent(email(day(11)))];
+    let ext = Extension {
+        on: day(12),
+        until: december(24),
+        note: None,
+    };
+    assert_eq!(
+        credit.record_extension(&[Lever::S20tCorrection], ext.clone(), today),
+        Ok(vec![Lever::S20tCorrection])
+    );
+    assert_eq!(
+        credit.record_extension(BOTH, ext, today),
+        Ok(vec![Lever::S21vCorrection])
+    );
 }

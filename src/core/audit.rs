@@ -320,6 +320,96 @@ fn format_due(due: Due) -> String {
     }
 }
 
+fn is_s40_1b(lever: Lever) -> bool {
+    matches!(
+        lever,
+        Lever::S20rAccess | Lever::S20tCorrection | Lever::S21tAccess | Lever::S21vCorrection
+    )
+}
+
+fn requires_s40_1a(lever: Lever) -> bool {
+    !is_s40_1b(lever) && lever != Lever::SpamUnsubscribe
+}
+
+/// Whether a request that s 40(1A) covers has an `escalated` status in effect.
+fn has_recorded_escalation(message: &Message) -> bool {
+    message.requests.iter().any(|r| {
+        requires_s40_1a(r.lever)
+            && r.in_effect()
+                .statuses
+                .iter()
+                .any(|s| s.status == Status::Escalated)
+    })
+}
+
+/// Eligibility notes under Privacy Act ss 40(1A)-(1B) and the Spam Act for `message`, one
+/// for each that applies to at least one of its requests.
+pub fn escalation_eligibility(message: &Message) -> Vec<&'static str> {
+    let any = |test: fn(Lever) -> bool| message.requests.iter().any(|r| test(r.lever));
+    let mut notes = Vec::new();
+    if any(requires_s40_1a) {
+        notes.push(if has_recorded_escalation(message) {
+            "Privacy Act s 40(1A): applies (confirm you complained to the business first, unless \
+             that was not appropriate; the OAIC's page 'Before you lodge a privacy complaint with \
+             us' says to lodge with it if the business does not respond within 30 days)"
+        } else {
+            "Privacy Act s 40(1A): applies (no complaint to the business or escalation recorded; \
+             complain to the business first unless not appropriate)"
+        });
+    }
+    if any(is_s40_1b) {
+        notes.push(
+            "Privacy Act s 40(1B): complain-first precondition does not apply to ss 20R, 20T, 21T \
+             or 21V requests",
+        );
+    }
+    if any(|lever| lever == Lever::SpamUnsubscribe) {
+        notes.push(
+            "Spam Act 2003: the ACMA enforces it and takes spam reports (acma.gov.au/spam), not \
+             the OAIC",
+        );
+    }
+    notes
+}
+
+/// State and Privacy Act s 40(1A) warnings to surface when exporting an escalation bundle.
+pub fn escalation_notices(message: &Message) -> Vec<String> {
+    let mut notices = Vec::new();
+    if message.unfinished {
+        notices.push(
+            "draft run did not finish: the letter you hold under this tag may not match the \
+             recorded requests; draft it again"
+                .to_owned(),
+        );
+    }
+    if message.superseded {
+        notices.push(
+            "draft was superseded by a later draft under a new tag and remains as history only"
+                .to_owned(),
+        );
+    }
+    if message.sent().is_none() {
+        notices.push(format!(
+            "letter is not recorded as sent; record sending with `ghostsoap sent {}` before \
+             escalating",
+            message.tag
+        ));
+    }
+    if message.requests.iter().any(|r| requires_s40_1a(r.lever))
+        && !has_recorded_escalation(message)
+    {
+        notices.push(
+            "Privacy Act s 40(1A): no complaint to the business or escalation is recorded; the \
+             OAIC must not investigate unless you complained to the business first or it \
+             decides complaining to the business was not appropriate; its page 'Before you lodge \
+             a privacy complaint with us' says to lodge with it if the business does not respond \
+             within 30 days"
+                .to_owned(),
+        );
+    }
+    notices
+}
+
 fn append_escalation_header(out: &mut String, message: &Message, entry: Option<&Entry>) {
     out.push_str(&format!("Tag: {}\nEntry: {}\n", message.tag, message.entry));
     if let Some(meta) = entry {
@@ -343,6 +433,16 @@ fn append_escalation_header(out: &mut String, message: &Message, entry: Option<&
     match message.sent() {
         Some(sent) => out.push_str(&format!("Sent: {} by {}\n", sent.on, sent.channel.label())),
         None => out.push_str("Sent: not recorded\n"),
+    }
+    for note in escalation_eligibility(message) {
+        out.push_str(&format!("Eligibility: {note}\n"));
+    }
+    let notices = escalation_notices(message);
+    if !notices.is_empty() {
+        out.push_str("\nNotices:\n");
+        for notice in notices {
+            out.push_str(&format!("- {notice}\n"));
+        }
     }
 }
 

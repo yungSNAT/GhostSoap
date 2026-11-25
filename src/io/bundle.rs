@@ -194,6 +194,7 @@ pub struct BundleReceipt {
     pub manifest: PathBuf,
     pub files: Vec<String>,
     pub audit: AuditSummary,
+    pub notices: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -203,9 +204,19 @@ struct EscalationRecord<'a> {
     global_audit_count: usize,
     global_audit_head: &'a str,
     audit_excerpt_note: &'static str,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    notices: Vec<String>,
     message: &'a Message,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     audit_excerpt: Vec<&'a AuditEntry>,
+}
+
+struct PreparedBundle {
+    audit: AuditSummary,
+    notices: Vec<String>,
+    record_text: String,
+    summary_text: String,
+    manifest_text: String,
 }
 
 fn create_private_dir(dir: &Path) -> io::Result<()> {
@@ -270,7 +281,7 @@ fn prepare_bundle_texts(
     tag: &str,
     entry: Option<&Entry>,
     today: Date,
-) -> io::Result<(AuditSummary, String, String, String)> {
+) -> io::Result<PreparedBundle> {
     let message = state.message(tag).ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::NotFound,
@@ -278,6 +289,7 @@ fn prepare_bundle_texts(
         )
     })?;
     let audit_summary = audit::verify_chain(&state.audit).map_err(io::Error::other)?;
+    let notices = audit::escalation_notices(message);
     let summary_text =
         audit::format_escalation_summary(message, entry, &state.audit, &audit_summary, today);
     let record = EscalationRecord {
@@ -286,6 +298,7 @@ fn prepare_bundle_texts(
         global_audit_count: audit_summary.count,
         global_audit_head: &audit_summary.head_hash,
         audit_excerpt_note: AUDIT_EXCERPT_NOTE,
+        notices: notices.clone(),
         message,
         audit_excerpt: state
             .audit
@@ -302,7 +315,13 @@ fn prepare_bundle_texts(
         &audit_summary,
         &[("record.toml", &record_sha), ("summary.txt", &summary_sha)],
     );
-    Ok((audit_summary, record_text, summary_text, manifest_text))
+    Ok(PreparedBundle {
+        audit: audit_summary,
+        notices,
+        record_text,
+        summary_text,
+        manifest_text,
+    })
 }
 
 fn write_escalation_bundle_with(
@@ -313,8 +332,7 @@ fn write_escalation_bundle_with(
     today: Date,
     mut write_file: impl FnMut(&Path, &[u8]) -> Result<(), (io::Error, bool)>,
 ) -> io::Result<BundleReceipt> {
-    let (audit_summary, record_text, summary_text, manifest_text) =
-        prepare_bundle_texts(state, tag, entry, today)?;
+    let prepared = prepare_bundle_texts(state, tag, entry, today)?;
     create_private_dir(dir).map_err(|e| match e.kind() {
         io::ErrorKind::AlreadyExists => io::Error::new(
             e.kind(),
@@ -323,9 +341,12 @@ fn write_escalation_bundle_with(
         _ => e,
     })?;
     let items = [
-        (dir.join("record.toml"), record_text.as_bytes()),
-        (dir.join("summary.txt"), summary_text.as_bytes()),
-        (dir.join("manifest.sha256"), manifest_text.as_bytes()),
+        (dir.join("record.toml"), prepared.record_text.as_bytes()),
+        (dir.join("summary.txt"), prepared.summary_text.as_bytes()),
+        (
+            dir.join("manifest.sha256"),
+            prepared.manifest_text.as_bytes(),
+        ),
     ];
     let mut created = Vec::new();
     for (path, bytes) in items {
@@ -343,7 +364,8 @@ fn write_escalation_bundle_with(
         dir: dir.to_owned(),
         manifest: dir.join("manifest.sha256"),
         files: vec!["record.toml".to_owned(), "summary.txt".to_owned()],
-        audit: audit_summary,
+        audit: prepared.audit,
+        notices: prepared.notices,
     })
 }
 
