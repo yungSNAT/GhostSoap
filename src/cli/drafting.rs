@@ -9,7 +9,7 @@ use super::*;
 /// How `draft` hands over its letters.
 #[derive(Clone, Copy)]
 pub(super) struct Output {
-    /// Output format (`auto`, `eml` or `text`).
+    /// Output format (`auto`, `eml`, `text` or `pdf`).
     pub(super) format: DraftFormat,
     /// Print them instead of writing files.
     pub(super) copy: bool,
@@ -223,6 +223,14 @@ pub(super) fn record_drafts<'a>(
 ) -> Result<(Vec<Drafted<'a>>, io::drafts::Redraft), String> {
     // Every letter is composed first: one that cannot be written changes nothing.
     let drafted = compose_drafts(state, planned, detail, today)?;
+    for letter in drafted.iter().filter(|d| uses_pdf(d.letter.kind, format)) {
+        letters::pdf(&letter.letter).map_err(|c| {
+            format!(
+                "the letter to {} holds '{c}' (U+{:04X}), which a PDF's standard font cannot                  show; draft it with --format text instead",
+                letter.entry.id, c as u32
+            )
+        })?;
+    }
     // An earlier draft leaves its folder before the state changes, so the letter on disk is
     // never one the state no longer describes.
     let redraft = stage_earlier_drafts(state, &drafted)?;
@@ -447,10 +455,14 @@ pub(super) fn unused_tag(used: &[String], candidate: impl Fn(u64) -> String) -> 
 
 fn uses_eml(kind: ChannelKind, format: DraftFormat) -> bool {
     match format {
-        DraftFormat::Auto => kind == ChannelKind::Email,
+        DraftFormat::Auto | DraftFormat::Pdf => kind == ChannelKind::Email,
         DraftFormat::Eml => true,
         DraftFormat::Text => false,
     }
+}
+
+fn uses_pdf(kind: ChannelKind, format: DraftFormat) -> bool {
+    format == DraftFormat::Pdf && kind == ChannelKind::Post
 }
 
 pub(super) fn write_draft(
@@ -468,6 +480,9 @@ pub(super) fn write_draft(
     };
     let text = if uses_eml(letter.kind, output.format) {
         letters::eml(letter)
+    } else if uses_pdf(letter.kind, output.format) {
+        // `record_drafts` refused any letter the font cannot show.
+        letters::pdf(letter).map_err(|c| format!("cannot write U+{:04X} to a PDF", c as u32))?
     } else {
         format!("{}\n", letter.body)
     };
@@ -494,7 +509,13 @@ pub(super) fn draft_name(
     kind: ChannelKind,
     format: DraftFormat,
 ) -> String {
-    let extension = if uses_eml(kind, format) { "eml" } else { "txt" };
+    let extension = if uses_eml(kind, format) {
+        "eml"
+    } else if uses_pdf(kind, format) {
+        "pdf"
+    } else {
+        "txt"
+    };
     format!("{}-{tag}.{extension}", entry.id)
 }
 

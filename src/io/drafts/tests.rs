@@ -112,6 +112,7 @@ fn clean_deletes_only_drafts_it_wrote() {
     let drafts = dir.path().join("drafts");
     write(&drafts, "quantium-au-GS-7K3QX.eml", "x").unwrap();
     write(&drafts, "talefin-au-GS-00AZ9.txt", "y").unwrap();
+    write(&drafts, "anz-au-GS-00AZ8.pdf", "z").unwrap();
     fs::write(drafts.join("notes.txt"), "keep").unwrap();
     fs::write(
         drafts.join("notes-GS-ABCDE.txt"),
@@ -131,7 +132,7 @@ fn clean_deletes_only_drafts_it_wrote() {
         "no line break"
     );
     let cleaned = clean(&drafts, true).unwrap();
-    assert_eq!(cleaned.deleted, 2);
+    assert_eq!(cleaned.deleted, 3);
     assert!(drafts.join("notes.txt").exists());
     assert!(drafts.join("notes-GS-ABCDE.txt").exists());
     assert!(!drafts.join(MANIFEST).exists());
