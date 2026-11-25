@@ -331,12 +331,14 @@ fn requires_s40_1a(lever: Lever) -> bool {
     !is_s40_1b(lever) && lever != Lever::SpamUnsubscribe
 }
 
+/// Whether a request that s 40(1A) covers has an `escalated` status in effect.
 fn has_recorded_escalation(message: &Message) -> bool {
     message.requests.iter().any(|r| {
-        r.in_effect()
-            .statuses
-            .iter()
-            .any(|s| s.status == Status::Escalated)
+        requires_s40_1a(r.lever)
+            && r.in_effect()
+                .statuses
+                .iter()
+                .any(|s| s.status == Status::Escalated)
     })
 }
 
@@ -348,7 +350,8 @@ pub fn escalation_eligibility(message: &Message) -> Vec<&'static str> {
     if any(requires_s40_1a) {
         notes.push(if has_recorded_escalation(message) {
             "Privacy Act s 40(1A): applies (confirm you complained to the business first, unless \
-             that was not appropriate; the OAIC's guidance gives the business 30 days to respond)"
+             that was not appropriate; the OAIC's page 'Before you lodge a privacy complaint with \
+             us' says to lodge with it if the business does not respond within 30 days)"
         } else {
             "Privacy Act s 40(1A): applies (no complaint to the business or escalation recorded; \
              complain to the business first unless not appropriate)"
@@ -361,7 +364,10 @@ pub fn escalation_eligibility(message: &Message) -> Vec<&'static str> {
         );
     }
     if any(|lever| lever == Lever::SpamUnsubscribe) {
-        notes.push("Spam Act 2003: spam complaints go to the ACMA rather than the OAIC");
+        notes.push(
+            "Spam Act 2003: the ACMA enforces it and takes spam reports (acma.gov.au/spam), not \
+             the OAIC",
+        );
     }
     notes
 }
@@ -395,8 +401,9 @@ pub fn escalation_notices(message: &Message) -> Vec<String> {
         notices.push(
             "Privacy Act s 40(1A): no complaint to the business or escalation is recorded; the \
              OAIC must not investigate unless you complained to the business first or it \
-             decides complaining to the business was not appropriate; its guidance gives the \
-             business 30 days to respond"
+             decides complaining to the business was not appropriate; its page 'Before you lodge \
+             a privacy complaint with us' says to lodge with it if the business does not respond \
+             within 30 days"
                 .to_owned(),
         );
     }

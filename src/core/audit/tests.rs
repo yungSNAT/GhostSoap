@@ -362,3 +362,32 @@ fn escalation_summary_names_every_route_a_mixed_message_needs() {
         }
     }
 }
+
+#[test]
+fn an_escalation_on_a_credit_access_request_does_not_cover_a_ban_request() {
+    use crate::core::tracker::{Event, StatusEvent};
+
+    let mut message = sample_message();
+    message.sends.push(SendRecord::Sent(Send {
+        on: date(2026, 10, 10),
+        channel: ChannelKind::Email,
+    }));
+    message.requests = vec![
+        Request::new(Lever::S20rAccess),
+        Request::new(Lever::S20kBan),
+    ];
+    message.requests[0].events.push(Event::Status(StatusEvent {
+        on: date(2026, 11, 15),
+        status: Status::Escalated,
+        reason: None,
+        source: None,
+        note: None,
+    }));
+    let notices = escalation_notices(&message);
+    assert!(
+        notices
+            .iter()
+            .any(|n| n.starts_with("Privacy Act s 40(1A)")),
+        "{notices:?}"
+    );
+}

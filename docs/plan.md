@@ -11,7 +11,7 @@ GhostSoap is a free, local-first Rust tool that helps people in Australia reclai
 Research on 24 October 2026 (sources at the end of this plan) found:
 
 - **Few services use Australian rights.** The 24 October research found none, and only one comparable paid service had an Australian list (55 brokers, about 40 of them US business-data or ad-tech firms; from A$49 a year); other major paid services either listed Australia under US or EU law or excluded Australia. By 5 November 2026 a comparable managed Australian service advertised requests under the Privacy Act (A$129 to A$259 for a year of re-scanning), and a comparable provider published a free guide citing the APPs.
-- **Few open source tools cover Australia.** On 24 October none did; comparable open source projects focused on the US or EU. On 8 November 2026 a comparable UK-first open source tool added an Australian letter combining APP 7.6 and APP 11.2 requests (marked as not yet used for real), without access (APP 12), correction (APP 13), credit reporting (Part IIIA) or Spam Act requests. Read on 13 November 2026, that comparable tool also sent from the user's mailbox, read replies and drafted follow-ups going straight to the OAIC with no external dispute resolution step, whilst none of its default broker entries was tagged with Australian law.
+- **Few open source tools cover Australia.** On 24 October none did; comparable open source projects focused on the US or EU. On 8 November 2026 a comparable UK-first open source tool added an Australian letter combining APP 7.6 and APP 11.2 requests (marked as not yet used for real), without access (APP 12), correction (APP 13), credit reporting (Part IIIA) or Spam Act requests. Read on 13 November 2026, that comparable tool also sent from the user's mailbox, read replies and drafted a follow-up complaint to the business, a reply to a demand for ID and an OAIC complaint that skipped any external dispute resolution step, whilst none of its default broker entries was tagged with Australian law.
 - **No licence-compatible Australian broker dataset exists.** Existing public broker directories are CC BY-NC-SA, so they can serve only as leads.
 - **The category underperforms.** Consumer Reports (August 2024, 32 volunteers) found paid services removed 35% of people-search profiles within 4 months; manual opt-outs did better.
 
@@ -193,7 +193,7 @@ ghostsoap init                       create the encrypted profile (M2)
 ghostsoap registry list [--json]     list the packs and entries
 ghostsoap plan --pack start-here     choose entities and levers; dry run by default (M2)
 ghostsoap scan [--open]              list or open people-search sites' own search pages
-ghostsoap draft [--format eml|text] [--copy | --mailto]   write drafts or print them (M2/M3a)
+ghostsoap draft [--format auto|eml|text] [--copy | --mailto]   write drafts or print them (M2/M3a)
 ghostsoap clean                      delete drafts (M2)
 ghostsoap law [--json]               print the law table and dated law status (M2)
 ghostsoap check <file>               warn of legal claims the law table does not support
@@ -213,7 +213,7 @@ ghostsoap forget [--no-passphrase] [--yes]   delete profile, records, bundles an
 ghostsoap completions <shell>        generate shell completions (bash, zsh, fish, powershell, elvish)
 ```
 
-`--json` is built for `plan`, `law` and `registry list`, which hold no personal details, for the agent skill in `skills/ghostsoap`; another command gets it only when its milestone names it. Output honours `NO_COLOR`, and no status is shown by colour alone; M2 output has no colour.
+`--json` is built for `plan`, `law` and `registry list`, which hold no personal details, for the agent skill in `skills/ghostsoap`, and for `audit`, which prints the audit log's entries; another command gets it only when its milestone names it. Output honours `NO_COLOR`, and no status is shown by colour alone; M2 output has no colour.
 
 ### Dependencies
 
