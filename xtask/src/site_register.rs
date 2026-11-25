@@ -58,10 +58,9 @@ fn row(entry: &Entry) -> String {
         .iter()
         .map(|k| named(serde_json::to_value(k)))
         .collect();
-    let name = match entry.sources.first() {
-        Some(url) => format!("<a href=\"{}\">{}</a>", escape(url), escape(&entry.name)),
-        None => escape(&entry.name),
-    };
+    // Validation gives every entry at least one source.
+    let url = entry.sources.first().expect("an entry has a source");
+    let name = format!("<a href=\"{}\">{}</a>", escape(url), escape(&entry.name));
     format!(
         "      <tr><td>{name}</td><td>{}</td><td>{}</td><td>{}</td><td class=\"date\">{}</td></tr>\n",
         kinds.join(", "),
@@ -130,16 +129,14 @@ mod tests {
     use ghostsoap::core::register::{RegisterFiles, SourceFile, parse_register};
     use std::path::Path;
 
-    #[test]
-    fn the_site_register_lists_every_entry() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../site/register.html");
+    fn check_page(path: &Path, update: bool) {
         let register = parse_register(&embedded::register()).unwrap();
         let current = page(&register);
-        if std::env::var_os("UPDATE_SITE_REGISTER").is_some() {
-            std::fs::write(&path, &current).unwrap();
+        if update {
+            std::fs::write(path, &current).unwrap();
             return;
         }
-        let html = std::fs::read_to_string(&path)
+        let html = std::fs::read_to_string(path)
             .unwrap_or_default()
             .replace("\r\n", "\n");
         assert!(
@@ -147,6 +144,52 @@ mod tests {
             "site/register.html is out of date; run UPDATE_SITE_REGISTER=1 cargo test -p xtask"
         );
         assert_eq!(html.matches("<tr><td>").count(), register.entries.len());
+    }
+
+    #[test]
+    fn the_site_register_lists_every_entry() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../site/register.html");
+        check_page(&path, std::env::var_os("UPDATE_SITE_REGISTER").is_some());
+    }
+
+    #[test]
+    fn updating_writes_the_page_the_check_then_accepts() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("register.html");
+        let stale = std::panic::catch_unwind(|| check_page(&path, false));
+        assert!(stale.is_err(), "a missing page is out of date");
+        check_page(&path, true);
+        check_page(&path, false);
+    }
+
+    #[test]
+    fn an_obsolete_entry_shows_why_it_gets_no_letter() {
+        let register = parse_register(&RegisterFiles {
+            entries: vec![SourceFile {
+                name: "closed-au.toml".to_owned(),
+                text: r#"
+id = "closed-au"
+name = "PUBLIC Closed"
+legal_entity = "PUBLIC Closed Pty Ltd"
+abn = "88 000 014 675"
+kinds = ["marketing-list"]
+priority = "high"
+quality = "verified"
+verified_at = 2026-10-24
+sources = ["https://example.invalid/privacy"]
+identity_fields = ["full_name", "email"]
+exemption_risk = "none"
+escalation = ["oaic"]
+effort = "easy"
+[obsolete]
+reason = "closed"
+"#
+                .to_owned(),
+            }],
+            packs: vec![],
+        })
+        .unwrap();
+        assert!(row(&register.entries["closed-au"]).contains("<td>obsolete (closed)</td>"));
     }
 
     #[test]
@@ -168,7 +211,7 @@ mod tests {
                 name: "quote-au.toml".to_owned(),
                 text: r#"
 id = "quote-au"
-name = "PUBLIC <Quote> & \"Co\""
+name = "PUBLIC <Quote> & \"Co\" O'Neil"
 legal_entity = "PUBLIC Quote Pty Ltd"
 abn = "88 000 014 675"
 kinds = ["marketing-list", "directory"]
@@ -206,7 +249,7 @@ levers = []
         assert_eq!(
             row(entry),
             "      <tr><td><a href=\"https://example.com/privacy?a=1&amp;b=2\">PUBLIC &lt;Quote&gt; \
-             &amp; &quot;Co&quot;</a></td><td>marketing-list, directory</td><td>letter by email, \
+             &amp; &quot;Co&quot; O&#39;Neil</a></td><td>marketing-list, directory</td><td>letter by email, \
              post</td><td>medium</td><td class=\"date\">2026-10-24</td></tr>\n"
         );
     }
