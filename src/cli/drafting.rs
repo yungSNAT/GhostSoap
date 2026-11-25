@@ -123,7 +123,11 @@ pub(super) fn draft(
         // The state records every letter before one is written or shown, so a letter the
         // user can send always has a record for `sent` to find. Each is marked unfinished
         // until all are handed over, so a run that fails or stops leaves `sent` refusing them.
-        let format = output.format;
+        // `--copy` prints text, so a PDF's font limits do not apply to it.
+        let format = match output.format {
+            DraftFormat::Pdf if output.copy => DraftFormat::Auto,
+            format => format,
+        };
         let drafted = update_state(
             passphrase_stdin,
             |state| record_drafts(state, &planned, detail, folder.as_deref(), format, today()),
@@ -226,9 +230,11 @@ pub(super) fn record_drafts<'a>(
     for letter in drafted.iter().filter(|d| uses_pdf(d.letter.kind, format)) {
         letters::pdf(&letter.letter).map_err(|c| {
             format!(
-                "the letter to {} holds '{c}' (U+{:04X}), which a PDF's standard font cannot \
+                "the letter to {} holds '{}' (U+{:04X}), which a PDF's standard font cannot \
                  show; draft it with --format text instead",
-                letter.entry.id, c as u32
+                letter.entry.id,
+                c.escape_debug(),
+                c as u32
             )
         })?;
     }

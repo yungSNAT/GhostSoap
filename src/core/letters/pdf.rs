@@ -25,7 +25,7 @@ pub fn pdf(letter: &Letter) -> Result<String, char> {
 /// The body's lines as WinAnsi bytes, each at most `COLUMNS` long.
 fn layout(letter: &Letter) -> Result<Vec<Vec<u8>>, char> {
     let mut lines = Vec::new();
-    for line in letter.body.split('\n') {
+    for line in letter.body.trim_end_matches('\n').split('\n') {
         let mut bytes = Vec::new();
         for c in line.chars() {
             bytes.push(win_ansi(c).ok_or(c)?);
@@ -119,7 +119,9 @@ fn escape(bytes: &[u8]) -> String {
 /// The WinAnsiEncoding byte for `c` (PDF 1.7, Annex D), if it has one.
 fn win_ansi(c: char) -> Option<u8> {
     let byte = match c {
-        ' '..='~' | '\u{A0}'..='\u{FF}' => c as u8,
+        // No-break space and soft hyphen are left out: the font draws them as an ordinary
+        // space and a visible hyphen.
+        ' '..='~' | '\u{A1}'..='\u{AC}' | '\u{AE}'..='\u{FF}' => c as u8,
         '€' => 0x80,
         '‚' => 0x82,
         'ƒ' => 0x83,
@@ -248,6 +250,12 @@ mod tests {
     }
 
     #[test]
+    fn a_trailing_newline_adds_no_blank_page() {
+        let body = vec!["line"; LINES_PER_PAGE].join("\n") + "\n";
+        assert!(pdf(&letter(&body)).unwrap().contains("/Count 1"));
+    }
+
+    #[test]
     fn a_long_word_is_broken_at_76_columns_without_losing_a_character() {
         let word = "x".repeat(200);
         let pdf = pdf(&letter(&format!("{}\n{word}", "y".repeat(76)))).unwrap();
@@ -266,7 +274,9 @@ mod tests {
         for c in '\u{80}'..='\u{9F}' {
             assert_eq!(win_ansi(c), None);
         }
-        assert_eq!(win_ansi('\u{A0}'), Some(0xA0));
+        assert_eq!(win_ansi('\u{A0}'), None);
+        assert_eq!(win_ansi('\u{AD}'), None);
+        assert_eq!(win_ansi('\u{A1}'), Some(0xA1));
         assert_eq!(win_ansi('ÿ'), Some(0xFF));
     }
 
