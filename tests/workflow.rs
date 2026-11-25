@@ -488,3 +488,23 @@ fn law_lists_every_lever_with_its_sources() {
         assert!(stdout.contains(line), "missing {line:?}");
     }
 }
+
+#[test]
+fn status_with_nothing_recorded_says_so_rather_than_showing_clear_counts() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    init(&home);
+    let pass = format!("{PASSPHRASE}\n");
+    for args in [
+        &["status", "--passphrase-stdin"][..],
+        &["status", "--due", "--passphrase-stdin"][..],
+    ] {
+        let out = ghostsoap(&home, args, &pass);
+        assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+        let stdout = text(&out.stdout);
+        assert!(
+            stdout.contains("Nothing tracked yet: no letter has been drafted"),
+            "{stdout}"
+        );
+    }
+}

@@ -67,6 +67,25 @@ fn scan_takes_packs_and_entries_and_skips_entries_without_a_page() {
     assert!(text(&out.stderr).contains("unknown entry `nope-au`"));
 }
 
+#[test]
+fn a_scan_with_no_page_to_check_says_nothing_was_scanned() {
+    let tmp = tempfile::tempdir().unwrap();
+    for args in [
+        &["scan", "--entry", "acceleon-au"][..],
+        &["scan", "--entry", "acceleon-au", "--open"][..],
+    ] {
+        let out = ghostsoap(tmp.path(), args, "");
+        assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+        let stdout = text(&out.stdout);
+        assert!(
+            stdout.contains("Nothing scanned: none of the selected entries has a page"),
+            "{stdout}"
+        );
+        assert!(!stdout.contains("Search each page"), "{stdout}");
+        assert!(!stdout.contains("Handed"), "{stdout}");
+    }
+}
+
 #[cfg(unix)]
 mod open {
     use super::common::{ghostsoap_with, text};
