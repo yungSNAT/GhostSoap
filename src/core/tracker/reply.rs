@@ -33,14 +33,15 @@ impl Message {
     }
 
     /// Record an answer, or a step the user took, on the requests `levers` names, or on
-    /// every request: all of them or none. `Ok(false)` means it was already the latest
-    /// status in effect on each, so nothing changed. `today` stops a date in the future.
+    /// every request: all of them or none. Returns the levers whose request recorded the
+    /// event (empty when it was already the latest status in effect on each). `today` stops
+    /// a date in the future.
     pub fn record_status(
         &mut self,
         levers: &[Lever],
         event: StatusEvent,
         today: Date,
-    ) -> Result<bool, String> {
+    ) -> Result<Vec<Lever>, String> {
         let tag = &self.tag;
         if event.on > today {
             return Err(format!("{} is in the future", event.on));
@@ -89,18 +90,19 @@ impl Message {
         for &at in &new {
             self.requests[at].events.push(Event::Status(event.clone()));
         }
-        Ok(!new.is_empty())
+        Ok(new.into_iter().map(|at| self.requests[at].lever).collect())
     }
 
     /// Record a longer period the user agreed to in writing, which moves the statutory date
     /// of the requests `levers` names, or of every request (ss 20T(2)(b), 21V(2)(b)).
-    /// `Ok(false)` means it was already the longer period in effect on each.
+    /// Returns the levers whose request recorded the longer period (empty when it was
+    /// already the longer period in effect on each).
     pub fn record_extension(
         &mut self,
         levers: &[Lever],
         extension: Extension,
         today: Date,
-    ) -> Result<bool, String> {
+    ) -> Result<Vec<Lever>, String> {
         let tag = &self.tag;
         if extension.on > today {
             return Err(format!("{} is in the future", extension.on));
@@ -145,17 +147,18 @@ impl Message {
             let event = Event::Extension(extension.clone());
             self.requests[at].events.push(event);
         }
-        Ok(!new.is_empty())
+        Ok(new.into_iter().map(|at| self.requests[at].lever).collect())
     }
 
     /// Record that the latest status, or the latest longer period, in effect on the requests
     /// `levers` names, or on every request, was recorded wrongly. It stays as history.
+    /// Returns the deduplicated levers withdrawn.
     pub fn withdraw_event(
         &mut self,
         levers: &[Lever],
         of: Withdrawn,
         note: Option<String>,
-    ) -> Result<(), String> {
+    ) -> Result<Vec<Lever>, String> {
         let targets = self.targets(levers)?;
         for &at in &targets {
             let request = &self.requests[at];
@@ -169,14 +172,17 @@ impl Message {
                 return Err(format!("{} {lever} has no {what} to withdraw", self.tag));
             }
         }
-        for at in targets {
+        for &at in &targets {
             let withdrawal = Withdrawal {
                 of,
                 note: note.clone(),
             };
             self.requests[at].events.push(Event::Withdrawal(withdrawal));
         }
-        Ok(())
+        Ok(targets
+            .into_iter()
+            .map(|at| self.requests[at].lever)
+            .collect())
     }
 }
 

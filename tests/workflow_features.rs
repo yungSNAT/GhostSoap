@@ -384,6 +384,11 @@ fn escalation_bundle_verifies_and_detects_tampering() {
         &pass,
     );
     assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    assert!(
+        text(&out.stderr).contains("is plaintext"),
+        "expected plaintext warning on stderr: {}",
+        text(&out.stderr)
+    );
     let manifest = bundle_dir.join("manifest.sha256");
 
     let ok = ghostsoap(
@@ -485,4 +490,162 @@ fn shell_completions_include_new_subcommands_and_flags() {
             );
         }
     }
+}
+
+#[test]
+fn escalation_export_warns_plaintext_and_notices_for_unsent_or_unescalated_tags() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    init(&home);
+    let pass = format!("{PASSPHRASE}\n");
+    let drafted = ghostsoap(
+        &home,
+        &["draft", "--entry", "cotality-au", "--passphrase-stdin"],
+        &pass,
+    );
+    assert_eq!(drafted.status.code(), Some(0), "{}", text(&drafted.stderr));
+    let tag = extract_tag(&text(&drafted.stdout));
+    let export_to = |dir: &Path| {
+        let args = [
+            "export",
+            "--escalation",
+            &tag,
+            "--out",
+            dir.to_str().unwrap(),
+            "--passphrase-stdin",
+        ];
+        let out = ghostsoap(&home, &args, &pass);
+        assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+        text(&out.stderr)
+    };
+
+    let unsent_dir = tmp.path().join("unsent-pack");
+    let stderr = export_to(&unsent_dir);
+    for needle in [
+        "is plaintext",
+        "not recorded as sent",
+        "Privacy Act s 40(1A)",
+    ] {
+        assert!(stderr.contains(needle), "missing {needle:?} in:\n{stderr}");
+    }
+    let summary = fs::read_to_string(unsent_dir.join("summary.txt")).unwrap();
+    assert!(summary.contains("Notices:") && summary.contains("Privacy Act s 40(1A)"));
+    assert!(
+        fs::read_to_string(unsent_dir.join("record.toml"))
+            .unwrap()
+            .contains("notices = [")
+    );
+
+    let sent = ghostsoap(&home, &["sent", &tag, "--passphrase-stdin"], &pass);
+    assert_eq!(sent.status.code(), Some(0), "{}", text(&sent.stderr));
+    let stderr2 = export_to(&tmp.path().join("sent-pack"));
+    assert!(stderr2.contains("is plaintext") && stderr2.contains("Privacy Act s 40(1A)"));
+    assert!(!stderr2.contains("not recorded as sent"));
+}
+
+#[test]
+fn reply_audit_logs_only_applied_levers_on_partial_dedup() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    init(&home);
+    let pass = format!("{PASSPHRASE}\n");
+    let drafted = ghostsoap(
+        &home,
+        &["draft", "--entry", "cotality-au", "--passphrase-stdin"],
+        &pass,
+    );
+    assert_eq!(drafted.status.code(), Some(0), "{}", text(&drafted.stderr));
+    let tag = extract_tag(&text(&drafted.stdout));
+    for args in [
+        &["sent", tag.as_str(), "--passphrase-stdin"][..],
+        &[
+            "reply",
+            tag.as_str(),
+            "acknowledged",
+            "--lever",
+            "app7-source",
+            "--passphrase-stdin",
+        ][..],
+        &["reply", tag.as_str(), "acknowledged", "--passphrase-stdin"][..],
+    ] {
+        let out = ghostsoap(&home, args, &pass);
+        assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    }
+
+    let audit = ghostsoap(
+        &home,
+        &["audit", "--list", "--json", "--passphrase-stdin"],
+        &pass,
+    );
+    assert_eq!(audit.status.code(), Some(0), "{}", text(&audit.stderr));
+    let parsed: serde_json::Value = serde_json::from_slice(&audit.stdout).unwrap();
+    let entries = parsed["entries"].as_array().unwrap();
+    assert_eq!(entries.len(), 3);
+    assert!(
+        entries[1]["detail"]
+            .as_str()
+            .unwrap()
+            .contains("levers=app7-source")
+    );
+    let second_reply = entries[2]["detail"].as_str().unwrap();
+    assert!(
+        second_reply.contains("levers=app7-no-marketing,app7-no-facilitation"),
+        "expected only newly modified levers, got {second_reply}"
+    );
+    assert!(
+        !second_reply.contains("app7-source"),
+        "deduplicated lever should not appear in audit detail: {second_reply}"
+    );
+}
+
+#[test]
+fn audit_export_cli_accepts_early_format_2_days() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    init(&home);
+    let pass = format!("{PASSPHRASE}\n");
+    let drafted = ghostsoap(
+        &home,
+        &[
+            "draft",
+            "--entry",
+            "equifax-au",
+            "--lever",
+            "s20r-access",
+            "--passphrase-stdin",
+        ],
+        &pass,
+    );
+    assert_eq!(drafted.status.code(), Some(0), "{}", text(&drafted.stderr));
+    let tag = extract_tag(&text(&drafted.stdout));
+    let sent = ghostsoap(&home, &["sent", &tag, "--passphrase-stdin"], &pass);
+    assert_eq!(sent.status.code(), Some(0), "{}", text(&sent.stderr));
+
+    let export_path = tmp.path().join("legacy-days.toml");
+    let exp = ghostsoap(
+        &home,
+        &[
+            "export",
+            "--out",
+            export_path.to_str().unwrap(),
+            "--passphrase-stdin",
+        ],
+        &pass,
+    );
+    assert_eq!(exp.status.code(), Some(0), "{}", text(&exp.stderr));
+    fs::remove_file(tmp.path().join("legacy-days.toml.sha256")).unwrap();
+    let raw = fs::read_to_string(&export_path).unwrap();
+    let legacy = raw.replacen("days-after = 10", "days = 10", 1);
+    assert!(legacy.contains("\ndays = 10\n"), "{legacy}");
+    fs::write(&export_path, legacy).unwrap();
+
+    let verify = ghostsoap(
+        &home,
+        &["audit", "--export", export_path.to_str().unwrap(), "--json"],
+        "",
+    );
+    assert_eq!(verify.status.code(), Some(0), "{}", text(&verify.stderr));
+    let parsed: serde_json::Value = serde_json::from_slice(&verify.stdout).unwrap();
+    assert_eq!(parsed["chain_verified"], true);
+    assert_eq!(parsed["count"], 1);
 }

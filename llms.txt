@@ -2,12 +2,14 @@
 
 > A free, local-first command-line tool that prepares Australian Privacy Act requests to
 > data brokers for you to send from your own mailbox. It makes no network connections. It
-> records each letter, the day you sent it and each answer, and lists what to do next
-> with each request's dates.
+> records each letter, the day you sent it and each answer, lists what to do next with
+> each request's dates, verifies its hash-chained audit log, exports plaintext backups and
+> OAIC escalation bundles, and keeps a checklist of data hygiene steps.
 
-Status: milestone M2 with M3a under way, version 0.1.0, with no GitHub release or published
-package. Build from source with `cargo build --release`; `rust-toolchain.toml` pins the
-compiler. GhostSoap provides information and templates, not legal advice.
+Status: milestones M0 to M2, M3a and M4 complete (including the hygiene checklist, `scan`,
+`demo`, `audit` and `export --escalation`), version 0.1.0, with no GitHub release or
+published package. Build from source with `cargo build --release`; `rust-toolchain.toml`
+pins the compiler. GhostSoap provides information and templates, not legal advice.
 
 ## Start
 

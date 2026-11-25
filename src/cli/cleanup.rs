@@ -67,9 +67,17 @@ fn export_escalation(
         receipt.files.len(),
         receipt.audit
     );
+    for notice in &receipt.notices {
+        eprintln!("warning: {notice}");
+    }
     warn_exposed(
         &receipt.dir,
         ("the escalation bundle's folder", "the escalation bundle"),
+    );
+    eprintln!(
+        "warning: {} is plaintext: anyone who can open it can read this letter's record and \
+         audit summary. Keep it private, and delete it when you no longer need it.",
+        receipt.dir.display()
     );
     Ok(())
 }

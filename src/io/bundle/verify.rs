@@ -7,14 +7,11 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
-
 use crate::core::audit::{self, AuditEntry, AuditSummary};
-use crate::core::checklist::Mark;
-use crate::core::profile::Profile;
 use crate::core::sha256;
-use crate::core::tracker::{FORMAT, Message};
+use crate::core::tracker::{FORMAT, State};
 use crate::io::bundle::{manifest_path, read_regular_file};
+use crate::io::state;
 
 /// Verified files in a GhostSoap SHA-256 manifest.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -64,19 +61,13 @@ pub fn verify_manifest_file(manifest: &Path) -> Result<ManifestCheck, String> {
     verify_manifest_entries(manifest, None)
 }
 
-/// Schema mirror of GhostSoap `State` exports (`deny_unknown_fields`) so arbitrary TOML is
-/// rejected whilst a tampered `audit` chain still decodes for exact chain diagnosis.
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ExportDocument {
-    format: u32,
-    profile: Profile,
-    #[serde(default)]
-    messages: Vec<Message>,
-    #[serde(default)]
-    checklist: Vec<Mark>,
-    #[serde(default)]
-    audit: Vec<AuditEntry>,
+/// Decode a GhostSoap `State` export without running `State::problems`, so a tampered
+/// `audit` chain still decodes for exact chain diagnosis whilst early format-2 `days`
+/// exports are accepted as `state::load` accepts them.
+fn parse_export_state(export_path: &Path, text: &str) -> Result<State, String> {
+    let redact = |e: toml::de::Error| redact_toml_error(export_path, text, &e);
+    let table: toml::Table = toml::from_str(text).map_err(redact)?;
+    state::decode_format2(table, text).map_err(redact)
 }
 
 /// Redact TOML parse errors so raw PII lines from an export never appear in stderr/logs.
@@ -111,17 +102,15 @@ pub fn verify_export_file(export_path: &Path) -> Result<ExportCheck, String> {
         .map_err(|e| format!("cannot read export {}: {e}", export_path.display()))?;
     let text = String::from_utf8(raw)
         .map_err(|_| format!("export {} is not valid UTF-8", export_path.display()))?;
-    let doc: ExportDocument =
-        toml::from_str(&text).map_err(|e| redact_toml_error(export_path, &text, &e))?;
-    let _ = (&doc.profile, &doc.messages, &doc.checklist);
-    if doc.format != FORMAT {
+    let state = parse_export_state(export_path, &text)?;
+    if state.format != FORMAT {
         return Err(format!(
             "export {} has unsupported state format {}, expected {FORMAT}",
             export_path.display(),
-            doc.format
+            state.format
         ));
     }
-    let summary = audit::verify_chain(&doc.audit)?;
+    let summary = audit::verify_chain(&state.audit)?;
     let expected = export_path
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
@@ -142,7 +131,7 @@ pub fn verify_export_file(export_path: &Path) -> Result<ExportCheck, String> {
     };
     Ok(ExportCheck {
         summary,
-        entries: doc.audit,
+        entries: state.audit,
         manifest,
     })
 }

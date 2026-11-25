@@ -14,9 +14,9 @@ recheck_months = 6
 [[links]]
 name = "Have I Been Pwned"
 url = "https://haveibeenpwned.com/"
-checked = 2026-11-17
+checked = 2026-11-25
 
 [[links]]
 name = "IDCARE"
 url = "https://www.idcare.org/"
-checked = 2026-11-17
+checked = 2026-11-25
