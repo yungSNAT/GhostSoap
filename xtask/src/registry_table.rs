@@ -89,6 +89,26 @@ mod tests {
     }
 
     #[test]
+    fn each_row_gives_the_day_its_entry_was_last_verified() {
+        let register = parse_register(&embedded::register()).unwrap();
+        let table = table(&register);
+        assert!(
+            table.starts_with("| Entry | Name | Kinds | Packs | Route | Verified |\n"),
+            "{table}"
+        );
+        for entry in register.entries.values() {
+            let row = table
+                .lines()
+                .find(|line| line.starts_with(&format!("| `{}` |", entry.id)))
+                .unwrap();
+            assert!(
+                row.ends_with(&format!(" | {} |", entry.verified_at)),
+                "{row}"
+            );
+        }
+    }
+
+    #[test]
     fn updating_the_table_preserves_surrounding_text() {
         let temp = tempfile::tempdir().unwrap();
         let path = temp.path().join("README.md");
