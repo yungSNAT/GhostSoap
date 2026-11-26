@@ -441,4 +441,13 @@ fn an_escalated_app7_request_does_not_hide_the_notice_for_an_unescalated_app12_r
         )),
         "{notes:?}"
     );
+    // s 40(1A) leaves 'not appropriate' to the OAIC, never to the user.
+    for line in notes.iter().filter(|n| n.starts_with("Privacy Act s 40(1A)")) {
+        assert!(
+            line.contains("the OAIC decides complaining to the business was not appropriate"),
+            "{line}"
+        );
+        assert!(!line.contains("that was not appropriate"), "{line}");
+        assert!(!line.contains("that is not appropriate"), "{line}");
+    }
 }
