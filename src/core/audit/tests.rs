@@ -442,6 +442,28 @@ fn an_escalated_app7_request_does_not_hide_the_notice_for_an_unescalated_app12_r
         "{notes:?}"
     );
     assert_the_oaic_judges_appropriateness(&notes);
+    assert_the_oaic_page_is_reported_faithfully(&notes, &notices);
+}
+
+/// The OAIC page says a person 'can' lodge after 30 days without a response or when unhappy
+/// with the response; neither line may turn that into an instruction or drop the second limb.
+fn assert_the_oaic_page_is_reported_faithfully(notes: &[String], notices: &[String]) {
+    let quoting: Vec<&String> = notes
+        .iter()
+        .chain(notices)
+        .filter(|line| line.contains("'Before you lodge a privacy complaint with us'"))
+        .collect();
+    assert_eq!(quoting.len(), 2, "{quoting:?}");
+    for line in quoting {
+        assert!(
+            line.contains(
+                "says you can lodge with it if the business does not respond within 30 days or \
+                 you are not happy with its response"
+            ),
+            "{line}"
+        );
+        assert!(!line.contains("says to lodge"), "{line}");
+    }
 }
 
 /// s 40(1A) leaves 'not appropriate' to the OAIC, never to the user.
