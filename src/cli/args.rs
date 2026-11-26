@@ -44,8 +44,9 @@ pub enum Command {
         #[arg(long)]
         out: Option<PathBuf>,
         /// Output format: `auto` writes `.eml` for email and `.txt` for post/web form,
-        /// `eml` writes RFC 5322 `.eml` drafts (with `X-Unsent: 1`), and `text` writes
-        /// plain text.
+        /// `eml` writes RFC 5322 `.eml` drafts (with `X-Unsent: 1`), `text` writes
+        /// plain text, and `pdf` writes A4 `.pdf` files to print for post (email stays
+        /// `.eml`, web form `.txt`).
         #[arg(long, value_enum, default_value_t = DraftFormat::Auto)]
         format: DraftFormat,
         /// Print each letter's To, Subject and body (or raw `.eml` with `--format eml`)
@@ -167,6 +168,8 @@ pub enum DraftFormat {
     Eml,
     /// Plain text (`.txt`).
     Text,
+    /// A4 `.pdf` for post, `.eml` for email and `.txt` for web form.
+    Pdf,
 }
 
 /// Output format for `ghostsoap demo`.

@@ -244,12 +244,13 @@ fn check_private(_dir: &Path) -> io::Result<()> {
     Ok(())
 }
 
-/// A name GhostSoap gives a draft: `<entry-id>-GS-XXXXX.eml` or `.txt`, where the entry id
+/// A name GhostSoap gives a draft: `<entry-id>-GS-XXXXX.eml`, `.txt` or `.pdf`, where the entry id
 /// is lowercase ASCII letters, digits and hyphens and `XXXXX` is 5 digits or capitals.
 fn is_draft(name: &str) -> bool {
     let Some(stem) = name
         .strip_suffix(".eml")
         .or_else(|| name.strip_suffix(".txt"))
+        .or_else(|| name.strip_suffix(".pdf"))
     else {
         return false;
     };

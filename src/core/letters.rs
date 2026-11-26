@@ -279,8 +279,10 @@ pub fn wrap(text: &str, width: usize) -> String {
 }
 
 mod eml;
+mod pdf;
 
 pub use eml::eml;
+pub use pdf::pdf;
 
 /// A `mailto:` link (RFC 6068), or `None` when it would be longer than mail clients and
 /// browsers reliably accept.

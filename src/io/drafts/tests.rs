@@ -12,7 +12,7 @@ mod remove;
 fn drafts_ignore_other_extensions_and_report_filesystem_errors() {
     let dir = tempfile::tempdir().unwrap();
     let drafts = dir.path().join("drafts");
-    let err = write(&drafts, "example-au-GS-ABCDE.pdf", "text").unwrap_err();
+    let err = write(&drafts, "example-au-GS-ABCDE.docx", "text").unwrap_err();
     assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
     assert!(!drafts.exists());
 
@@ -112,6 +112,7 @@ fn clean_deletes_only_drafts_it_wrote() {
     let drafts = dir.path().join("drafts");
     write(&drafts, "quantium-au-GS-7K3QX.eml", "x").unwrap();
     write(&drafts, "talefin-au-GS-00AZ9.txt", "y").unwrap();
+    write(&drafts, "anz-au-GS-00AZ8.pdf", "z").unwrap();
     fs::write(drafts.join("notes.txt"), "keep").unwrap();
     fs::write(
         drafts.join("notes-GS-ABCDE.txt"),
@@ -131,7 +132,7 @@ fn clean_deletes_only_drafts_it_wrote() {
         "no line break"
     );
     let cleaned = clean(&drafts, true).unwrap();
-    assert_eq!(cleaned.deleted, 2);
+    assert_eq!(cleaned.deleted, 3);
     assert!(drafts.join("notes.txt").exists());
     assert!(drafts.join("notes-GS-ABCDE.txt").exists());
     assert!(!drafts.join(MANIFEST).exists());

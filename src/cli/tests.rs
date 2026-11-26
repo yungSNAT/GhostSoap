@@ -263,3 +263,15 @@ fn audit_command_rejects_export_and_manifest_together() {
     let err = audit_command(&args).unwrap_err();
     assert!(err.contains("cannot be used together"), "{err}");
 }
+
+#[test]
+fn pdf_applies_to_post_only() {
+    let register = built_in_register().unwrap();
+    let entry = &register.entries["anz-au"];
+    let name = |kind| draft_name(entry, "GS-ABCDE", kind, DraftFormat::Pdf);
+    assert_eq!(name(ChannelKind::Post), "anz-au-GS-ABCDE.pdf");
+    assert_eq!(name(ChannelKind::Email), "anz-au-GS-ABCDE.eml");
+    assert_eq!(name(ChannelKind::WebForm), "anz-au-GS-ABCDE.txt");
+    let auto = draft_name(entry, "GS-ABCDE", ChannelKind::Post, DraftFormat::Auto);
+    assert_eq!(auto, "anz-au-GS-ABCDE.txt");
+}
