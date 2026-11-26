@@ -272,7 +272,9 @@ fn escalation_notices_and_eligibility_cover_state_flags_and_s40_provisions() {
     let empty_summary = verify_chain(&[]).unwrap();
     let flagged_summary =
         format_escalation_summary(&flagged, None, &[], &empty_summary, date(2026, 11, 25));
-    assert!(flagged_summary.contains("Eligibility: Privacy Act s 40(1A): applies (no complaint"));
+    assert!(flagged_summary.contains(
+        "Eligibility: Privacy Act s 40(1A): applies to app7-no-marketing (no complaint"
+    ));
     assert!(flagged_summary.contains("\nNotices:\n"));
 
     // Sent and escalated s 40(1A) message has no notices and confirms s 40(1A) applies.
@@ -392,5 +394,51 @@ fn an_escalation_on_a_credit_access_request_does_not_cover_a_ban_request() {
             .iter()
             .any(|n| n.starts_with("Privacy Act s 40(1A)")),
         "{notices:?}"
+    );
+}
+
+#[test]
+fn an_escalated_app7_request_does_not_hide_the_notice_for_an_unescalated_app12_request() {
+    use crate::core::tracker::{Event, StatusEvent};
+
+    let mut message = sample_message();
+    message.sends.push(SendRecord::Sent(Send {
+        on: date(2026, 10, 10),
+        channel: ChannelKind::Email,
+    }));
+    message.requests = vec![
+        Request::new(Lever::App7NoMarketing),
+        Request::new(Lever::App12),
+    ];
+    message.requests[0].events.push(Event::Status(StatusEvent {
+        on: date(2026, 11, 15),
+        status: Status::Escalated,
+        reason: None,
+        source: None,
+        note: None,
+    }));
+
+    let notices = escalation_notices(&message);
+    let s40: Vec<&String> = notices
+        .iter()
+        .filter(|n| n.starts_with("Privacy Act s 40(1A)"))
+        .collect();
+    assert_eq!(s40.len(), 1, "{notices:?}");
+    assert!(s40[0].contains("app12"), "{notices:?}");
+    assert!(!s40[0].contains("app7-no-marketing"), "{notices:?}");
+
+    let notes = escalation_eligibility(&message);
+    assert!(
+        notes.iter().any(|n| n.starts_with(
+            "Privacy Act s 40(1A): applies to app7-no-marketing (escalation recorded; confirm"
+        )),
+        "{notes:?}"
+    );
+    assert!(
+        notes.iter().any(|n| n.starts_with(
+            "Privacy Act s 40(1A): applies to app12 (no complaint to the business or escalation \
+             recorded;"
+        )),
+        "{notes:?}"
     );
 }
