@@ -121,7 +121,7 @@ GhostSoap suits you if you want to keep your details on your own computer and se
 
 - **Someone else does the work:** paid data-removal services handle removals for you, which means giving them your details.
 - **A guide rather than a tool:** free Australian opt-out guides walk through removals site by site without installing software.
-- **The tool sends and follows up for you, or you live outside Australia:** comparable open source tools also run on your own computer, and some send letters from your mailbox and read the replies, which GhostSoap does not. They are built mainly for UK, EU or US privacy law, though some also write Australian letters.
+- **The tool sends and follows up for you, or you live outside Australia:** comparable open source tools also run on your own computer, and some send letters from your mailbox and read the replies, which GhostSoap does not. They are built mainly for UK, EU or US privacy law, though some also write Australian letters (checked 27 November 2026).
 - **A result gone from Google:** [Results about you](https://support.google.com/websearch/answer/12719076) asks Google to drop a result from Search. The information stays on the source page, so it complements a request to the site.
 - **Whether a breach exposed you:** [Have I Been Pwned](https://haveibeenpwned.com/) checks whether your email address is in a known data breach. If identity documents leaked, [IDCARE](https://www.idcare.org/), Australia's national identity and cyber incident support service, offers free support.
 - **Fewer telemarketing calls:** the ACMA's [Do Not Call Register](https://www.donotcall.gov.au/) lets you register an Australian phone, mobile or fax number to opt out of most unsolicited telemarketing calls and faxes.

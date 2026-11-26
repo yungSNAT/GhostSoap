@@ -4,7 +4,7 @@ _GhostSoap at no Price._
 
 Draft 2, 24 October 2026, amended since. Status: approved (section 12); M0 to M2, M3a and M4 complete (including `scan`, `demo`, `audit` and `export --escalation`); public since 24 October 2026; M3 split into M3a and M3b on 9 November 2026 after the 29 October review (section 14); v0.1 to ship without M3b (decided 10 November 2026, section 12).
 
-GhostSoap is a free, local-first Rust tool that helps people in Australia reclaim their privacy. It sends Australian Privacy Act requests to data brokers and other businesses from the user's own mailbox, tracks every deadline and reply, builds an escalation file for the Office of the Australian Information Commissioner (OAIC), and walks the user through the wider data hygiene steps that email cannot fix.
+GhostSoap is a free, local-first Rust tool that helps people in Australia reclaim their privacy. It prepares Australian Privacy Act requests to data brokers and other businesses for the user to send from their own mailbox, tracks every deadline and reply, builds an escalation file for the Office of the Australian Information Commissioner (OAIC), and walks the user through the wider data hygiene steps that email cannot fix.
 
 ## 1. Why another tool
 
