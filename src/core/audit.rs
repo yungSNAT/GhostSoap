@@ -351,6 +351,13 @@ fn s40_1a_levers(message: &Message, escalated: bool) -> String {
         .join(", ")
 }
 
+/// The OAIC's complain-first guidance, quoted word for word with its link and dates.
+pub(crate) const OAIC_COMPLAIN_FIRST: &str = "the OAIC's page 'Before you lodge a privacy \
+     complaint with us' \
+     (https://www.oaic.gov.au/privacy/privacy-complaints/before-you-lodge-a-privacy-complaint-with-us, \
+     updated 2 March 2026, read 27 November 2026) says: 'If they don't respond to your complaint \
+     within 30 days or you're not happy with their response, you can lodge a complaint with us.'";
+
 /// Eligibility notes under Privacy Act ss 40(1A)-(1B) and the Spam Act for `message`, one
 /// for each that applies to at least one of its requests, with s 40(1A) split by whether
 /// each request has an escalation recorded.
@@ -362,9 +369,7 @@ pub fn escalation_eligibility(message: &Message) -> Vec<String> {
         notes.push(format!(
             "Privacy Act s 40(1A): applies to {escalated} (escalation recorded; confirm you \
              complained to the business first, as otherwise the OAIC may investigate only if it \
-             considers complaining to the business was not appropriate; the OAIC's page \
-             'Before you lodge a privacy complaint with us' says to lodge with it if the business \
-             does not respond within 30 days)"
+             considers complaining to the business was not appropriate; {OAIC_COMPLAIN_FIRST})"
         ));
     }
     let unescalated = s40_1a_levers(message, false);
@@ -421,9 +426,7 @@ pub fn escalation_notices(message: &Message) -> Vec<String> {
             "Privacy Act s 40(1A): no escalation is recorded for {unescalated}; unless you have \
              already complained to the business, do so first: the OAIC must not investigate \
              unless you complained to the business first or it decides complaining to the \
-             business was not appropriate; its page \
-             'Before you lodge a privacy complaint with us' says to lodge with it if the business \
-             does not respond within 30 days"
+             business was not appropriate; {OAIC_COMPLAIN_FIRST}"
         ));
     }
     notices
