@@ -445,24 +445,20 @@ fn an_escalated_app7_request_does_not_hide_the_notice_for_an_unescalated_app12_r
     assert_the_oaic_page_is_reported_faithfully(&notes, &notices);
 }
 
-/// The OAIC page says a person 'can' lodge after 30 days without a response or when unhappy
-/// with the response; neither line may turn that into an instruction or drop the second limb.
+/// Each function quotes the OAIC page once, word for word, with its link and dates.
 fn assert_the_oaic_page_is_reported_faithfully(notes: &[String], notices: &[String]) {
-    let quoting: Vec<&String> = notes
-        .iter()
-        .chain(notices)
-        .filter(|line| line.contains("'Before you lodge a privacy complaint with us'"))
-        .collect();
-    assert_eq!(quoting.len(), 2, "{quoting:?}");
-    for line in quoting {
-        assert!(
-            line.contains(
-                "says you can lodge with it if the business does not respond within 30 days or \
-                 you are not happy with its response"
-            ),
-            "{line}"
-        );
-        assert!(!line.contains("says to lodge"), "{line}");
+    const QUOTE: &str = "the OAIC's page 'Before you lodge a privacy complaint with us' \
+        (https://www.oaic.gov.au/privacy/privacy-complaints/before-you-lodge-a-privacy-complaint-with-us, \
+        updated 2 March 2026, read 27 November 2026) says: 'If they don't respond to your \
+        complaint within 30 days or you're not happy with their response, you can lodge a \
+        complaint with us.'";
+    for lines in [notes, notices] {
+        let naming: Vec<&String> = lines
+            .iter()
+            .filter(|line| line.contains("Before you lodge a privacy complaint with us"))
+            .collect();
+        assert_eq!(naming.len(), 1, "{lines:?}");
+        assert!(naming[0].contains(QUOTE), "{}", naming[0]);
     }
 }
 
