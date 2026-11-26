@@ -51,100 +51,100 @@ A pack has `id` (equal to the file name), `name`, `description` and `entries`, a
 
 ## Entries
 
-Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI fails when this table is out of date. A route of `letter` means GhostSoap drafts requests; `its own web form` marks an overseas entry, which gets no letter: the user goes to the web form in its channels. `obsolete (<reason>)`, followed by `use <id> instead` when another entry handles its requests, marks a retired entry, which gets no letter.
+Generated from the register by `UPDATE_REGISTRY_TABLE=1 cargo test -p xtask`; CI fails when this table is out of date. `Verified` is the entry's `verified_at`, the day its contact was last checked. A route of `letter` means GhostSoap drafts requests; `its own web form` marks an overseas entry, which gets no letter: the user goes to the web form in its channels. `obsolete (<reason>)`, followed by `use <id> instead` when another entry handles its requests, marks a retired entry, which gets no letter.
 
 <!-- entries:start -->
-| Entry | Name | Kinds | Packs | Route |
-|---|---|---|---|---|
-| `acceleon-au` | Acceleon | property-data, people-search, directory | `people-search`, `start-here` | letter |
-| `acxiom-au` | Acxiom | marketing-list | `marketing` | its own web form |
-| `adecco-au` | Adecco | recruitment | `recruitment` | letter |
-| `afterpay-au` | Afterpay | financial-services | `banks-and-lenders` | letter |
-| `allianz-au` | Allianz Australia | insurance | `insurers` | letter |
-| `amazon-au` | Amazon Australia | retail | `retail` | letter |
-| `anz-au` | ANZ | financial-services | `banks-and-lenders` | letter |
-| `apollo-au` | Apollo.io | marketing-list | `marketing` | its own web form |
-| `aussie-broadband-au` | Aussie Broadband | telecommunications | `telecommunications` | letter |
-| `australia-post-au` | Australia Post (data services, National Change of Address) | marketing-list | `marketing` | letter |
-| `bunnings-au` | Bunnings | retail | `retail` | letter |
-| `bupa-au` | Bupa Health Insurance | insurance | `insurers` | letter |
-| `canva-au` | Canva | online-service | `data-breaches`, `retail` | letter |
-| `careerone-au` | CareerOne | recruitment | `recruitment` | letter |
-| `cba-au` | Commonwealth Bank of Australia | financial-services | `banks-and-lenders` | letter |
-| `chandler-macleod-au` | Chandler Macleod | recruitment | `recruitment` | letter |
-| `charterhouse-au` | Charterhouse Partnership | recruitment | `recruitment` | letter |
-| `coles-au` | Coles | retail | `retail` | letter |
-| `conexum-au` | Conexum | marketing-list | `marketing`, `start-here` | letter |
-| `contactout-au` | ContactOut | marketing-list | `marketing` | its own web form |
-| `cotality-au` | Cotality (formerly CoreLogic Australia; brands include RP Data, Cordell, onthehouse.com.au) | property-data, marketing-list | `property`, `start-here` | letter |
-| `domain-au` | Domain (Allhomes) | property-data | `property` | letter |
-| `dymocks-au` | Dymocks | retail | `data-breaches`, `retail` | letter |
-| `ebay-au` | eBay Australia | retail | `retail` | letter |
-| `equifax-au` | Equifax | credit-reporting-body | `credit` | letter |
-| `equifax-marketing-au` | Equifax Data-driven Marketing | marketing-list | `marketing`, `start-here` | letter |
-| `everyday-rewards-au` | Everyday Rewards (Woolworths) | loyalty | `loyalty` | letter |
-| `experian-au` | Experian | credit-reporting-body | `credit` | letter |
-| `experian-marketing-au` | Experian Data and Marketing | marketing-list, ad-tech | `marketing`, `start-here` | letter |
-| `flybuys-au` | Flybuys | loyalty | `loyalty` | letter |
-| `globalx-au` | GlobalX | property-data | `property` | letter |
-| `harvey-norman-au` | Harvey Norman Online | retail | `retail` | letter |
-| `hays-au` | Hays | recruitment | `recruitment` | letter |
-| `hcf-au` | HCF | insurance | `insurers` | letter |
-| `hudson-au` | Hudson | recruitment | `recruitment` | letter |
-| `iag-au` | NRMA Insurance (IAG) | insurance | `insurers` | letter |
-| `id4me-au` | iD4me | people-search, marketing-list | `people-search`, `start-here` | letter |
-| `indeed-au` | Indeed | recruitment | `recruitment` | its own web form |
-| `infotracer-au` | InfoTracer Australia | people-search | `people-search` | its own web form |
-| `infotrack-au` | InfoTrack | property-data | `property` | letter |
-| `jb-hi-fi-au` | JB Hi-Fi | retail, loyalty | `retail` | letter |
-| `kmart-au` | Kmart | retail | `retail` | letter |
-| `landchecker-au` | Landchecker | property-data | `property` | letter |
-| `latitude-au` | Latitude Financial Services | financial-services | `banks-and-lenders`, `data-breaches` | letter |
-| `lead-lists-au` | Lead Lists | marketing-list | `marketing` | letter |
-| `linkedin-au` | LinkedIn | recruitment | `recruitment` | its own web form |
-| `list-factory-au` | List Factory | marketing-list | `marketing` | letter |
-| `liveramp-au` | LiveRamp Australia | ad-tech | `marketing`, `start-here` | letter |
-| `locate-family-au` | Locate Family | people-search | `people-search` | its own web form |
-| `lusha-au` | Lusha | marketing-list | `marketing` | its own web form |
-| `macquarie-au` | Macquarie Bank | financial-services | `banks-and-lenders` | letter |
-| `manpowergroup-au` | ManpowerGroup | recruitment | `recruitment` | letter |
-| `medibank-au` | Medibank | insurance | `data-breaches`, `insurers` | letter |
-| `michael-page-au` | Michael Page | recruitment | `recruitment` | letter |
-| `myer-one-au` | MYER one | loyalty | `loyalty` | letter |
-| `nab-au` | NAB | financial-services | `banks-and-lenders` | letter |
-| `nib-au` | nib | insurance | `insurers` | letter |
-| `nielsen-au` | Nielsen (Australia) | ad-tech |  | letter |
-| `optus-au` | Optus | telecommunications | `data-breaches`, `telecommunications` | letter |
-| `peoplebank-au` | Peoplebank | recruitment | `recruitment` | letter |
-| `peopledatalabs-au` | People Data Labs | marketing-list | `marketing` | its own web form |
-| `priceline-pulse-rewards-au` | Priceline Pulse Rewards | loyalty | `loyalty` | letter |
-| `programmed-au` | Programmed | recruitment | `recruitment` | letter |
-| `qantas-frequent-flyer-au` | Qantas Frequent Flyer | loyalty | `data-breaches`, `loyalty` | letter |
-| `qbe-au` | QBE Insurance (Australia) | insurance | `insurers` | letter |
-| `quantium-au` | Quantium | ad-tech |  | letter |
-| `randstad-au` | Randstad | recruitment | `recruitment` | letter |
-| `rea-group-au` | realestate.com.au (REA Group) | property-data | `property` | letter |
-| `records-finder-au` | Records Finder Australia | people-search | `people-search` | its own web form |
-| `robert-half-au` | Robert Half | recruitment | `recruitment` | letter |
-| `robert-walters-au` | Robert Walters | recruitment | `recruitment` | letter |
-| `rocketreach-au` | RocketReach | marketing-list | `marketing` | its own web form |
-| `seek-au` | SEEK | recruitment |  | letter |
-| `smrtr-au` | smrtr | marketing-list, ad-tech | `marketing` | letter |
-| `snovio-au` | Snov.io | marketing-list | `marketing` | its own web form |
-| `suncorp-au` | Suncorp Insurance (AAMI, GIO, Apia) | insurance | `insurers` | letter |
-| `talefin-au` | TaleFin | credit-reporting-body | `credit` | letter |
-| `talent-international-au` | Talent International | recruitment | `recruitment` | letter |
-| `telstra-au` | Telstra | telecommunications | `telecommunications` | letter |
-| `the-iconic-au` | THE ICONIC | retail, loyalty | `retail` | letter |
-| `thryv-au` | Thryv Australia (White Pages, Yellow Pages) | directory, marketing-list | `marketing`, `start-here` | letter |
-| `ticketek-au` | Ticketek | retail | `data-breaches`, `retail` | letter |
-| `tpg-telecom-au` | TPG Telecom | telecommunications | `data-breaches`, `telecommunications` | letter |
-| `uplead-au` | UpLead | marketing-list | `marketing` | its own web form |
-| `velocity-frequent-flyer-au` | Velocity Frequent Flyer | loyalty | `loyalty` | letter |
-| `westpac-au` | Westpac | financial-services | `banks-and-lenders` | letter |
-| `winr-alchemist-au` | WINR Data | ad-tech | `marketing` | letter |
-| `zip-au` | Zip | financial-services | `banks-and-lenders` | letter |
-| `zoominfo-au` | ZoomInfo | marketing-list | `marketing` | its own web form |
+| Entry | Name | Kinds | Packs | Route | Verified |
+|---|---|---|---|---|---|
+| `acceleon-au` | Acceleon | property-data, people-search, directory | `people-search`, `start-here` | letter | 2026-10-24 |
+| `acxiom-au` | Acxiom | marketing-list | `marketing` | its own web form | 2026-11-24 |
+| `adecco-au` | Adecco | recruitment | `recruitment` | letter | 2026-10-26 |
+| `afterpay-au` | Afterpay | financial-services | `banks-and-lenders` | letter | 2026-10-26 |
+| `allianz-au` | Allianz Australia | insurance | `insurers` | letter | 2026-10-26 |
+| `amazon-au` | Amazon Australia | retail | `retail` | letter | 2026-10-26 |
+| `anz-au` | ANZ | financial-services | `banks-and-lenders` | letter | 2026-10-26 |
+| `apollo-au` | Apollo.io | marketing-list | `marketing` | its own web form | 2026-11-15 |
+| `aussie-broadband-au` | Aussie Broadband | telecommunications | `telecommunications` | letter | 2026-10-26 |
+| `australia-post-au` | Australia Post (data services, National Change of Address) | marketing-list | `marketing` | letter | 2026-10-24 |
+| `bunnings-au` | Bunnings | retail | `retail` | letter | 2026-10-26 |
+| `bupa-au` | Bupa Health Insurance | insurance | `insurers` | letter | 2026-10-26 |
+| `canva-au` | Canva | online-service | `data-breaches`, `retail` | letter | 2026-11-02 |
+| `careerone-au` | CareerOne | recruitment | `recruitment` | letter | 2026-10-26 |
+| `cba-au` | Commonwealth Bank of Australia | financial-services | `banks-and-lenders` | letter | 2026-10-26 |
+| `chandler-macleod-au` | Chandler Macleod | recruitment | `recruitment` | letter | 2026-10-26 |
+| `charterhouse-au` | Charterhouse Partnership | recruitment | `recruitment` | letter | 2026-10-26 |
+| `coles-au` | Coles | retail | `retail` | letter | 2026-11-02 |
+| `conexum-au` | Conexum | marketing-list | `marketing`, `start-here` | letter | 2026-10-24 |
+| `contactout-au` | ContactOut | marketing-list | `marketing` | its own web form | 2026-11-16 |
+| `cotality-au` | Cotality (formerly CoreLogic Australia; brands include RP Data, Cordell, onthehouse.com.au) | property-data, marketing-list | `property`, `start-here` | letter | 2026-10-24 |
+| `domain-au` | Domain (Allhomes) | property-data | `property` | letter | 2026-10-24 |
+| `dymocks-au` | Dymocks | retail | `data-breaches`, `retail` | letter | 2026-11-02 |
+| `ebay-au` | eBay Australia | retail | `retail` | letter | 2026-10-26 |
+| `equifax-au` | Equifax | credit-reporting-body | `credit` | letter | 2026-11-02 |
+| `equifax-marketing-au` | Equifax Data-driven Marketing | marketing-list | `marketing`, `start-here` | letter | 2026-11-02 |
+| `everyday-rewards-au` | Everyday Rewards (Woolworths) | loyalty | `loyalty` | letter | 2026-11-02 |
+| `experian-au` | Experian | credit-reporting-body | `credit` | letter | 2026-10-24 |
+| `experian-marketing-au` | Experian Data and Marketing | marketing-list, ad-tech | `marketing`, `start-here` | letter | 2026-10-24 |
+| `flybuys-au` | Flybuys | loyalty | `loyalty` | letter | 2026-10-24 |
+| `globalx-au` | GlobalX | property-data | `property` | letter | 2026-10-24 |
+| `harvey-norman-au` | Harvey Norman Online | retail | `retail` | letter | 2026-11-02 |
+| `hays-au` | Hays | recruitment | `recruitment` | letter | 2026-10-26 |
+| `hcf-au` | HCF | insurance | `insurers` | letter | 2026-10-26 |
+| `hudson-au` | Hudson | recruitment | `recruitment` | letter | 2026-10-26 |
+| `iag-au` | NRMA Insurance (IAG) | insurance | `insurers` | letter | 2026-10-26 |
+| `id4me-au` | iD4me | people-search, marketing-list | `people-search`, `start-here` | letter | 2026-10-24 |
+| `indeed-au` | Indeed | recruitment | `recruitment` | its own web form | 2026-10-26 |
+| `infotracer-au` | InfoTracer Australia | people-search | `people-search` | its own web form | 2026-10-25 |
+| `infotrack-au` | InfoTrack | property-data | `property` | letter | 2026-10-24 |
+| `jb-hi-fi-au` | JB Hi-Fi | retail, loyalty | `retail` | letter | 2026-10-26 |
+| `kmart-au` | Kmart | retail | `retail` | letter | 2026-10-26 |
+| `landchecker-au` | Landchecker | property-data | `property` | letter | 2026-10-24 |
+| `latitude-au` | Latitude Financial Services | financial-services | `banks-and-lenders`, `data-breaches` | letter | 2026-10-26 |
+| `lead-lists-au` | Lead Lists | marketing-list | `marketing` | letter | 2026-11-02 |
+| `linkedin-au` | LinkedIn | recruitment | `recruitment` | its own web form | 2026-10-26 |
+| `list-factory-au` | List Factory | marketing-list | `marketing` | letter | 2026-10-24 |
+| `liveramp-au` | LiveRamp Australia | ad-tech | `marketing`, `start-here` | letter | 2026-10-24 |
+| `locate-family-au` | Locate Family | people-search | `people-search` | its own web form | 2026-10-25 |
+| `lusha-au` | Lusha | marketing-list | `marketing` | its own web form | 2026-11-15 |
+| `macquarie-au` | Macquarie Bank | financial-services | `banks-and-lenders` | letter | 2026-10-26 |
+| `manpowergroup-au` | ManpowerGroup | recruitment | `recruitment` | letter | 2026-10-26 |
+| `medibank-au` | Medibank | insurance | `data-breaches`, `insurers` | letter | 2026-10-26 |
+| `michael-page-au` | Michael Page | recruitment | `recruitment` | letter | 2026-11-02 |
+| `myer-one-au` | MYER one | loyalty | `loyalty` | letter | 2026-10-24 |
+| `nab-au` | NAB | financial-services | `banks-and-lenders` | letter | 2026-10-26 |
+| `nib-au` | nib | insurance | `insurers` | letter | 2026-10-26 |
+| `nielsen-au` | Nielsen (Australia) | ad-tech |  | letter | 2026-10-24 |
+| `optus-au` | Optus | telecommunications | `data-breaches`, `telecommunications` | letter | 2026-10-26 |
+| `peoplebank-au` | Peoplebank | recruitment | `recruitment` | letter | 2026-10-26 |
+| `peopledatalabs-au` | People Data Labs | marketing-list | `marketing` | its own web form | 2026-11-17 |
+| `priceline-pulse-rewards-au` | Priceline Pulse Rewards | loyalty | `loyalty` | letter | 2026-10-24 |
+| `programmed-au` | Programmed | recruitment | `recruitment` | letter | 2026-10-26 |
+| `qantas-frequent-flyer-au` | Qantas Frequent Flyer | loyalty | `data-breaches`, `loyalty` | letter | 2026-10-24 |
+| `qbe-au` | QBE Insurance (Australia) | insurance | `insurers` | letter | 2026-10-26 |
+| `quantium-au` | Quantium | ad-tech |  | letter | 2026-10-24 |
+| `randstad-au` | Randstad | recruitment | `recruitment` | letter | 2026-10-26 |
+| `rea-group-au` | realestate.com.au (REA Group) | property-data | `property` | letter | 2026-10-24 |
+| `records-finder-au` | Records Finder Australia | people-search | `people-search` | its own web form | 2026-11-02 |
+| `robert-half-au` | Robert Half | recruitment | `recruitment` | letter | 2026-10-26 |
+| `robert-walters-au` | Robert Walters | recruitment | `recruitment` | letter | 2026-10-26 |
+| `rocketreach-au` | RocketReach | marketing-list | `marketing` | its own web form | 2026-11-16 |
+| `seek-au` | SEEK | recruitment |  | letter | 2026-10-26 |
+| `smrtr-au` | smrtr | marketing-list, ad-tech | `marketing` | letter | 2026-10-24 |
+| `snovio-au` | Snov.io | marketing-list | `marketing` | its own web form | 2026-11-16 |
+| `suncorp-au` | Suncorp Insurance (AAMI, GIO, Apia) | insurance | `insurers` | letter | 2026-10-26 |
+| `talefin-au` | TaleFin | credit-reporting-body | `credit` | letter | 2026-10-24 |
+| `talent-international-au` | Talent International | recruitment | `recruitment` | letter | 2026-10-26 |
+| `telstra-au` | Telstra | telecommunications | `telecommunications` | letter | 2026-10-26 |
+| `the-iconic-au` | THE ICONIC | retail, loyalty | `retail` | letter | 2026-10-26 |
+| `thryv-au` | Thryv Australia (White Pages, Yellow Pages) | directory, marketing-list | `marketing`, `start-here` | letter | 2026-10-24 |
+| `ticketek-au` | Ticketek | retail | `data-breaches`, `retail` | letter | 2026-10-26 |
+| `tpg-telecom-au` | TPG Telecom | telecommunications | `data-breaches`, `telecommunications` | letter | 2026-10-26 |
+| `uplead-au` | UpLead | marketing-list | `marketing` | its own web form | 2026-11-16 |
+| `velocity-frequent-flyer-au` | Velocity Frequent Flyer | loyalty | `loyalty` | letter | 2026-10-24 |
+| `westpac-au` | Westpac | financial-services | `banks-and-lenders` | letter | 2026-10-26 |
+| `winr-alchemist-au` | WINR Data | ad-tech | `marketing` | letter | 2026-10-24 |
+| `zip-au` | Zip | financial-services | `banks-and-lenders` | letter | 2026-10-26 |
+| `zoominfo-au` | ZoomInfo | marketing-list | `marketing` | its own web form | 2026-11-15 |
 <!-- entries:end -->
 
 ## Evidence hashes and drift
