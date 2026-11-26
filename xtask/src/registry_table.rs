@@ -11,9 +11,12 @@ use ghostsoap::core::register::Register;
 const START: &str = "<!-- entries:start -->";
 const END: &str = "<!-- entries:end -->";
 
-/// One row per entry, in id order, with the packs that name it and how a user reaches it.
+/// One row per entry, in id order, with the packs that name it, how a user reaches it and
+/// the day it was last verified.
 fn table(register: &Register) -> String {
-    let mut out = String::from("| Entry | Name | Kinds | Packs | Route |\n|---|---|---|---|---|\n");
+    let mut out = String::from(
+        "| Entry | Name | Kinds | Packs | Route | Verified |\n|---|---|---|---|---|---|\n",
+    );
     for entry in register.entries.values() {
         let kinds: Vec<String> = entry
             .kinds
@@ -37,12 +40,13 @@ fn table(register: &Register) -> String {
             None => "letter".to_owned(),
         };
         out.push_str(&format!(
-            "| `{}` | {} | {} | {} | {} |\n",
+            "| `{}` | {} | {} | {} | {} | {} |\n",
             entry.id,
             cell(&entry.name),
             kinds.join(", "),
             packs.join(", "),
-            route
+            route,
+            entry.verified_at
         ));
     }
     out
@@ -86,6 +90,26 @@ mod tests {
     fn the_register_readme_lists_every_entry() {
         let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../registry/README.md");
         check_readme(&path, std::env::var_os("UPDATE_REGISTRY_TABLE").is_some());
+    }
+
+    #[test]
+    fn each_row_gives_the_day_its_entry_was_last_verified() {
+        let register = parse_register(&embedded::register()).unwrap();
+        let table = table(&register);
+        assert!(
+            table.starts_with("| Entry | Name | Kinds | Packs | Route | Verified |\n"),
+            "{table}"
+        );
+        for entry in register.entries.values() {
+            let row = table
+                .lines()
+                .find(|line| line.starts_with(&format!("| `{}` |", entry.id)))
+                .unwrap();
+            assert!(
+                row.ends_with(&format!(" | {} |", entry.verified_at)),
+                "{row}"
+            );
+        }
     }
 
     #[test]
@@ -135,8 +159,8 @@ reason = "closed"
         .unwrap();
         assert_eq!(
             table(&register),
-            "| Entry | Name | Kinds | Packs | Route |\n|---|---|---|---|---|\n\
-             | `closed-au` | PUBLIC Closed | marketing-list |  | obsolete (closed) |\n"
+            "| Entry | Name | Kinds | Packs | Route | Verified |\n|---|---|---|---|---|---|\n\
+             | `closed-au` | PUBLIC Closed | marketing-list |  | obsolete (closed) | 2026-10-24 |\n"
         );
     }
 

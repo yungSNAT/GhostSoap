@@ -13,7 +13,7 @@ use std::process::Output;
 
 use common::{PASSPHRASE, ghostsoap, init, text};
 
-const ITEMS: [&str; 14] = [
+const ITEMS: [&str; 15] = [
     "breach-check",
     "credit-reports",
     "credit-ban",
@@ -27,6 +27,7 @@ const ITEMS: [&str; 14] = [
     "my-health-record",
     "loyalty-marketing",
     "social-media",
+    "ai-training",
     "doxxing",
 ];
 
@@ -113,7 +114,7 @@ fn marks_are_kept_encrypted_and_shown_as_progress() {
     assert!(line("silent-elector").contains(" not for me "), "{list}");
     assert!(line("do-not-call").contains(" done 2026-01-02 "), "{list}");
     assert!(line("doxxing").contains(" to do "), "{list}");
-    assert!(list.ends_with("\nto do 11  check again 1  done 1  not for me 1\n"));
+    assert!(list.ends_with("\nto do 12  check again 1  done 1  not for me 1\n"));
 
     let next = done(&with_passphrase(&home, &["checklist", "--next"]));
     assert!(next.contains("(breach-check)\nStatus: check again (done 2026-01-02)\n"));

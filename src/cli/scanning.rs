@@ -41,6 +41,10 @@ pub(super) fn scan(args: &ScanArgs) -> Result<(), String> {
             ),
         }
     }
+    if pages.is_empty() {
+        println!("Nothing scanned: none of the selected entries has a page of its own to check.");
+        return Ok(());
+    }
     println!("{SCAN_NOTE}");
     if !args.open {
         return Ok(());
