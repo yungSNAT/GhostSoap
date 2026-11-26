@@ -701,6 +701,7 @@ dependencies = [
  "clap",
  "clap_complete",
  "jiff",
+ "known-folders",
  "mimalloc",
  "rpassword",
  "serde",
@@ -998,6 +999,15 @@ checksum = "2b8645470337db67b01a7f966decf7d0bafedbae74147d33e641c67a91df239f"
 dependencies = [
  "rand_core",
  "zeroize",
+]
+
+[[package]]
+name = "known-folders"
+version = "1.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a1886916523694cd6ea3d175f03a1e5010699a2a4cc13696d83d7bea1d80638"
+dependencies = [
+ "windows-sys",
 ]
 
 [[package]]
