@@ -369,8 +369,8 @@ pub fn escalation_eligibility(message: &Message) -> Vec<String> {
     let unescalated = s40_1a_levers(message, false);
     if !unescalated.is_empty() {
         notes.push(format!(
-            "Privacy Act s 40(1A): applies to {unescalated} (no complaint to the business or \
-             escalation recorded; complain to the business first unless not appropriate)"
+            "Privacy Act s 40(1A): applies to {unescalated} (no escalation recorded; complain to \
+             the business first unless you already have or that is not appropriate)"
         ));
     }
     if any(is_s40_1b) {
@@ -416,9 +416,10 @@ pub fn escalation_notices(message: &Message) -> Vec<String> {
     let unescalated = s40_1a_levers(message, false);
     if !unescalated.is_empty() {
         notices.push(format!(
-            "Privacy Act s 40(1A): no complaint to the business or escalation is recorded for \
-             {unescalated}; the OAIC must not investigate unless you complained to the business \
-             first or it decides complaining to the business was not appropriate; its page \
+            "Privacy Act s 40(1A): no escalation is recorded for {unescalated}; unless you have \
+             already complained to the business, do so first: the OAIC must not investigate \
+             unless you complained to the business first or it decides complaining to the \
+             business was not appropriate; its page \
              'Before you lodge a privacy complaint with us' says to lodge with it if the business \
              does not respond within 30 days"
         ));

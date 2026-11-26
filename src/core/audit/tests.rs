@@ -273,7 +273,7 @@ fn escalation_notices_and_eligibility_cover_state_flags_and_s40_provisions() {
     let flagged_summary =
         format_escalation_summary(&flagged, None, &[], &empty_summary, date(2026, 11, 25));
     assert!(flagged_summary.contains(
-        "Eligibility: Privacy Act s 40(1A): applies to app7-no-marketing (no complaint"
+        "Eligibility: Privacy Act s 40(1A): applies to app7-no-marketing (no escalation recorded;"
     ));
     assert!(flagged_summary.contains("\nNotices:\n"));
 
@@ -436,8 +436,8 @@ fn an_escalated_app7_request_does_not_hide_the_notice_for_an_unescalated_app12_r
     );
     assert!(
         notes.iter().any(|n| n.starts_with(
-            "Privacy Act s 40(1A): applies to app12 (no complaint to the business or escalation \
-             recorded;"
+            "Privacy Act s 40(1A): applies to app12 (no escalation recorded; complain to the \
+             business first unless you already have"
         )),
         "{notes:?}"
     );
